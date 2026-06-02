@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Read(//mnt/c/Program Files/Unity/**)",
+      "Read(//mnt/c/Program Files/Unity Hub/**)",
+      "WebSearch",
+      "Bash(python3 *)",
+      "Bash(nohup mcp-for-unity --transport http --http-port 8080)",
+      "Bash(echo \"PID: $!\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s -N http://127.0.0.1:8080/mcp -H 'Accept: application/json, text/event-stream' -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}')",
+      "Bash(curl -s -N http://127.0.0.1:8080/mcp -H 'Accept: text/event-stream' --max-time 3)",
+      "Bash(curl -s http://127.0.0.1:8080/mcp?sessionId=test123 -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -X POST -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}')",
+      "Bash(curl -s -v http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -X POST -d '{ *)",
+      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -X POST -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":2}')",
+      "Bash(curl -s --noproxy * -D - http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: ef094999effc40099e7444d731b06c91' -X POST -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":2}')",
+      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: ef094999effc40099e7444d731b06c91' -X POST -d '{ *)",
+      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: 6a8540ff7f4f4c198f1a7373047fba2d' -X POST -d '{ *)",
+      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: 6a8540ff7f4f4c198f1a7373047fba2d' -X POST -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"read_console\",\"arguments\":{}},\"id\":4}')",
+      "Bash(awk '{print $2}')"
+    ]
+  }
+}

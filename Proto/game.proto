@@ -1,0 +1,299 @@
+syntax = "proto3";
+
+package game.game;
+
+option csharp_namespace = "Game.Game";
+
+import "common.proto";
+
+// ============================================================
+// Game System — 回合流程 / 操作 / 技能 / 计分
+// ============================================================
+
+// ============================================================
+// 游戏状态快照（按玩家视角构造，包含该玩家可见的信息）
+// ============================================================
+
+// 单个玩家的完整游戏状态（服务端为每个玩家构造不同视图）
+message PlayerGameView {
+  int64 player_id = 1;
+  // 自己的手牌（4张），is_known=true 的显示数值
+  repeated OwnCardState own_cards = 2;
+  // 其他玩家的手牌（仅数量，不暴露数值）
+  repeated OpponentHandState opponent_hands = 3;
+  // 公共牌堆信息
+  DrawPileInfo draw_pile = 4;
+  DiscardPileInfo discard_pile = 5;
+  // 各玩家累计分
+  repeated PlayerScoreInfo scores = 6;
+}
+
+// 玩家累计分数
+message PlayerScoreInfo {
+  int64 player_id = 1;
+  int32 total_score = 2;   // 跨轮累计总分
+  int32 current_round_score = 3; // 本轮得分（-1 表示尚未结算）
+}
+
+// ============================================================
+// 回合相关
+// ============================================================
+
+// 回合开始通知（广播给所有人）
+message TurnStartNotify {
+  int64 room_id = 1;
+  int64 current_player_id = 2;  // 当前回合玩家
+  int32 turn_number = 3;        // 当前轮次内的回合编号
+  int32 round_number = 4;       // 第几轮
+  GamePhase phase = 5;
+  // 公开牌堆信息
+  DrawPileInfo draw_pile = 6;
+  DiscardPileInfo discard_pile = 7;
+  // 最终轮剩余回合数（仅 phase=FINAL_ROUND 时有效）
+  int32 final_round_remaining = 8;
+}
+
+// ============================================================
+// 选项 A：从抽牌堆摸牌（两步操作）
+// ============================================================
+
+// 步骤1：请求抽牌
+message DrawCardReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+}
+
+// 步骤1响应：仅发给抽牌玩家本人（包含抽到的牌的信息）
+message DrawCardRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  int32 card_id = 3;               // 卡牌唯一ID
+  int32 value = 4;                 // 点数 0-13
+  SkillType skill = 5; // 技能类型（如 7-K）
+  // 玩家看到此响应后，在客户端上决定：弃掉 / 替换 / 使用技能
+}
+
+// 步骤2a：弃掉刚抽的牌
+message DiscardDrawnReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+}
+
+message DiscardDrawnRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// 步骤2b：用刚抽的牌替换自己的一张
+message ReplaceWithDrawnReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+  int32 slot_index = 5;  // 要被替换的槽位 0-3
+}
+
+message ReplaceWithDrawnRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  // 替换后，该槽位变为已知（因为玩家看到了抽到的牌）
+}
+
+// ============================================================
+// 选项 B：从弃牌堆拿最上面一张（一步操作，不能使用技能）
+// ============================================================
+
+message TakeFromDiscardReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+  int32 slot_index = 5;  // 要被替换的槽位 0-3
+}
+
+message TakeFromDiscardRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// ============================================================
+// 选项 A 子流程：使用技能（抽到 7-K 时可触发）
+// ============================================================
+
+// 统一的技能请求（通过 oneof 区分技能类型）
+message UseSkillReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+  int32 card_id = 5;   // 用于技能的那张牌ID（从 DrawCardRsp 获取）
+  oneof skill_params {
+    PeekSelfParams peek_self = 10;
+    SpyParams spy = 11;
+    BlindSwapInitParams blind_swap_init = 12;
+    LookAndSwapInitParams look_and_swap_init = 13;
+  }
+}
+
+message UseSkillRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  // 根据技能类型返回不同信息（仅发给技能发起者）：
+  int32 peeked_value = 3;        // 偷看类技能返回的卡牌数值（-1 表示不适用）
+  bool needs_target_response = 4; // 是否需要等待目标玩家响应（盲交换=true）
+  // 看+换：先返回看到的数值，客户端再决定是否换
+  bool needs_swap_decision = 5;  // 是否需要玩家决定是否交换（看+换=true）
+}
+
+// --- 盲交换：目标玩家响应 ---
+
+// 服务端向目标玩家发送技能提示
+message SkillPromptNotify {
+  int64 room_id = 1;
+  int64 target_player_id = 2;  // 需要响应的玩家
+  SkillType skill_type = 3;
+  int64 source_player_id = 4;  // 发起技能的玩家
+  // 对于盲交换：目标玩家需要选择一个槽位
+  // 对于看+换：由 UseSkillRsp 直接处理，不需要此通知
+}
+
+// 目标玩家响应盲交换
+message BlindSwapRespondReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+  int32 slot_index = 5;  // 目标玩家选择的槽位 0-3
+}
+
+message BlindSwapRespondRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// --- 看+换：发起者决定是否交换 ---
+
+message LookSwapDecideReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+  bool do_swap = 5;          // 是否执行交换
+  int32 own_slot_index = 6;  // 自己用于交换的槽位（仅 do_swap=true 时有效）
+}
+
+message LookSwapDecideRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// ============================================================
+// 选项 C：喊稳态
+// ============================================================
+
+message CallSteadyReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 client_seq = 4;
+}
+
+message CallSteadyRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  // 喊稳态成功后，进入最终轮
+}
+
+// ============================================================
+// 广播通知（所有玩家可见）
+// ============================================================
+
+// 游戏开始通知（发牌完成后的初始快照，广播给所有人）
+message GameStartNotify {
+  int64 room_id = 1;
+  int32 round_number = 2;     // 第1轮
+  int64 first_player_id = 3;  // 第一个回合的玩家
+  // 每个玩家收到此通知后，应从 PlayerGameView 构造本地初始状态
+  // PlayerGameView 由后续的 StateSyncNotify 携带（或合并至此）
+  PlayerGameView your_view = 4;  // 该客户端对应玩家的视图
+}
+
+// 操作结果广播（告知所有玩家发生了什么，不暴露隐藏信息）
+message ActionResultNotify {
+  int64 room_id = 1;
+  int64 server_seq = 2;
+  ActionType action_type = 3;
+  int64 source_player_id = 4;   // 执行操作的玩家
+  int64 target_player_id = 5;   // 目标玩家（如有）
+  // 公开可见的结果
+  DrawPileInfo draw_pile = 6;        // 更新后的抽牌堆
+  DiscardPileInfo discard_pile = 7;   // 更新后的弃牌堆
+  SkillType skill_used = 8;           // 使用的技能类型（如有）
+  bool swap_occurred = 9;                         // 是否发生了交换
+  // 回合是否结束
+  bool turn_ended = 10;
+  int64 next_player_id = 11;  // 下一位回合玩家（turn_ended=true时有效）
+}
+
+// 亮牌计分通知（最终轮结束后广播）
+message RoundRevealNotify {
+  int64 room_id = 1;
+  int32 round_number = 2;
+  int64 steady_caller_id = 3;  // 喊稳态的玩家
+  // 所有玩家的最终手牌（本轮结束，全部公开）
+  repeated PlayerRevealedHand revealed_hands = 4;
+  // 本轮得分
+  repeated RoundScoreDetail scores = 5;
+}
+
+// 亮牌后的玩家手牌（该轮结束时公开）
+message PlayerRevealedHand {
+  int64 player_id = 1;
+  repeated int32 card_values = 2;  // 4张牌的点数（按槽位 0-3）
+  int32 total = 3;                 // 4张总和
+}
+
+// 单轮得分详情
+message RoundScoreDetail {
+  int64 player_id = 1;
+  int32 hand_total = 2;      // 手牌总和
+  int32 penalty = 3;         // 罚分（0或10）
+  int32 round_score = 4;     // 本轮最终得分
+  int32 cumulative_score = 5;// 累计总分
+  bool is_steady_caller = 6;
+  bool is_lowest = 7;        // 是否本轮最低
+}
+
+// 100 分减半触发记录（同轮可能多人触发）
+message HundredTrigger {
+  int64 player_id = 1;
+  int32 new_score = 2;
+}
+
+// 分数更新通知（每轮计分后广播）
+message ScoreUpdateNotify {
+  int64 room_id = 1;
+  int32 round_number = 2;
+  repeated PlayerScoreInfo scores = 3;
+  repeated HundredTrigger hundred_triggers = 4; // 空列表表示无人触发
+}
+
+// 游戏结束通知
+message GameOverNotify {
+  int64 room_id = 1;
+  int32 total_rounds = 2;
+  repeated FinalRanking rankings = 3;
+}
+
+// 最终排名
+message FinalRanking {
+  int32 rank = 1;
+  int64 player_id = 2;
+  string nickname = 3;
+  int32 final_score = 4;
+  bool is_winner = 5;
+}

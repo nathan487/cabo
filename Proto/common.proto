@@ -1,0 +1,238 @@
+syntax = "proto3";
+
+package game.common;
+
+option csharp_namespace = "Game.Common";
+
+// ============================================================
+// Common Types — 所有模块共享的基础类型
+// ============================================================
+
+// --- 错误信息 ---
+
+message ErrorInfo {
+  int32 code = 1;      // 0=成功, 非0=错误码
+  string message = 2;  // 人类可读的错误描述
+}
+
+// --- 消息 ID 枚举（用于日志/路由/调试，非必须用于反序列化） ---
+
+enum MsgId {
+  MSG_ID_UNKNOWN = 0;
+
+  // Room System (1000–1099)
+  MSG_ID_CREATE_ROOM_REQ = 1001;
+  MSG_ID_CREATE_ROOM_RSP = 1002;
+  MSG_ID_JOIN_ROOM_REQ = 1003;
+  MSG_ID_JOIN_ROOM_RSP = 1004;
+  MSG_ID_LEAVE_ROOM_REQ = 1005;
+  MSG_ID_LEAVE_ROOM_RSP = 1006;
+  MSG_ID_READY_REQ = 1007;
+  MSG_ID_READY_RSP = 1008;
+  MSG_ID_START_GAME_REQ = 1009;
+  MSG_ID_START_GAME_RSP = 1010;
+  MSG_ID_KICK_PLAYER_REQ = 1011;
+  MSG_ID_KICK_PLAYER_RSP = 1012;
+  MSG_ID_ROOM_STATE_NOTIFY = 1020;
+  MSG_ID_PLAYER_JOIN_NOTIFY = 1021;
+  MSG_ID_PLAYER_LEAVE_NOTIFY = 1022;
+  MSG_ID_PLAYER_READY_NOTIFY = 1023;
+  MSG_ID_ROOM_START_NOTIFY = 1024;
+
+  // Game Actions (1100–1199)
+  MSG_ID_GAME_START_NOTIFY = 1101;
+  MSG_ID_TURN_START_NOTIFY = 1102;
+  MSG_ID_DRAW_CARD_REQ = 1103;
+  MSG_ID_DRAW_CARD_RSP = 1104;
+  MSG_ID_DISCARD_DRAWN_REQ = 1105;
+  MSG_ID_DISCARD_DRAWN_RSP = 1106;
+  MSG_ID_REPLACE_WITH_DRAWN_REQ = 1107;
+  MSG_ID_REPLACE_WITH_DRAWN_RSP = 1108;
+  MSG_ID_TAKE_FROM_DISCARD_REQ = 1109;
+  MSG_ID_TAKE_FROM_DISCARD_RSP = 1110;
+  MSG_ID_USE_SKILL_REQ = 1111;
+  MSG_ID_USE_SKILL_RSP = 1112;
+  MSG_ID_CALL_STEADY_REQ = 1113;
+  MSG_ID_CALL_STEADY_RSP = 1114;
+  MSG_ID_BLIND_SWAP_RESPOND_REQ = 1115;
+  MSG_ID_BLIND_SWAP_RESPOND_RSP = 1116;
+  MSG_ID_LOOK_SWAP_DECIDE_REQ = 1117;
+  MSG_ID_LOOK_SWAP_DECIDE_RSP = 1118;
+  MSG_ID_ACTION_RESULT_NOTIFY = 1120;
+  MSG_ID_SKILL_PROMPT_NOTIFY = 1121;
+  MSG_ID_ROUND_REVEAL_NOTIFY = 1122;
+  MSG_ID_SCORE_UPDATE_NOTIFY = 1123;
+  MSG_ID_GAME_OVER_NOTIFY = 1124;
+
+  // Sync (1200–1299)
+  MSG_ID_RECONNECT_REQ = 1201;
+  MSG_ID_RECONNECT_RSP = 1202;
+  MSG_ID_STATE_SYNC_NOTIFY = 1203;
+  MSG_ID_HEARTBEAT_REQ = 1204;
+  MSG_ID_HEARTBEAT_RSP = 1205;
+}
+
+// --- 游戏阶段 ---
+
+enum GamePhase {
+  GAME_PHASE_UNKNOWN = 0;
+  GAME_PHASE_WAITING = 1;     // 等待玩家准备
+  GAME_PHASE_PLAYING = 2;      // 正常回合
+  GAME_PHASE_FINAL_ROUND = 3;  // 有人喊稳态后的最后一轮
+  GAME_PHASE_REVEAL = 4;       // 亮牌计分
+  GAME_PHASE_GAME_OVER = 5;    // 游戏结束
+}
+
+// --- 房间状态 ---
+
+enum RoomStateType {
+  ROOM_STATE_UNKNOWN = 0;
+  ROOM_STATE_WAITING = 1;  // 等待玩家加入/准备
+  ROOM_STATE_READY = 2;    // 全员准备，等待房主开始
+  ROOM_STATE_PLAYING = 3;  // 游戏中
+}
+
+// --- 卡牌数值 ---
+
+enum CardValue {
+  CARD_VALUE_UNKNOWN = 0;
+  CARD_VALUE_0 = 1;   // 理想血糖
+  CARD_VALUE_1 = 2;
+  CARD_VALUE_2 = 3;
+  CARD_VALUE_3 = 4;
+  CARD_VALUE_4 = 5;
+  CARD_VALUE_5 = 6;
+  CARD_VALUE_6 = 7;
+  CARD_VALUE_7 = 8;   // 偷看自己
+  CARD_VALUE_8 = 9;   // 偷看自己
+  CARD_VALUE_9 = 10;  // 间谍
+  CARD_VALUE_10 = 11; // 间谍
+  CARD_VALUE_11 = 12; // 盲交换
+  CARD_VALUE_12 = 13; // 盲交换
+  CARD_VALUE_13 = 14; // 看+换
+}
+
+// --- 技能类型 ---
+
+enum SkillType {
+  SKILL_TYPE_UNKNOWN = 0;
+  SKILL_TYPE_NONE = 1;         // 无技能 (0–6)
+  SKILL_TYPE_PEEK_SELF = 2;    // 偷看自己一张暗牌 (7–8)
+  SKILL_TYPE_SPY = 3;          // 偷看对手一张暗牌 (9–10)
+  SKILL_TYPE_BLIND_SWAP = 4;   // 盲交换一张 (11–12)
+  SKILL_TYPE_LOOK_AND_SWAP = 5;// 先看后换 (13)
+}
+
+// --- 回合动作类型（用于 ActionResultNotify 的 oneof） ---
+
+enum ActionType {
+  ACTION_TYPE_UNKNOWN = 0;
+  ACTION_TYPE_DRAW = 1;              // 抽牌
+  ACTION_TYPE_DISCARD_DRAWN = 2;     // 弃掉刚抽的牌
+  ACTION_TYPE_REPLACE_WITH_DRAWN = 3;// 用抽到的牌替换自己一张
+  ACTION_TYPE_TAKE_FROM_DISCARD = 4; // 从弃牌堆拿牌替换
+  ACTION_TYPE_USE_SKILL = 5;         // 使用技能
+  ACTION_TYPE_CALL_STEADY = 6;       // 喊稳态
+}
+
+// --- 卡牌信息（服务端内部使用，选择性下发给客户端） ---
+
+message CardInfo {
+  int32 card_id = 1;       // 唯一卡牌ID（服务端生成，用于追踪）
+  int32 value = 2;         // 点数 0-13
+  SkillType skill = 3;     // 技能类型（由value推导）
+}
+
+// --- 玩家手中的单张卡牌状态（所有者视角） ---
+
+message OwnCardState {
+  int32 slot_index = 1;  // 槽位 0-3
+  bool is_known = 2;     // 该玩家是否知道这张牌的点数
+  int32 value = 3;       // 点数（仅 is_known=true 时有效）
+}
+
+// --- 对手的卡牌状态（非所有者视角，MVP 下仅暴露数量） ---
+
+message OpponentHandState {
+  int64 player_id = 1;
+  int32 card_count = 2;  // 固定为 4
+}
+
+// --- 弃牌堆信息 ---
+
+message DiscardPileInfo {
+  int32 count = 1;           // 弃牌堆总数
+  CardInfo top_card = 2;     // 弃牌堆最上面一张（公开可见）
+}
+
+// --- 抽牌堆信息 ---
+
+message DrawPileInfo {
+  int32 count = 1;  // 剩余张数
+}
+
+// --- 玩家公开信息 ---
+
+message PlayerPublicInfo {
+  int64 player_id = 1;
+  string nickname = 2;
+  int32 seat_id = 3;     // 座位号 0-5
+  bool is_ready = 4;
+  bool is_host = 5;
+  bool is_connected = 6; // 是否在线（掉线检测用）
+  int32 total_score = 7; // 跨轮累计总分
+}
+
+// --- 技能参数：偷看自己 ---
+
+message PeekSelfParams {
+  int32 slot_index = 1;  // 偷看自己的哪个槽位 (0-3)
+}
+
+// --- 技能参数：偷看对手 ---
+
+message SpyParams {
+  int64 target_player_id = 1;
+  int32 target_slot_index = 2;  // 偷看对手的哪个槽位 (0-3)
+}
+
+// --- 技能参数：发起盲交换 ---
+
+message BlindSwapInitParams {
+  int64 target_player_id = 1;
+  int32 own_slot_index = 2;  // 自己用于交换的槽位 (0-3)
+}
+
+// --- 技能参数：响应盲交换（目标玩家选择自己的槽位） ---
+
+message BlindSwapRespondParams {
+  int32 slot_index = 1;  // 目标玩家选择的槽位 (0-3)
+}
+
+// --- 技能参数：发起看+换 ---
+
+message LookAndSwapInitParams {
+  int64 target_player_id = 1;
+  int32 target_slot_index = 2;  // 要看的对手槽位 (0-3)
+}
+
+// --- 技能参数：看+换的决定 ---
+
+message LookAndSwapDecideParams {
+  bool do_swap = 1;          // 是否执行交换
+  int32 own_slot_index = 2;  // 自己用于交换的槽位（仅 do_swap=true 时有效）
+}
+
+// --- 技能结果（广播用） ---
+
+message SkillResult {
+  SkillType skill_type = 1;
+  int64 source_player_id = 2;   // 发起技能的玩家
+  int64 target_player_id = 3;   // 目标玩家（如有）
+  // 不同技能的结果通过以下可选字段承载：
+  bool swapped = 4;              // 是否发生了交换
+  int32 source_slot_index = 5;   // 发起方的槽位
+  int32 target_slot_index = 6;   // 目标方的槽位
+  bool source_peeked_value = 7;  // 是否向发起方揭示了卡牌数值（偷看类技能用）
+}
+// ClientMessage/ServerMessage 定义在 messages.proto 中，统一导入所有模块

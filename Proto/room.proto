@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package game.room;
+
+option csharp_namespace = "Game.Room";
+
+import "common.proto";
+
+// ============================================================
+// Room System — 房间创建/加入/准备/开始
+// ============================================================
+
+// --- 创建房间 ---
+
+message CreateRoomReq {
+  int64 request_id = 1;  // 客户端请求ID，用于Rsp匹配
+  int32 max_players = 2; // 最大玩家数 2-6，默认4
+  string nickname = 3;   // 创建者的昵称
+}
+
+message CreateRoomRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  int64 room_id = 3;       // 服务端房间ID
+  string room_code = 4;    // 房间码（短码，供分享）
+  int64 player_id = 5;     // 服务端分配的玩家ID
+  string session_token = 6;// 会话令牌（重连用）
+}
+
+// --- 加入房间 ---
+
+message JoinRoomReq {
+  int64 request_id = 1;
+  string room_code = 2;  // 房间码
+  string nickname = 3;   // 加入者的昵称
+}
+
+message JoinRoomRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  int64 room_id = 3;
+  int64 player_id = 4;      // 服务端分配的玩家ID
+  string session_token = 5; // 会话令牌
+  int32 seat_id = 6;        // 分配的座位号
+}
+
+// --- 离开房间 ---
+
+message LeaveRoomReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+}
+
+message LeaveRoomRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// --- 准备/取消准备 ---
+
+message ReadyReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  bool is_ready = 4;  // true=准备, false=取消准备
+}
+
+message ReadyRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  bool is_ready = 3;  // 确认当前准备状态
+}
+
+// --- 开始游戏（仅房主） ---
+
+message StartGameReq {
+  int64 request_id = 1;
+  int64 player_id = 2;  // 必须是房主
+  int64 room_id = 3;
+}
+
+message StartGameRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+  // 游戏开始后由 GameStartNotify 下发详细状态
+}
+
+// --- 踢出玩家（仅房主，游戏未开始时可用） ---
+
+message KickPlayerReq {
+  int64 request_id = 1;
+  int64 player_id = 2;   // 房主ID
+  int64 room_id = 3;
+  int64 target_player_id = 4;  // 被踢玩家ID
+}
+
+message KickPlayerRsp {
+  int64 request_id = 1;
+  ErrorInfo error = 2;
+}
+
+// ============================================================
+// 房间状态
+// ============================================================
+
+message RoomState {
+  int64 room_id = 1;
+  string room_code = 2;
+  int32 max_players = 3;
+  RoomStateType state = 4;
+  repeated PlayerPublicInfo players = 5;
+  int64 host_player_id = 6;
+}
+
+// ============================================================
+// 通知消息（广播给房间内所有玩家）
+// ============================================================
+
+// 房间状态变更（新玩家进入/离开时广播全量）
+message RoomStateNotify {
+  int64 room_id = 1;
+  RoomState room = 2;
+}
+
+// 玩家加入
+message PlayerJoinNotify {
+  int64 room_id = 1;
+  PlayerPublicInfo player = 2;
+}
+
+// 玩家离开
+message PlayerLeaveNotify {
+  int64 room_id = 1;
+  int64 player_id = 2;
+  int64 new_host_player_id = 3;  // 如果离开的是房主，指定新房主
+}
+
+// 玩家准备状态变更
+message PlayerReadyNotify {
+  int64 room_id = 1;
+  int64 player_id = 2;
+  bool is_ready = 3;
+}
+
+// 房间开始（房主点击开始，通知所有人切换到游戏阶段）
+message RoomStartNotify {
+  int64 room_id = 1;
+  // 游戏详细初始状态由 GameStartNotify 下发
+}
