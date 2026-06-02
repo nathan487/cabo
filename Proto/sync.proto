@@ -36,7 +36,7 @@ message ReconnectReq {
 
 message ReconnectRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
   int64 player_id = 3;     // 确认的玩家ID
   int64 room_id = 4;       // 确认的房间ID
   bool is_in_game = 5;     // 是否正在游戏中
@@ -51,7 +51,7 @@ message StateSyncNotify {
   int64 server_time_ms = 3;
 
   // 房间状态（始终包含）
-  RoomState room_state = 4;
+  .game.room.RoomState room_state = 4;
 
   // 游戏状态（仅 is_in_game 时有效）
   bool is_in_game = 5;
@@ -61,20 +61,20 @@ message StateSyncNotify {
 // 游戏同步状态（供重连/状态恢复使用）
 message GameSyncState {
   int32 round_number = 1;
-  GamePhase phase = 2;
+  .game.common.GamePhase phase = 2;
   int64 current_turn_player_id = 3;   // 当前回合玩家
   int64 steady_caller_player_id = 4;  // 喊稳态的玩家（如有）
   int32 final_round_remaining = 5;    // 最终轮剩余回合数
 
   // 公开信息
-  DrawPileInfo draw_pile = 10;
-  DiscardPileInfo discard_pile = 11;
+  .game.common.DrawPileInfo draw_pile = 10;
+  .game.common.DiscardPileInfo discard_pile = 11;
 
   // 该玩家的个人视图（包含自己的手牌和对手的公开信息）
-  PlayerGameView player_view = 12;
+  .game.game.PlayerGameView player_view = 12;
 
   // 所有玩家的累计分数
-  repeated PlayerScoreInfo scores = 13;
+  repeated .game.game.PlayerScoreInfo scores = 13;
 
   // 当前回合的两步操作状态（用于恢复中断的操作）
   TurnStepState pending_step = 14;
@@ -86,13 +86,12 @@ message TurnStepState {
     STEP_TYPE_UNKNOWN = 0;
     STEP_TYPE_NONE = 1;               // 无挂起操作（正常回合开始）
     STEP_TYPE_WAITING_DRAW_DECISION = 2; // 玩家已抽牌，等待决定（弃/换/技能）
-    STEP_TYPE_WAITING_BLIND_SWAP = 3;    // 等待目标玩家选择盲交换槽位
-    STEP_TYPE_WAITING_LOOK_SWAP = 4;     // 等待发起者决定是否交换
+    reserved 3, 4;                       // deprecated: old blind-swap/look-and-swap flows
   }
   StepType step_type = 1;
   int64 waiting_player_id = 2;  // 当前等待哪个玩家的输入
   // 当 STEP_TYPE_WAITING_DRAW_DECISION 时，重连的玩家需要知道刚抽到的牌
   int32 drawn_card_id = 3;      // 刚抽到的牌ID（仅重连玩家可见）
   int32 drawn_card_value = 4;   // 刚抽到的牌数值（仅重连玩家可见）
-  SkillType drawn_card_skill = 5; // 刚抽到的牌技能
+  .game.common.SkillType drawn_card_skill = 5; // 刚抽到的牌技能
 }

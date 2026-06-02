@@ -4,7 +4,6 @@ package game.messages;
 
 option csharp_namespace = "Game.Messages";
 
-import "common.proto";
 import "room.proto";
 import "game.proto";
 import "sync.proto";
@@ -27,27 +26,26 @@ message ClientMessage {
   int64 seq = 1;  // 客户端序号（递增，用于幂等处理和请求追踪）
   oneof payload {
     // Room System
-    CreateRoomReq create_room_req = 10;
-    JoinRoomReq join_room_req = 11;
-    LeaveRoomReq leave_room_req = 12;
-    ReadyReq ready_req = 13;
-    StartGameReq start_game_req = 14;
-    KickPlayerReq kick_player_req = 15;
+    .game.room.CreateRoomReq create_room_req = 10;
+    .game.room.JoinRoomReq join_room_req = 11;
+    .game.room.LeaveRoomReq leave_room_req = 12;
+    .game.room.ReadyReq ready_req = 13;
+    .game.room.StartGameReq start_game_req = 14;
+    .game.room.KickPlayerReq kick_player_req = 15;
 
     // Game Actions
-    DrawCardReq draw_card_req = 20;
-    DiscardDrawnReq discard_drawn_req = 21;
-    ReplaceWithDrawnReq replace_with_drawn_req = 22;
-    TakeFromDiscardReq take_from_discard_req = 23;
-    UseSkillReq use_skill_req = 24;
-    CallSteadyReq call_steady_req = 25;
-    BlindSwapRespondReq blind_swap_respond_req = 26;
-    LookSwapDecideReq look_swap_decide_req = 27;
+    .game.game.DrawCardReq draw_card_req = 20;
+    .game.game.DiscardDrawnReq discard_drawn_req = 21;
+    .game.game.ReplaceWithDrawnReq replace_with_drawn_req = 22;
+    .game.game.TakeFromDiscardReq take_from_discard_req = 23;
+    .game.game.UseSkillReq use_skill_req = 24;
+    .game.game.CallSteadyReq call_steady_req = 25;
 
     // Sync
-    ReconnectReq reconnect_req = 30;
-    HeartbeatReq heartbeat_req = 31;
+    .game.sync.ReconnectReq reconnect_req = 30;
+    .game.sync.HeartbeatReq heartbeat_req = 31;
   }
+  reserved 26, 27; // deprecated: old blind-swap response and 13 look-and-swap flow
 }
 
 // 服务端 → 客户端
@@ -56,38 +54,36 @@ message ServerMessage {
   int64 server_time_ms = 2; // 服务端毫秒时间戳
   oneof payload {
     // Room System
-    CreateRoomRsp create_room_rsp = 10;
-    JoinRoomRsp join_room_rsp = 11;
-    LeaveRoomRsp leave_room_rsp = 12;
-    ReadyRsp ready_rsp = 13;
-    StartGameRsp start_game_rsp = 14;
-    KickPlayerRsp kick_player_rsp = 15;
-    RoomStateNotify room_state_notify = 16;
-    PlayerJoinNotify player_join_notify = 17;
-    PlayerLeaveNotify player_leave_notify = 18;
-    PlayerReadyNotify player_ready_notify = 19;
-    RoomStartNotify room_start_notify = 20;
+    .game.room.CreateRoomRsp create_room_rsp = 10;
+    .game.room.JoinRoomRsp join_room_rsp = 11;
+    .game.room.LeaveRoomRsp leave_room_rsp = 12;
+    .game.room.ReadyRsp ready_rsp = 13;
+    .game.room.StartGameRsp start_game_rsp = 14;
+    .game.room.KickPlayerRsp kick_player_rsp = 15;
+    .game.room.RoomStateNotify room_state_notify = 16;
+    .game.room.PlayerJoinNotify player_join_notify = 17;
+    .game.room.PlayerLeaveNotify player_leave_notify = 18;
+    .game.room.PlayerReadyNotify player_ready_notify = 19;
+    .game.room.RoomStartNotify room_start_notify = 20;
 
     // Game
-    GameStartNotify game_start_notify = 30;
-    TurnStartNotify turn_start_notify = 31;
-    DrawCardRsp draw_card_rsp = 32;
-    DiscardDrawnRsp discard_drawn_rsp = 33;
-    ReplaceWithDrawnRsp replace_with_drawn_rsp = 34;
-    TakeFromDiscardRsp take_from_discard_rsp = 35;
-    UseSkillRsp use_skill_rsp = 36;
-    CallSteadyRsp call_steady_rsp = 37;
-    BlindSwapRespondRsp blind_swap_respond_rsp = 38;
-    LookSwapDecideRsp look_swap_decide_rsp = 39;
-    ActionResultNotify action_result_notify = 40;
-    SkillPromptNotify skill_prompt_notify = 41;
-    RoundRevealNotify round_reveal_notify = 42;
-    ScoreUpdateNotify score_update_notify = 43;
-    GameOverNotify game_over_notify = 44;
+    .game.game.GameStartNotify game_start_notify = 30;
+    .game.game.TurnStartNotify turn_start_notify = 31;
+    .game.game.DrawCardRsp draw_card_rsp = 32;
+    .game.game.DiscardDrawnRsp discard_drawn_rsp = 33;
+    .game.game.ReplaceWithDrawnRsp replace_with_drawn_rsp = 34;
+    .game.game.TakeFromDiscardRsp take_from_discard_rsp = 35;
+    .game.game.UseSkillRsp use_skill_rsp = 36;
+    .game.game.CallSteadyRsp call_steady_rsp = 37;
+    .game.game.ActionResultNotify action_result_notify = 40;
+    .game.game.RoundRevealNotify round_reveal_notify = 42;
+    .game.game.ScoreUpdateNotify score_update_notify = 43;
+    .game.game.GameOverNotify game_over_notify = 44;
 
     // Sync
-    ReconnectRsp reconnect_rsp = 50;
-    StateSyncNotify state_sync_notify = 51;
-    HeartbeatRsp heartbeat_rsp = 52;
+    .game.sync.ReconnectRsp reconnect_rsp = 50;
+    .game.sync.StateSyncNotify state_sync_notify = 51;
+    .game.sync.HeartbeatRsp heartbeat_rsp = 52;
   }
+  reserved 38, 39, 41; // deprecated: old blind-swap response, 13 look-and-swap, and skill prompt
 }

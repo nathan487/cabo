@@ -54,12 +54,9 @@ enum MsgId {
   MSG_ID_USE_SKILL_RSP = 1112;
   MSG_ID_CALL_STEADY_REQ = 1113;
   MSG_ID_CALL_STEADY_RSP = 1114;
-  MSG_ID_BLIND_SWAP_RESPOND_REQ = 1115;
-  MSG_ID_BLIND_SWAP_RESPOND_RSP = 1116;
-  MSG_ID_LOOK_SWAP_DECIDE_REQ = 1117;
-  MSG_ID_LOOK_SWAP_DECIDE_RSP = 1118;
+  reserved 1115, 1116, 1117, 1118; // deprecated: old blind-swap response and 13 look-and-swap flow
   MSG_ID_ACTION_RESULT_NOTIFY = 1120;
-  MSG_ID_SKILL_PROMPT_NOTIFY = 1121;
+  reserved 1121; // deprecated: old skill prompt flow
   MSG_ID_ROUND_REVEAL_NOTIFY = 1122;
   MSG_ID_SCORE_UPDATE_NOTIFY = 1123;
   MSG_ID_GAME_OVER_NOTIFY = 1124;
@@ -107,9 +104,9 @@ enum CardValue {
   CARD_VALUE_8 = 9;   // 偷看自己
   CARD_VALUE_9 = 10;  // 间谍
   CARD_VALUE_10 = 11; // 间谍
-  CARD_VALUE_11 = 12; // 盲交换
-  CARD_VALUE_12 = 13; // 盲交换
-  CARD_VALUE_13 = 14; // 看+换
+  CARD_VALUE_11 = 12; // 交换
+  CARD_VALUE_12 = 13; // 交换
+  CARD_VALUE_13 = 14; // 无技能
 }
 
 // --- 技能类型 ---
@@ -119,8 +116,8 @@ enum SkillType {
   SKILL_TYPE_NONE = 1;         // 无技能 (0–6)
   SKILL_TYPE_PEEK_SELF = 2;    // 偷看自己一张暗牌 (7–8)
   SKILL_TYPE_SPY = 3;          // 偷看对手一张暗牌 (9–10)
-  SKILL_TYPE_BLIND_SWAP = 4;   // 盲交换一张 (11–12)
-  SKILL_TYPE_LOOK_AND_SWAP = 5;// 先看后换 (13)
+  SKILL_TYPE_SWAP = 4;         // 交换一张 (11–12)
+  reserved 5;                  // deprecated: old 13 look-and-swap skill
 }
 
 // --- 回合动作类型（用于 ActionResultNotify 的 oneof） ---
@@ -146,7 +143,7 @@ message CardInfo {
 // --- 玩家手中的单张卡牌状态（所有者视角） ---
 
 message OwnCardState {
-  int32 slot_index = 1;  // 槽位 0-3
+  int32 slot_index = 1;  // 槽位，从 0 开始；失败交换可能让牌区超过 4 张
   bool is_known = 2;     // 该玩家是否知道这张牌的点数
   int32 value = 3;       // 点数（仅 is_known=true 时有效）
 }
@@ -155,7 +152,7 @@ message OwnCardState {
 
 message OpponentHandState {
   int64 player_id = 1;
-  int32 card_count = 2;  // 固定为 4
+  int32 card_count = 2;  // 当前牌区数量，失败交换后可能超过 4
 }
 
 // --- 弃牌堆信息 ---
@@ -196,31 +193,12 @@ message SpyParams {
   int32 target_slot_index = 2;  // 偷看对手的哪个槽位 (0-3)
 }
 
-// --- 技能参数：发起盲交换 ---
+// --- 技能参数：发起交换 ---
 
-message BlindSwapInitParams {
+message SwapParams {
   int64 target_player_id = 1;
-  int32 own_slot_index = 2;  // 自己用于交换的槽位 (0-3)
-}
-
-// --- 技能参数：响应盲交换（目标玩家选择自己的槽位） ---
-
-message BlindSwapRespondParams {
-  int32 slot_index = 1;  // 目标玩家选择的槽位 (0-3)
-}
-
-// --- 技能参数：发起看+换 ---
-
-message LookAndSwapInitParams {
-  int64 target_player_id = 1;
-  int32 target_slot_index = 2;  // 要看的对手槽位 (0-3)
-}
-
-// --- 技能参数：看+换的决定 ---
-
-message LookAndSwapDecideParams {
-  bool do_swap = 1;          // 是否执行交换
-  int32 own_slot_index = 2;  // 自己用于交换的槽位（仅 do_swap=true 时有效）
+  int32 own_slot_index = 2;     // 自己用于交换的槽位
+  int32 target_slot_index = 3;  // 对手用于交换的槽位
 }
 
 // --- 技能结果（广播用） ---
@@ -234,5 +212,17 @@ message SkillResult {
   int32 source_slot_index = 5;   // 发起方的槽位
   int32 target_slot_index = 6;   // 目标方的槽位
   bool source_peeked_value = 7;  // 是否向发起方揭示了卡牌数值（偷看类技能用）
+}
+
+// --- 多张替换结果（广播用，不暴露隐藏牌点数） ---
+
+message ExchangeAttemptResult {
+  bool attempted_multi_card = 1;       // 是否尝试替换多张牌
+  bool success = 2;                    // 单张替换恒为 true；多张同点数才为 true
+  repeated int32 selected_slot_indices = 3; // 玩家选择换出的槽位
+  int32 incoming_card_value = 4;       // 换入牌点数；弃牌堆来源公开，抽牌来源只给当前玩家视图
+  int32 discarded_count = 5;           // 成功时进入弃牌堆的牌数
+  int32 added_card_count = 6;          // 失败时加入自己牌区的牌数（通常 1，三张及以上失败为 2）
+  bool drew_extra_penalty_card = 7;    // 是否因尝试换出 3 张及以上失败而额外抽牌
 }
 // ClientMessage/ServerMessage 定义在 messages.proto 中，统一导入所有模块

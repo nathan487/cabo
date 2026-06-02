@@ -20,7 +20,7 @@ message CreateRoomReq {
 
 message CreateRoomRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
   int64 room_id = 3;       // 服务端房间ID
   string room_code = 4;    // 房间码（短码，供分享）
   int64 player_id = 5;     // 服务端分配的玩家ID
@@ -37,7 +37,7 @@ message JoinRoomReq {
 
 message JoinRoomRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
   int64 room_id = 3;
   int64 player_id = 4;      // 服务端分配的玩家ID
   string session_token = 5; // 会话令牌
@@ -54,7 +54,7 @@ message LeaveRoomReq {
 
 message LeaveRoomRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
 }
 
 // --- 准备/取消准备 ---
@@ -68,7 +68,7 @@ message ReadyReq {
 
 message ReadyRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
   bool is_ready = 3;  // 确认当前准备状态
 }
 
@@ -82,7 +82,7 @@ message StartGameReq {
 
 message StartGameRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
   // 游戏开始后由 GameStartNotify 下发详细状态
 }
 
@@ -97,7 +97,7 @@ message KickPlayerReq {
 
 message KickPlayerRsp {
   int64 request_id = 1;
-  ErrorInfo error = 2;
+  .game.common.ErrorInfo error = 2;
 }
 
 // ============================================================
@@ -108,8 +108,8 @@ message RoomState {
   int64 room_id = 1;
   string room_code = 2;
   int32 max_players = 3;
-  RoomStateType state = 4;
-  repeated PlayerPublicInfo players = 5;
+  .game.common.RoomStateType state = 4;
+  repeated .game.common.PlayerPublicInfo players = 5;
   int64 host_player_id = 6;
 }
 
@@ -126,7 +126,7 @@ message RoomStateNotify {
 // 玩家加入
 message PlayerJoinNotify {
   int64 room_id = 1;
-  PlayerPublicInfo player = 2;
+  .game.common.PlayerPublicInfo player = 2;
 }
 
 // 玩家离开

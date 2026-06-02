@@ -102,7 +102,7 @@ WebSocket 解包流程:
      │               │GameStartNotify (广播)
      │<──────────────│──────────────>│
      │ (包含 PlayerGameView:       │
-     │  自己4张牌的状态)            │
+     │  自己当前牌区状态)            │
 ```
 
 ### 3.2 选项A：抽牌堆暗摸（两步操作）
@@ -121,28 +121,33 @@ WebSocket 解包流程:
     │  (card_id, value,       │  (仅发给当前玩家)         │
     │   skill_type)           │                         │
     │                         │                         │
-    │  ├─ 决策 A1: 弃掉       │                         │
+    │  ├─ 决策 A1: 直接弃掉   │                         │
     │  │  DiscardDrawnReq     │                         │
     │  │─────────────────────>│                         │
     │  │                      │  ActionResultNotify     │
     │  │<─────────────────────│────────────────────────>│
-    │  │                      │  (discard_pile 更新)    │
+    │  │                      │  (discard_pile 更新；   │
+    │  │                      │   若为7-12可触发技能)  │
     │  │                      │                         │
     │  ├─ 决策 A2: 替换       │                         │
     │  │  ReplaceWithDrawnReq │                         │
-    │  │  (slot_index)        │                         │
+    │  │  (slot_indices)      │                         │
     │  │─────────────────────>│                         │
     │  │                      │  ActionResultNotify     │
     │  │<─────────────────────│────────────────────────>│
     │  │                      │  (discard_pile 更新,    │
+    │  │                      │   exchange_result,      │
     │  │                      │   不暴露旧牌数值)        │
     │  │                      │                         │
     │  └─ 决策 A3: 使用技能    │                         │
     │     UseSkillReq         │                         │
     │     (skill_params)      │                         │
     │    ────────────────────>│                         │
+    │     (仅直接弃掉7-12后)   │                         │
     │     → 见 3.3 技能流程    │                         │
 ```
+
+多张替换校验由服务端完成：`slot_indices` 为 1 张时直接成功；为多张时，被换出的牌点数必须完全相同。失败时，玩家保留原选择的牌，换入牌加入自己的牌区；如果尝试换出 3 张及以上且失败，额外从牌库抽 1 张加入自己的牌区。
 
 ### 3.3 技能子流程
 
@@ -166,28 +171,22 @@ WebSocket 解包流程:
     │                         │   turn_ended=true)      │
 ```
 
-#### 3.3.2 盲交换（11-12）——需要目标玩家响应
+#### 3.3.2 交换（11-12）
 
 ```
 当前玩家          服务端            目标玩家          其他玩家
     │               │                 │                 │
     │ UseSkillReq   │                 │                 │
-    │ (blind_swap_  │                 │                 │
-    │  init)        │                 │                 │
+    │ (swap:        │                 │                 │
+    │  target_player│                 │                 │
+    │  own_slot,    │                 │                 │
+    │  target_slot) │                 │                 │
     │──────────────>│                 │                 │
     │               │                 │                 │
-    │ UseSkillRsp   │ SkillPromptNotify                │
-    │ (needs_target │ (skill_type=    │                 │
-    │  _response=   │  BLIND_SWAP)    │                 │
-    │  true)        │                 │                 │
+    │ UseSkillRsp   │                 │                 │
+    │ (swap_occurred│                 │                 │
+    │  =true)       │                 │                 │
     │<──────────────│────────────────>│                 │
-    │               │                 │                 │
-    │               │ BlindSwapRespondReq              │
-    │               │ (slot_index)    │                 │
-    │               │<────────────────│                 │
-    │               │                 │                 │
-    │               │ BlindSwapRespondRsp              │
-    │               │────────────────>│                 │
     │               │                 │                 │
     │               │ ActionResultNotify                │
     │<──────────────│────────────────│────────────────>│
@@ -195,32 +194,7 @@ WebSocket 解包流程:
     │               │  不暴露交换的牌值)                  │
 ```
 
-#### 3.3.3 看+换（13）——两步决策
-
-```
-当前玩家          服务端            目标玩家          其他玩家
-    │               │                 │                 │
-    │ UseSkillReq   │                 │                 │
-    │ (look_and_    │                 │                 │
-    │  swap_init)   │                 │                 │
-    │──────────────>│                 │                 │
-    │               │                 │                 │
-    │ UseSkillRsp   │                 │                 │
-    │ (peeked_value │                 │                 │
-    │  needs_swap_  │                 │                 │
-    │  decision=true)│                │                 │
-    │<──────────────│                 │                 │
-    │               │                 │                 │
-    │ LookSwapDecideReq              │                 │
-    │ (do_swap,     │                 │                 │
-    │  own_slot)    │                 │                 │
-    │──────────────>│                 │                 │
-    │               │                 │                 │
-    │               │ ActionResultNotify                │
-    │<──────────────│────────────────│────────────────>│
-    │               │ (swap_occurred=?,                  │
-    │               │  不暴露交换的牌值)                  │
-```
+> 13 没有技能，不能触发看+换流程。
 
 ### 3.4 选项B：从弃牌堆明拿
 
@@ -228,7 +202,7 @@ WebSocket 解包流程:
 当前玩家                    服务端                     其他玩家
     │                         │                         │
     │  TakeFromDiscardReq     │                         │
-    │  (slot_index)           │                         │
+    │  (slot_indices)         │                         │
     │────────────────────────>│                         │
     │                         │                         │
     │  TakeFromDiscardRsp     │                         │
@@ -238,6 +212,7 @@ WebSocket 解包流程:
     │<────────────────────────│────────────────────────>│
     │                         │  (action_type=TAKE_FROM_DISCARD,
     │                         │   discard_pile 更新,    │
+    │                         │   exchange_result,      │
     │                         │   turn_ended=true)      │
 ```
 
@@ -355,15 +330,14 @@ WebSocket 解包流程:
 
 | 信息 | 自己可见 | 对手可见 | 说明 |
 |------|---------|---------|------|
-| 自己初始2张暗牌 | ✅ 数值 | ❌ | 开局偷看最左边2张 |
+| 自己初始2张暗牌 | ✅ 数值 | ❌ | 开局秘密查看任意2张 |
 | 自己另外2张暗牌 | ❌（直到被偷看/替换） | ❌ | 全程盲 |
 | 通过"偷看自己"看到的牌 | ✅ 数值 | ❌ | skill 7-8 |
 | 通过"间谍"看到的对手牌 | ✅ 数值 | ❌ | skill 9-10，但对手不知道你看到了什么 |
 | 抽到的暗牌 | ✅ 数值（在决策期间） | ❌ | 仅当前玩家在 DrawCardRsp 中看到 |
 | 弃牌堆顶部 | ✅ 数值 | ✅ 数值 | 公开信息 |
 | 抽牌堆剩余数 | ✅ 数量 | ✅ 数量 | 公开信息 |
-| 盲交换结果 | ❌（双方都不知道换了什么） | ❌ | 纯盲操 |
-| 看+换结果 | ✅（发起者看到对方牌） | ❌（对方不知道被看了什么） | 信息不对称 |
+| 交换结果 | ❌（不自动揭示牌值） | ❌ | 11-12 交换只公开发生过交换 |
 | 亮牌 | ✅ 全部 | ✅ 全部 | 每轮结束 |
 
 ### 5.2 实现方式
@@ -443,7 +417,9 @@ switch (serverMsg.PayloadCase) { ... }
 - [x] 字段名使用 snake_case，id 字段以 _id 结尾
 - [x] 服务端权威：客户端只发送操作意图
 - [x] 所有下行消息通过 ServerMessage.server_seq 排序/去重
+- [x] ReplaceWithDrawnReq / TakeFromDiscardReq 支持多张替换与失败加牌结果
 - [x] ScoreUpdateNotify 支持同轮多个玩家触发 100 分减半
+- [x] RoundScoreDetail 支持神风特攻队标记
 - [x] 状态结构可直接渲染 UI 无需额外计算
 - [x] 隐藏信息保护：对手手牌不暴露数值
 - [x] 重连支持：StateSyncNotify 包含全量快照和挂起步骤
