@@ -12,6 +12,10 @@ void Logger::setLogLevel(int level){
 }
 
 void Logger::log(int level, const std::string& msg){
+    // Filter: only log if level >= logLevel_ (higher = more important)
+    // INFO=0, ERROR=1, FATAL=2, DEBUG=3. Default level is 0 (show all).
+    if (level > logLevel_ && level != FATAL) return;
+
     switch (level)
     {
     case INFO:
@@ -30,7 +34,7 @@ void Logger::log(int level, const std::string& msg){
         break;
     }
 
-    std::cout << Timestamp::now().toString() <<' ' << msg <<std::endl;
+    std::cout << ' ' << Timestamp::now().toString() <<' ' << msg <<std::endl;
 }
 
 

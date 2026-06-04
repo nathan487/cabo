@@ -54,6 +54,7 @@ public :
 
     void log(int level, const std::string& msg);
 private :
+    Logger() : logLevel_(0) {} // Default: show INFO and above (0=INFO)
     int logLevel_;
-    
+
 };

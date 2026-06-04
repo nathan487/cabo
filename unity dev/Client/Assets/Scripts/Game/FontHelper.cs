@@ -11,14 +11,26 @@ public static class FontHelper
 
     /// <summary>
     /// Returns a Font that supports Chinese characters.
-    /// Tries Microsoft YaHei (微软雅黑) first, falls back to SimHei (黑体),
-    /// then SimSun (宋体), then Noto Sans CJK, then any CJK font, then Arial.
+    /// Tries Resources/Fonts/ZCOOLKuaiLe first (Build-safe),
+    /// falls back to OS fonts (Microsoft YaHei, SimHei, etc.).
     /// </summary>
     public static Font GetChineseFont()
     {
         if (_chineseFont != null) return _chineseFont;
         if (_tried) return null; // already tried and failed
         _tried = true;
+
+        // 🔥 优先尝试从 Resources 加载真实 TTF 字体（Build 安全）
+        _chineseFont = Resources.Load<Font>("Fonts/ZCOOLKuaiLe");
+        if (_chineseFont != null)
+        {
+            Debug.Log($"[FontHelper] Using Resources font: {_chineseFont.name}");
+            return _chineseFont;
+        }
+        else
+        {
+            Debug.LogWarning("[FontHelper] Resources/Fonts/ZCOOLKuaiLe not found, trying OS fonts...");
+        }
 
         // Windows: most common Chinese fonts, ordered by visual quality
         string[] candidates = {
@@ -95,7 +107,7 @@ public static class FontHelper
             if (f != null)
             {
                 // Verify the font actually has Chinese characters
-                f.RequestCharactersInTexture("血糖卡波玩家回合抽牌弃牌稳态技能确认取消游戏结束");
+                f.RequestCharactersInTexture("血糖卡波PlayerTurnDrawDiscardCaboSkill确认取消GAME OVER");
                 return f;
             }
         }

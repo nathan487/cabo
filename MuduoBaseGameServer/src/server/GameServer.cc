@@ -1,0 +1,186 @@
+#include <mymuduo/TcpServer.h>
+#include <mymuduo/EventLoop.h>
+#include <mymuduo/InetAddress.h>
+#include <mymuduo/logger.h>
+#include <mymuduo/TcpConnection.h>
+#include <mymuduo/Buffer.h>
+
+#include "common/MessageCodec.h"
+#include "common/MessageDispatcher.h"
+#include "room/RoomService.h"
+#include "game/GameService.h"
+
+#include <string>
+#include <unordered_map>
+
+class GameServer {
+public:
+    GameServer(EventLoop* loop, const InetAddress& addr,
+               const std::string& name)
+        : server_(loop, addr, name), loop_(loop)
+    {
+        server_.setConnectionCallback(
+            [this](const TcpConnectionPtr& conn) { onConnection(conn); });
+        server_.setMessageCallback(
+            [this](const TcpConnectionPtr& conn,
+                   Buffer* buf, Timestamp time) {
+                onMessage(conn, buf, time);
+            });
+        server_.setThreadNum(4);
+
+        // ── Room handlers ──
+        dispatcher_.registerHandler(10, // create_room_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleCreateRoom(conn, msg);
+            });
+        dispatcher_.registerHandler(11, // join_room_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleJoinRoom(conn, msg);
+            });
+        dispatcher_.registerHandler(12, // leave_room_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleLeaveRoom(conn, msg);
+            });
+        dispatcher_.registerHandler(13, // ready_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleReady(conn, msg);
+            });
+        dispatcher_.registerHandler(14, // start_game_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                onStartGame(conn, msg);
+            });
+
+        // ── Game action handlers ──
+        dispatcher_.registerHandler(20, // draw_card_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleDrawCard(conn, msg);
+            });
+        dispatcher_.registerHandler(21, // discard_drawn_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleDiscardDrawn(conn, msg);
+            });
+        dispatcher_.registerHandler(22, // replace_with_drawn_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleReplaceWithDrawn(conn, msg);
+            });
+        dispatcher_.registerHandler(23, // take_from_discard_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleTakeFromDiscard(conn, msg);
+            });
+        dispatcher_.registerHandler(24, // use_skill_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleUseSkill(conn, msg);
+            });
+        dispatcher_.registerHandler(25, // call_steady_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleCallSteady(conn, msg);
+            });
+
+        // Wire room send function
+        roomService_.setSendFunc(
+            [](const cabogame::TcpConnectionPtr& conn, const std::string& framedData) {
+                conn->send(framedData);
+            });
+
+        // Wire game send function
+        gameService_.setSendFunc(
+            [](const cabogame::TcpConnectionPtr& conn, const std::string& framedData) {
+                conn->send(framedData);
+            });
+    }
+
+    void start() { server_.start(); }
+
+private:
+    // Triggered when host clicks Start Game.
+    // Validates room state, then delegates to GameService to begin.
+    void onStartGame(const cabogame::TcpConnectionPtr& conn,
+                     const ::game::messages::ClientMessage& msg) {
+        // RoomService validates host/ready/etc and sends RoomStartNotify
+        roomService_.handleStartGame(conn, msg);
+
+        // Kick off game logic
+        const auto& req = msg.start_game_req();
+        int64_t roomId = req.room_id();
+
+        // Build player state list from room data
+        auto roomPtr = roomService_.getRoom(roomId);
+        if (!roomPtr) return;
+
+        std::vector<std::shared_ptr<cabogame::PlayerGameState>> gamePlayers;
+        for (auto& rp : roomPtr->players) {
+            auto gp = std::make_shared<cabogame::PlayerGameState>();
+            gp->playerId = rp->playerId;
+            gp->nickname = rp->nickname;
+            gp->seatId = rp->seatId;
+            gp->conn = rp->conn;
+            gp->isConnected = rp->isConnected;
+            gp->totalScore = rp->totalScore;
+            gamePlayers.push_back(gp);
+        }
+
+        gameService_.startGame(roomId, gamePlayers, roomPtr->hostPlayerId);
+    }
+
+    void onConnection(const TcpConnectionPtr& conn) {
+        if (conn->connected()) {
+            LOG_INFO("GameServer - connection UP : %s",
+                     conn->peerAddress().toIpPort().c_str());
+            codecs_[conn.get()] = game::MessageCodec();
+        } else {
+            LOG_INFO("GameServer - connection DOWN : %s",
+                     conn->peerAddress().toIpPort().c_str());
+            codecs_.erase(conn.get());
+            roomService_.onConnectionClosed(conn);
+        }
+    }
+
+    void onMessage(const TcpConnectionPtr& conn,
+                   Buffer* buf, Timestamp /*time*/) {
+        std::string raw = buf->retrieveAllAsString();
+        auto it = codecs_.find(conn.get());
+        if (it == codecs_.end()) return;
+
+        it->second.feedBytes(raw.data(), raw.size(),
+            [this, conn](const std::vector<uint8_t>& payload) {
+                dispatcher_.dispatch(conn, payload);
+            });
+    }
+
+    TcpServer server_;
+    EventLoop* loop_;
+    game::MessageDispatcher dispatcher_;
+    game::RoomService roomService_;
+    cabogame::GameService gameService_;
+    std::unordered_map<const TcpConnection*, game::MessageCodec> codecs_;
+};
+
+int main(int argc, char* argv[]) {
+    int port = 8888;
+    if (argc > 1) {
+        port = std::stoi(argv[1]);
+    }
+
+    LOG_INFO("GameServer starting on port %d ...", port);
+
+    EventLoop loop;
+    InetAddress addr(static_cast<uint16_t>(port));
+    GameServer server(&loop, addr, "GameServer");
+    server.start();
+
+    LOG_INFO("GameServer listening on port %d", port);
+    loop.loop();
+
+    return 0;
+}

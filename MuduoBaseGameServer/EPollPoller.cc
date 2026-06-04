@@ -35,7 +35,7 @@ EPollPoller::~EPollPoller() {
 //
 void EPollPoller::updateChannel(Channel* channel){
     const int index = channel->getIndex();
-    LOG_INFO("func=%s => fd=%d events=%d index=%d\n",__FUNCTION__,channel->getFd(),channel->getEvents(),channel->getIndex());
+    LOG_DEBUG("func=%s => fd=%d events=%d index=%d\n",__FUNCTION__,channel->getFd(),channel->getEvents(),channel->getIndex());
 
     if(index == kNew || index == kDeleted){
         if(index == kNew){
@@ -60,7 +60,7 @@ void EPollPoller::updateChannel(Channel* channel){
 void EPollPoller::removeChannel(Channel* channel){
     int fd = channel->getFd();
     channels_.erase(fd);
-    LOG_INFO("func=%s => fd=%d events=%d index=%d\n",__FUNCTION__,channel->getFd(),channel->getEvents(),channel->getIndex());
+    LOG_DEBUG("func=%s => fd=%d events=%d index=%d\n",__FUNCTION__,channel->getFd(),channel->getEvents(),channel->getIndex());
 
     int index = channel->getIndex();
     if(index == kAdded){
@@ -92,7 +92,7 @@ void EPollPoller::update(int operation,Channel* channel){
 
 //调用epoll_wait，已就绪的事件响应的fd就会在events中，再调用fillActivateChannels
 Timestamp EPollPoller::poll(int timeoutMs,ChannelList* activeChannels){
-    // LOG_INFO("func=%s => fd totalcount:%lu\n",__FUNCTION__,channels_.size());
+    // LOG_DEBUG("func=%s => fd totalcount:%lu\n",__FUNCTION__,channels_.size());
     int numEvents = ::epoll_wait(epollfd_,
                                 &*events_.begin(),
                                 static_cast<int>(events_.size()),

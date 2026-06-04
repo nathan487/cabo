@@ -132,9 +132,9 @@ public class GameUI : MonoBehaviour
         if (btnDraw != null) btnDraw.onClick.AddListener(() => gm.ActionDrawFromDeck());
         if (btnTakeDiscard != null) btnTakeDiscard.onClick.AddListener(() => gm.ActionTakeFromDiscard());
         if (btnCallSteady != null) btnCallSteady.onClick.AddListener(ShowSteadyConfirm);
-        if (btnDiscardDrawn != null) btnDiscardDrawn.onClick.AddListener(() => gm.ActionDiscardDrawn());
+        if (btnDiscardDrawn != null) btnDiscardDrawn.onClick.AddListener(HandleDiscardDrawnClick);
         if (btnReplaceCard != null) btnReplaceCard.onClick.AddListener(EnterReplaceMode);
-        if (btnUseSkill != null) btnUseSkill.onClick.AddListener(EnterSkillMode);
+        // btnUseSkill is no longer a separate action; skill is triggered through the discard flow
         if (passScreenButton != null) passScreenButton.onClick.AddListener(HidePassScreen);
         if (roundEndButton != null) roundEndButton.onClick.AddListener(HideRoundEnd);
         if (btnSkillConfirm != null) btnSkillConfirm.onClick.AddListener(OnSkillConfirm);
@@ -203,9 +203,9 @@ public class GameUI : MonoBehaviour
         if (gm == null || gm.Players.Count == 0) return;
 
         var p = gm.Players[gm.CurrentPlayerIndex];
-        currentPlayerText.text = $"{p.Name} 的回合";
-        roundText.text = $"第 {gm.RoundNumber} 轮";
-        phaseHintText.text = "请选择行动：";
+        currentPlayerText.text = $"{p.Name} 的Turn";
+        roundText.text = $"Round {gm.RoundNumber} ";
+        phaseHintText.text = "请选择action：";
         selectedCardIndices.Clear();
         UpdateScoreDisplay();
         RefreshCards();
@@ -221,37 +221,51 @@ public class GameUI : MonoBehaviour
         btnCallSteady.interactable = canCallSteady;
         var steadyLabel = btnCallSteady != null ? btnCallSteady.GetComponentInChildren<Text>() : null;
         if (steadyLabel != null)
-            steadyLabel.text = canCallSteady ? "喊稳态！" : "（已喊过）";
+            steadyLabel.text = canCallSteady ? "喊Cabo！" : "（已喊过）";
 
         btnDiscardDrawn.gameObject.SetActive(false);
         btnReplaceCard.gameObject.SetActive(false);
         btnUseSkill.gameObject.SetActive(false);
         drawnPreview.SetActive(false);
         skillPanel.SetActive(false);
+        // Hide skill decline button — it's managed by EnterSkillMode
     }
 
     private void OnCardDraw(int playerIndex, Card card)
     {
         currentDrawnCard = card;
         drawnPreview.SetActive(true);
-        drawnPreviewText.text = $"抽到：{card.Value}";
+        drawnPreviewText.text = $"Drew：{card.Value}";
 
         bool fromDeck = !gm.DrewFromDiscard;
-        bool hasSkill = card.IsSkillCard;
 
         btnDraw.interactable = false;
         btnTakeDiscard.interactable = false;
         btnCallSteady.interactable = false;
 
+        // Per game rules: only two options after drawing —
+        // 1. Discard (if from deck, skill triggers for 7-12 as part of discard)
+        // 2. Replace (single or multi-card)
         btnDiscardDrawn.gameObject.SetActive(fromDeck);
         btnReplaceCard.gameObject.SetActive(true);
-        btnReplaceCard.GetComponentInChildren<Text>().text = "替换卡牌";
-        btnUseSkill.gameObject.SetActive(fromDeck && hasSkill);
+        btnReplaceCard.GetComponentInChildren<Text>().text = "Replace卡牌";
+        // btnUseSkill is hidden — skill is triggered through the discard flow, not as a separate action
+        btnUseSkill.gameObject.SetActive(false);
 
         if (fromDeck)
         {
             btnReplaceCard.onClick.RemoveAllListeners();
             btnReplaceCard.onClick.AddListener(EnterReplaceMode);
+
+            // Show skill hint on the discard button if applicable
+            if (card.IsSkillCard)
+            {
+                btnDiscardDrawn.GetComponentInChildren<Text>().text = $"Discard此牌（可发动Skill！）";
+            }
+            else
+            {
+                btnDiscardDrawn.GetComponentInChildren<Text>().text = "Discard此牌";
+            }
         }
         else
         {
@@ -260,8 +274,8 @@ public class GameUI : MonoBehaviour
         }
 
         phaseHintText.text = fromDeck
-            ? "请选择：弃掉此牌、替换卡牌、或使用技能？"
-            : "选择要替换的卡牌（可多选同值牌）：";
+            ? "请选择：Discard此牌（7-12可触发Skill）、或Replace卡牌？"
+            : "选择要Replace的卡牌（可多选同值牌）：";
     }
 
     // ═══════════════════════════════════════
@@ -313,7 +327,7 @@ public class GameUI : MonoBehaviour
             if (i < gm.Players.Count)
             {
                 var p = gm.Players[i];
-                scoreTexts[i].text = $"{p.Name}: {p.TotalScore} 分";
+                scoreTexts[i].text = $"{p.Name}: {p.TotalScore} pts";
                 scoreTexts[i].color = (i == gm.CurrentPlayerIndex) ? Color.green : Color.white;
             }
             else
@@ -386,7 +400,7 @@ public class GameUI : MonoBehaviour
             var nameGo = new GameObject("Name", typeof(RectTransform), typeof(Text));
             nameGo.transform.SetParent(panelGo.transform, false);
             var nameText = nameGo.GetComponent<Text>();
-            nameText.text = $"{opponent.Name}  {opponent.TotalScore}分";
+            nameText.text = $"{opponent.Name}  {opponent.TotalScore}pts";
             nameText.fontSize = 12;
             nameText.color = new Color(0.7f, 0.7f, 0.9f);
             nameText.alignment = TextAnchor.MiddleCenter;
@@ -459,7 +473,7 @@ public class GameUI : MonoBehaviour
 
             // Update name + score
             if (panelIdx < opponentNameTexts.Count && opponentNameTexts[panelIdx] != null)
-                opponentNameTexts[panelIdx].text = $"{opponent.Name}  {opponent.TotalScore}分";
+                opponentNameTexts[panelIdx].text = $"{opponent.Name}  {opponent.TotalScore}pts";
 
             // Show panel
             panel.SetActive(true);
@@ -533,11 +547,11 @@ public class GameUI : MonoBehaviour
     {
         gm.CurrentPhase = TurnPhase.ChoosingReplaceSlot;
         selectedCardIndices.Clear();
-        phaseHintText.text = "选择要替换的卡牌（可多选同值牌），然后确认：";
+        phaseHintText.text = "选择要Replace的卡牌（可多选同值牌），然后确认：";
 
         // Repurpose btnReplaceCard as confirm button
         btnReplaceCard.gameObject.SetActive(true);
-        btnReplaceCard.GetComponentInChildren<Text>().text = "确认替换";
+        btnReplaceCard.GetComponentInChildren<Text>().text = "确认Replace";
         btnReplaceCard.onClick.RemoveAllListeners();
         btnReplaceCard.onClick.AddListener(ConfirmReplaceSelection);
 
@@ -606,6 +620,29 @@ public class GameUI : MonoBehaviour
     }
 
     /// <summary>
+    /// Handle the "Discard Drawn Card" button click.
+    /// Per game rules: if the card is a skill card (7-12), the skill triggers
+    /// as part of the discard action. Otherwise the card is simply discarded.
+    /// </summary>
+    private void HandleDiscardDrawnClick()
+    {
+        if (currentDrawnCard == null) return;
+
+        if (currentDrawnCard.IsSkillCard)
+        {
+            // Discarding a 7-12 card from deck draw → skill triggers.
+            // Transition to skill phase first; CompleteSkill/DeclineSkill will discard after.
+            gm.ActionDiscardDrawn(); // Sets phase to SkillActive for skill cards (does NOT discard yet)
+            EnterSkillMode();        // Show the skill panel
+        }
+        else
+        {
+            // Non-skill card (0-6, 13): discard immediately and end turn.
+            gm.ActionDiscardDrawn(); // Discards and ends turn
+        }
+    }
+
+    /// <summary>
     /// External entry point for card replacement (used by CardDisplay prefab).
     /// </summary>
     public void ReplaceCardExternal(int slotIndex)
@@ -631,33 +668,44 @@ public class GameUI : MonoBehaviour
         skillPanel.SetActive(true);
         skillStatusText.text = "";
 
+        // Hide action buttons while skill is active
+        btnDraw.interactable = false;
+        btnTakeDiscard.interactable = false;
+        btnCallSteady.interactable = false;
+        btnDiscardDrawn.gameObject.SetActive(false);
+        btnReplaceCard.gameObject.SetActive(false);
+        btnUseSkill.gameObject.SetActive(false);
+
         // Restore correct confirm/decline listeners (may have been overwritten by ShowSteadyConfirm)
         btnSkillConfirm.onClick.RemoveAllListeners();
         btnSkillConfirm.onClick.AddListener(OnSkillConfirm);
         btnSkillDecline.onClick.RemoveAllListeners();
         btnSkillDecline.onClick.AddListener(OnSkillDecline);
 
+        // Set decline button text for skill flow
+        btnSkillDecline.GetComponentInChildren<Text>().text = "放弃Skill";
+
         // Hide all by default
         SetSkillSlotsVisible(false);
         SetSkillTargetsVisible(false);
         btnSkillConfirm.gameObject.SetActive(false);
-        btnSkillDecline.gameObject.SetActive(false);
+        btnSkillDecline.gameObject.SetActive(true); // Always show decline during skill
 
         switch (pendingSkillType)
         {
             case SkillType.PeekSelf:
                 skillTitleText.text = "偷看（查看自己一张牌）";
-                skillStatusText.text = "选择你的一张卡：";
+                skillStatusText.text = "选择You的一张卡：";
                 SetSkillSlotsVisible(true);
                 break;
             case SkillType.Spy:
-                skillTitleText.text = "侦查（查看对手一张牌）";
-                skillStatusText.text = "选择目标玩家：";
+                skillTitleText.text = "侦查（查看Opponent一张牌）";
+                skillStatusText.text = "选择目标Player：";
                 SetSkillTargetsVisible(true);
                 break;
             case SkillType.BlindSwap:
-                skillTitleText.text = "盲换";
-                skillStatusText.text = "先选择你的一张卡：";
+                skillTitleText.text = "交换";
+                skillStatusText.text = "先选择You的一张卡：";
                 SetSkillSlotsVisible(true);
                 break;
         }
@@ -696,14 +744,14 @@ public class GameUI : MonoBehaviour
                 if (pendingSkillOwnSlot < 0)
                 {
                     pendingSkillOwnSlot = slotIndex;
-                    skillStatusText.text = $"你的卡槽 {slotIndex + 1}。现在选择对手：";
+                    skillStatusText.text = $"You的卡槽 {slotIndex + 1}。现在选择Opponent：";
                     SetSkillSlotsVisible(false);
                     SetSkillTargetsVisible(true);
                 }
                 else
                 {
                     pendingSkillTargetSlot = slotIndex;
-                    skillStatusText.text = $"用你的卡槽 {pendingSkillOwnSlot + 1} 与 {gm.Players[pendingSkillTargetPlayer].Name} 的卡槽 {slotIndex + 1} 交换？";
+                    skillStatusText.text = $"用You的卡槽 {pendingSkillOwnSlot + 1} 与 {gm.Players[pendingSkillTargetPlayer].Name} 的卡槽 {slotIndex + 1} 交换？";
                     btnSkillConfirm.gameObject.SetActive(true);
                 }
                 break;
@@ -732,7 +780,7 @@ public class GameUI : MonoBehaviour
                 SetSkillSlotsVisible(true);
                 break;
             case SkillType.BlindSwap:
-                skillStatusText.text = $"对手：{target.Name}。选择其卡槽：";
+                skillStatusText.text = $"Opponent：{target.Name}。选择其卡槽：";
                 SetSkillTargetsVisible(false);
                 SetSkillSlotsVisible(true);
                 break;
@@ -753,10 +801,10 @@ public class GameUI : MonoBehaviour
 
     private void OnSkillDecline()
     {
-        // Cancel skill — go back to decision phase (player can still discard or replace)
+        // Player chose to discard the drawn skill card but NOT use its skill.
+        // Per rules: the drawn card still goes to discard, turn ends with no effect.
         skillPanel.SetActive(false);
-        gm.CurrentPhase = TurnPhase.DecidingDrawnCard;
-        phaseHintText.text = "请选择：弃掉此牌、替换卡牌、或使用技能？";
+        gm.DeclineSkillAndDiscard();
     }
 
     // ═══════════════════════════════════════
@@ -766,13 +814,13 @@ public class GameUI : MonoBehaviour
     private void ShowSteadyConfirm()
     {
         skillPanel.SetActive(true);
-        skillTitleText.text = "确认喊稳态？";
-        skillStatusText.text = "结束本轮，其余玩家各还有一次回合。";
+        skillTitleText.text = "确认喊Cabo？";
+        skillStatusText.text = "结束本，其余Player各还有一次Turn。";
         SetSkillSlotsVisible(false);
         SetSkillTargetsVisible(false);
         btnSkillConfirm.gameObject.SetActive(true);
         btnSkillDecline.gameObject.SetActive(true);
-        btnSkillConfirm.GetComponentInChildren<Text>().text = "确认稳态！";
+        btnSkillConfirm.GetComponentInChildren<Text>().text = "确认Cabo！";
         btnSkillDecline.GetComponentInChildren<Text>().text = "Cancel";
 
         btnSkillConfirm.onClick.RemoveAllListeners();
@@ -791,7 +839,7 @@ public class GameUI : MonoBehaviour
 
     private void OnSteadyCall()
     {
-        phaseHintText.text = $"{gm.Players[gm.SteadyCallerIndex].Name} 喊了稳态！";
+        phaseHintText.text = $"{gm.Players[gm.SteadyCallerIndex].Name} 喊了Cabo！";
     }
 
     // ═══════════════════════════════════════
@@ -820,11 +868,38 @@ public class GameUI : MonoBehaviour
     {
         roundEndPanel.SetActive(true);
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"第 {roundNum} 轮结束！");
-        sb.AppendLine($"{gm.Players[steadyCaller].Name} 喊了稳态");
+        sb.AppendLine($"━━━ Round {roundNum} 结束 ━━━");
         sb.AppendLine();
+
+        // Steady caller info
+        if (steadyCaller >= 0 && steadyCaller < gm.Players.Count)
+            sb.AppendLine($"{gm.Players[steadyCaller].Name} 喊了Cabo");
+        sb.AppendLine();
+
+        // Kamikaze highlight
+        if (gm.LastRoundHadKamikaze && gm.LastRoundKamikazePlayer != null)
+        {
+            sb.AppendLine($"⚡ KAMIKAZE特攻队！{gm.LastRoundKamikazePlayer.Name} (12,12,13,13)");
+            sb.AppendLine($"   → {gm.LastRoundKamikazePlayer.Name} 本 0 pts，其他人各 50 pts！");
+            sb.AppendLine();
+        }
+
         foreach (var p in gm.Players)
-            sb.AppendLine($"{p.Name}: 本轮 {p.GetRoundScore()} 分 → 累计 {p.TotalScore} 分");
+        {
+            string special = "";
+            if (gm.LastRoundHadKamikaze && p == gm.LastRoundKamikazePlayer)
+                special = " ⚡KAMIKAZE";
+            sb.AppendLine($"{p.Name}: Hand {p.GetRoundScore()} pts → Total {p.TotalScore} pts{special}");
+        }
+
+        // 100-point reset info
+        if (gm.LastRoundHundredResets.Count > 0)
+        {
+            sb.AppendLine();
+            foreach (var p in gm.LastRoundHundredResets)
+                sb.AppendLine($"🌊 翻大浪！{p.Name} 恰好 100 pts → 重置为 50 pts");
+        }
+
         roundEndText.text = sb.ToString();
     }
 
@@ -840,11 +915,21 @@ public class GameUI : MonoBehaviour
         roundEndPanel.SetActive(false);
         gameOverPanel.SetActive(true);
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("游戏结束");
-        sb.AppendLine($"胜者：{winner.Name}");
+        sb.AppendLine("══════ GAME OVER ══════");
         sb.AppendLine();
-        foreach (var p in gm.Players)
-            sb.AppendLine($"{p.Name}: {p.TotalScore} 分");
+        sb.AppendLine($"🏆 胜者：{winner.Name}  ({winner.TotalScore} pts)");
+        sb.AppendLine();
+
+        // Show final rankings (sorted by score)
+        var ranked = new System.Collections.Generic.List<Player>(gm.Players);
+        ranked.Sort((a, b) => a.TotalScore.CompareTo(b.TotalScore));
+        for (int i = 0; i < ranked.Count; i++)
+        {
+            var p = ranked[i];
+            string medal = i == 0 ? "🥇" : (i == 1 ? "🥈" : (i == 2 ? "🥉" : "  "));
+            sb.AppendLine($"{medal} #{i + 1}  {p.Name}: {p.TotalScore} pts");
+        }
+
         gameOverInfoText.text = sb.ToString();
     }
 

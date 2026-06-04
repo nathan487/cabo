@@ -16,6 +16,9 @@ namespace Cabo.Client.UI
         private InputField nicknameInput;
         private InputField roomCodeInput;
         private Toggle readyToggle;
+        private GameObject gameActionPanel;
+        private Text turnInfoText;
+        private long myPlayerId;
 
         private void Awake()
         {
@@ -49,56 +52,149 @@ namespace Cabo.Client.UI
             var canvasObj = new GameObject("ClientCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasObj.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 10;
 
             var scaler = canvasObj.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.referenceResolution = new Vector2(800, 600);
 
             if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
             {
                 new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
             }
 
-            var root = CreatePanel(canvasObj.transform, "Root", new Vector2(980, 620), new Color(0.08f, 0.12f, 0.18f, 0.93f));
+            var root = CreatePanel(canvasObj.transform, "Root", new Vector2(780, 560), new Color(0.08f, 0.12f, 0.18f, 0.95f));
             var font = ResolveFont();
 
-            titleText = CreateText(root.transform, "Title", "Cabo Client M1/M2 Skeleton", font, 34, new Vector2(0, 260), new Vector2(900, 48));
-            connectionText = CreateText(root.transform, "Connection", "Connection: Disconnected", font, 22, new Vector2(-270, 208), new Vector2(520, 36));
+            // Shift all content down by ~50px so title is fully visible
+            // Title — centered near top
+            titleText = CreateText(root.transform, "Title", "Cabo Network Test", font, 24, Vector2.zero, new Vector2(400, 36));
+            titleText.rectTransform.anchoredPosition = new Vector2(0, 245);
+            titleText.alignment = TextAnchor.MiddleCenter;
 
-            CreateText(root.transform, "NicknameLabel", "Nickname", font, 20, new Vector2(-420, 148), new Vector2(180, 32));
-            nicknameInput = CreateInput(root.transform, "NicknameInput", font, "PlayerA", new Vector2(-250, 148), new Vector2(280, 40));
+            // Connection status
+            connectionText = CreateText(root.transform, "ConnStatus", "Status: Disconnected", font, 16, Vector2.zero, new Vector2(360, 28));
+            connectionText.rectTransform.anchoredPosition = new Vector2(-180, 205);
 
-            CreateText(root.transform, "RoomCodeLabel", "Room Code", font, 20, new Vector2(30, 148), new Vector2(180, 32));
-            roomCodeInput = CreateInput(root.transform, "RoomCodeInput", font, "ABC123", new Vector2(200, 148), new Vector2(260, 40));
+            // --- Input row ---
+            float inputRowY = 155;
+            // Nickname
+            CreateText(root.transform, "NickLbl", "Name:", font, 14, Vector2.zero, new Vector2(60, 28))
+                .rectTransform.anchoredPosition = new Vector2(-340, inputRowY);
+            nicknameInput = CreateInput(root.transform, "NickInput", font, "PlayerA", new Vector2(-230, inputRowY), new Vector2(160, 34));
 
-            CreateButton(root.transform, font, "Connect", new Vector2(-380, 86), OnConnectClick);
-            CreateButton(root.transform, font, "Create Room", new Vector2(-170, 86), () => controller.CreateRoom(4));
-            CreateButton(root.transform, font, "Join Room", new Vector2(40, 86), () => controller.JoinRoom(roomCodeInput.text));
-            CreateButton(root.transform, font, "Start Game", new Vector2(250, 86), controller.StartGame);
+            // Room code
+            CreateText(root.transform, "CodeLbl", "Code:", font, 14, Vector2.zero, new Vector2(60, 28))
+                .rectTransform.anchoredPosition = new Vector2(-30, inputRowY);
+            roomCodeInput = CreateInput(root.transform, "CodeInput", font, "ABC123", new Vector2(80, inputRowY), new Vector2(140, 34));
 
-            readyToggle = CreateToggle(root.transform, font, "Ready", new Vector2(430, 86));
+            // Ready toggle + Copy code
+            readyToggle = CreateToggle(root.transform, font, "Ready", new Vector2(230, inputRowY));
             readyToggle.onValueChanged.AddListener(value => controller.SetReady(value));
+            CreateButton(root.transform, font, "Copy Code", new Vector2(320, inputRowY),
+                new Vector2(100, 34), new Color(0.3f, 0.4f, 0.5f), OnCopyRoomCodeClick);
 
-            roomInfoText = CreateText(root.transform, "RoomInfo", "No room joined.", font, 20, new Vector2(0, -40), new Vector2(900, 260));
+            // --- Row 1: main actions (4 buttons, 140px wide) ---
+            float btnY = 90;
+            CreateButton(root.transform, font, "Connect", new Vector2(-260, btnY), OnConnectClick);
+            CreateButton(root.transform, font, "Create Room", new Vector2(-90, btnY), OnCreateRoomClick);
+            CreateButton(root.transform, font, "Join Room", new Vector2(80, btnY), OnJoinRoomClick);
+            CreateButton(root.transform, font, "Start Game", new Vector2(250, btnY), controller.StartGame);
+
+            // --- Row 2: disconnect + leave ---
+            float btnY2 = 28;
+            CreateButton(root.transform, font, "Disconnect", new Vector2(-90, btnY2), OnDisconnectClick);
+            CreateButton(root.transform, font, "Leave Room", new Vector2(80, btnY2), OnLeaveRoomClick);
+
+            // --- Game Action Panel (hidden until game starts) ---
+            gameActionPanel = new GameObject("GameActions", typeof(RectTransform));
+            gameActionPanel.transform.SetParent(root.transform, false);
+            gameActionPanel.SetActive(false);
+            AddGameActionButtons(gameActionPanel.transform, font);
+
+            // --- Info area ---
+            roomInfoText = CreateText(root.transform, "RoomInfo", "Not in room.\nConnect, then Create Room.", font, 15, Vector2.zero, new Vector2(720, 220));
+            roomInfoText.rectTransform.anchoredPosition = new Vector2(0, -70);
             roomInfoText.alignment = TextAnchor.UpperLeft;
+            roomInfoText.raycastTarget = false; // Don't block button clicks
 
-            eventLogText = CreateText(root.transform, "EventLog", "", font, 18, new Vector2(0, -252), new Vector2(900, 120));
+            // Event log
+            eventLogText = CreateText(root.transform, "EventLog", "", font, 13, Vector2.zero, new Vector2(720, 80));
+            eventLogText.rectTransform.anchoredPosition = new Vector2(0, -220);
             eventLogText.alignment = TextAnchor.UpperLeft;
-            eventLogText.color = new Color(0.72f, 0.91f, 0.95f);
+            eventLogText.color = new Color(0.7f, 0.9f, 0.95f);
+            eventLogText.raycastTarget = false; // Don't block button clicks
 
-            AppendLog("UI initialized. Connect first.");
+            AppendLog("UI Ready. Click Connect first.");
         }
 
         private void OnConnectClick()
         {
             var nick = string.IsNullOrWhiteSpace(nicknameInput.text) ? "PlayerA" : nicknameInput.text.Trim();
+            Debug.Log("[LobbyUI] Connect button clicked");
             controller.Connect(nick);
+        }
+
+        private void OnCreateRoomClick()
+        {
+            Debug.Log("[LobbyUI] Create Room button clicked");
+            controller.CreateRoom(4);
+        }
+
+        private void OnJoinRoomClick()
+        {
+            Debug.Log("[LobbyUI] Join Room button clicked, code=" + roomCodeInput.text);
+            controller.JoinRoom(roomCodeInput.text);
+        }
+
+        private void OnCopyRoomCodeClick()
+        {
+            if (controller.CurrentRoom != null && !string.IsNullOrEmpty(controller.CurrentRoom.RoomCode))
+            {
+                GUIUtility.systemCopyBuffer = controller.CurrentRoom.RoomCode;
+                AppendLog("Room code copied: " + controller.CurrentRoom.RoomCode);
+            }
+        }
+
+        private void OnLeaveRoomClick()
+        {
+            Debug.Log("[LobbyUI] Leave Room button clicked");
+            // Immediately clear UI
+            roomInfoText.text = "Left room.\nReconnect / Create Room.";
+            connectionText.text = "Status: Disconnected";
+            connectionText.color = Color.white;
+            readyToggle.isOn = false;
+            controller.Disconnect();
+            // Delay then reconnect so user can join another room
+            StartCoroutine(ReconnectAfterDelay());
+        }
+
+        private System.Collections.IEnumerator ReconnectAfterDelay()
+        {
+            yield return new WaitForSeconds(0.3f);
+            if (controller.ConnectionStatus != ConnectionStatus.Connected)
+                controller.Connect(nicknameInput.text);
+        }
+
+        private void OnDisconnectClick()
+        {
+            Debug.Log("[LobbyUI] Disconnect button clicked");
+            controller.Disconnect();
+            connectionText.text = "Status: Disconnected";
+            connectionText.color = Color.white;
+            roomInfoText.text = "Disconnected.\nConnect, then Create Room.";
+            AppendLog("Disconnected");
         }
 
         private void HandleConnectionChanged(ConnectionStatus status)
         {
-            connectionText.text = "Connection: " + status;
-            AppendLog("Connection -> " + status);
+            string[] statusNames = { "Disconnected", "Connecting", "Connected", "Reconnecting" };
+            string cnName = ((int)status < statusNames.Length) ? statusNames[(int)status] : status.ToString();
+            connectionText.text = "Status: " + cnName;
+            connectionText.color = status == ConnectionStatus.Connected
+                ? new Color(0.3f, 0.9f, 0.4f)
+                : (status == ConnectionStatus.Connecting ? new Color(1f, 0.8f, 0.2f) : Color.white);
+            AppendLog("Connection -> " + cnName);
         }
 
         private void HandleRoomUpdated(RoomSnapshot _)
@@ -109,7 +205,63 @@ namespace Cabo.Client.UI
 
         private void HandleRoomStarted(string roomCode)
         {
-            AppendLog("Room " + roomCode + " started. Next: bind GameScene transition.");
+            gameActionPanel.SetActive(true);
+
+            var gw = GetGw();
+            if (gw != null && long.TryParse(gw.LocalPlayerId, out var pid))
+                myPlayerId = pid;
+
+            // Subscribe to game state changes
+            if (gw != null)
+                gw.GameStateChanged += UpdateTurnDisplay;
+
+            UpdateTurnDisplay();
+            AppendLog("Game started! Your ID: " + myPlayerId);
+        }
+
+        private void UpdateTurnDisplay()
+        {
+            var gw = GetGw();
+            if (gw == null) return;
+            bool myTurn = (myPlayerId == gw.CurrentTurnPlayerId);
+            turnInfoText.text = myTurn
+                ? $"YOUR TURN! (Player {myPlayerId})"
+                : $"Waiting... Current: Player {gw.CurrentTurnPlayerId} (You: {myPlayerId})";
+            turnInfoText.color = myTurn ? new Color(0.2f, 1f, 0.3f) : new Color(1f, 0.8f, 0.3f);
+        }
+
+        private Cabo.Client.Network.ProtoGateway GetGw()
+        {
+            return controller.GetGateway<Cabo.Client.Network.ProtoGateway>();
+        }
+
+        private void AddGameActionButtons(Transform parent, Font font)
+        {
+            // Turn info text
+            turnInfoText = CreateText(parent, "TurnInfo", "Waiting for turn...", font, 16, Vector2.zero, new Vector2(500, 30));
+            turnInfoText.rectTransform.anchoredPosition = new Vector2(0, -5);
+            turnInfoText.alignment = TextAnchor.MiddleCenter;
+            turnInfoText.color = new Color(1f, 0.9f, 0.3f);
+            turnInfoText.raycastTarget = false;
+
+            float y = -35;
+            var gw = GetGw();
+            CreateButton(parent, font, "Draw", new Vector2(-280, y),
+                new Vector2(100, 30), new Color(0.15f, 0.5f, 0.6f), () => gw?.DrawCard());
+            CreateButton(parent, font, "Discard", new Vector2(-170, y),
+                new Vector2(80, 30), new Color(0.3f, 0.3f, 0.3f), () => gw?.DiscardDrawn());
+            CreateButton(parent, font, "Swap0", new Vector2(-85, y),
+                new Vector2(55, 30), new Color(0.4f, 0.35f, 0.15f), () => gw?.ReplaceWithDrawn(0));
+            CreateButton(parent, font, "Swap1", new Vector2(-25, y),
+                new Vector2(55, 30), new Color(0.4f, 0.35f, 0.15f), () => gw?.ReplaceWithDrawn(1));
+            CreateButton(parent, font, "Swap2", new Vector2(35, y),
+                new Vector2(55, 30), new Color(0.4f, 0.35f, 0.15f), () => gw?.ReplaceWithDrawn(2));
+            CreateButton(parent, font, "Swap3", new Vector2(95, y),
+                new Vector2(55, 30), new Color(0.4f, 0.35f, 0.15f), () => gw?.ReplaceWithDrawn(3));
+            CreateButton(parent, font, "Take Disc", new Vector2(160, y),
+                new Vector2(80, 30), new Color(0.3f, 0.35f, 0.5f), () => gw?.TakeFromDiscard(0));
+            CreateButton(parent, font, "Cabo!", new Vector2(260, y),
+                new Vector2(80, 30), new Color(0.5f, 0.15f, 0.2f), () => gw?.CallSteady());
         }
 
         private void HandleError(string message)
@@ -165,27 +317,23 @@ namespace Cabo.Client.UI
 
         private static Font ResolveFont()
         {
+            // Use the project's Chinese font helper
+            var chFont = FontHelper.GetChineseFont();
+            if (chFont != null) return chFont;
+
+            // Fallbacks
             try
             {
                 var builtin = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (builtin != null)
-                {
-                    return builtin;
-                }
+                if (builtin != null) return builtin;
             }
-            catch
-            {
-                // ignored
-            }
-
+            catch { }
             try
             {
                 return Font.CreateDynamicFontFromOSFont("Arial", 16);
             }
-            catch
-            {
-                return null;
-            }
+            catch { }
+            return null;
         }
 
         private static InputField CreateInput(Transform parent, string name, Font font, string placeholder, Vector2 pos, Vector2 size)
@@ -214,19 +362,24 @@ namespace Cabo.Client.UI
 
         private static void CreateButton(Transform parent, Font font, string label, Vector2 pos, UnityEngine.Events.UnityAction onClick)
         {
+            CreateButton(parent, font, label, pos, new Vector2(150, 40), new Color(0.2f, 0.5f, 0.58f), onClick);
+        }
+
+        private static void CreateButton(Transform parent, Font font, string label, Vector2 pos, Vector2 size, Color color, UnityEngine.Events.UnityAction onClick)
+        {
             var go = new GameObject("Btn_" + label, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(190, 46);
+            rect.sizeDelta = size;
             rect.anchoredPosition = pos;
 
             var image = go.GetComponent<Image>();
-            image.color = new Color(0.2f, 0.5f, 0.58f);
+            image.color = color;
 
             var btn = go.GetComponent<Button>();
             btn.onClick.AddListener(onClick);
 
-            var txt = CreateText(go.transform, "Text", label, font, 19, Vector2.zero, new Vector2(180, 42));
+            var txt = CreateText(go.transform, "Text", label, font, 14, Vector2.zero, new Vector2(size.x - 16, size.y - 8));
             txt.alignment = TextAnchor.MiddleCenter;
         }
 

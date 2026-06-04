@@ -1,0 +1,17 @@
+/* 中文字体支持 - 用于 Build 后的 exe */
+
+/* 全局字体设置 */
+.unity-label {
+    -unity-font: resource('Fonts/NotoSansSC-Regular');
+    -unity-font-definition: initial;
+}
+
+.unity-button {
+    -unity-font: resource('Fonts/NotoSansSC-Regular');
+    -unity-font-definition: initial;
+}
+
+.unity-text-field {
+    -unity-font: resource('Fonts/NotoSansSC-Regular');
+    -unity-font-definition: initial;
+}

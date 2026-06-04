@@ -1,3 +1,4 @@
+using Cabo.Client.Network;
 using Cabo.Client.Room;
 using UnityEngine;
 
@@ -8,13 +9,9 @@ namespace Cabo.Client.Runtime
         [SerializeField] private RoomClientController.BackendMode backendMode = RoomClientController.BackendMode.Mock;
         [SerializeField] private bool autoCreateRoomUi = true;
 
-        // Auto-bootstrap is disabled for MVP offline testing (hot-seat mode).
-        // Re-enable by uncommenting the attribute below when server networking (M1) is ready.
-        // [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureBootstrap()
-        {
-            // Stub — no-op.
-        }
+        // Proto mode settings — server connection
+        [SerializeField] private string serverHost = "127.0.0.1";
+        [SerializeField] private int serverPort = 8888;
 
         private void Awake()
         {
@@ -28,7 +25,21 @@ namespace Cabo.Client.Runtime
 
             roomController.Initialize(backendMode);
 
-            // CaboSceneSetup removed — UI is now built by SceneBuilder (Editor/Tools/Build Game Scene)
+            // If Proto mode, inject the real ProtoGateway (replaces the placeholder
+            // created by Initialize() for ProtoPlaceholder mode)
+            if (backendMode == RoomClientController.BackendMode.ProtoPlaceholder)
+            {
+                var realGateway = new ProtoGateway(serverHost, serverPort, this);
+                roomController.SetProtoGateway(realGateway);
+                Debug.Log($"[ClientAppBootstrap] ProtoGateway injected -> {serverHost}:{serverPort}");
+            }
+
+            // Add game controller for cross-scene game event forwarding
+            if (GetComponent<Cabo.Client.Game.GameClientController>() == null)
+            {
+                gameObject.AddComponent<Cabo.Client.Game.GameClientController>();
+            }
+
             if (autoCreateRoomUi && GetComponent<Cabo.Client.UI.LobbyRoomDemoUI>() == null)
             {
                 gameObject.AddComponent<Cabo.Client.UI.LobbyRoomDemoUI>();

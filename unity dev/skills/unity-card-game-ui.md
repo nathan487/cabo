@@ -48,7 +48,8 @@
 
 - 非自己回合时禁用操作按钮
 - DrawCardRsp 之后必须进入二段决策 UI
-- SkillPromptNotify 只对 target_player_id 弹出
+- 技能 UI 只处理 7-12 直接弃牌后的 peek_self / spy / swap；不要实现旧版 SkillPromptNotify 或 13 看+换
+- 替换 UI 使用 slot_indices，支持多选槽位和失败后牌区数量超过 4 的显示
 - RoundRevealNotify 到达后锁定操作，进入结算态
 
 ## 视觉与可用性建议

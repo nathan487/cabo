@@ -1,0 +1,74 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:VisualElement name="GameRoot" class="game-root">
+
+        <!-- HUD Top Info Bar -->
+        <ui:VisualElement name="HUD" class="hud">
+            <ui:Label name="RoundInfo" text="Waiting for game..." class="round-info"/>
+            <ui:Label name="PhaseText" text="" class="phase-text"/>
+        </ui:VisualElement>
+
+        <!-- Opponent Area -->
+        <ui:VisualElement name="OpponentArea" class="player-area opponent-area">
+            <ui:Label name="OpponentName" text="Opponent" class="player-name"/>
+            <ui:Label name="OpponentScore" text="0 pts" class="player-score"/>
+            <ui:VisualElement name="OpponentCards" class="cards-container">
+                <ui:VisualElement name="OpponentCard0" class="card card-back"/>
+                <ui:VisualElement name="OpponentCard1" class="card card-back"/>
+                <ui:VisualElement name="OpponentCard2" class="card card-back"/>
+                <ui:VisualElement name="OpponentCard3" class="card card-back"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Pile Area -->
+        <ui:VisualElement name="PileArea" class="pile-area">
+            <ui:VisualElement name="DrawPile" class="pile draw-pile">
+                <ui:Label name="DrawCount" text="52" class="pile-count"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="DiscardPile" class="pile discard-pile">
+                <ui:Label name="DiscardTop" text="-" class="pile-value"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Drawn Card Preview (hidden by default) -->
+        <ui:VisualElement name="DrawnPreview" class="drawn-preview hidden">
+            <ui:Label name="DrawnText" text="Drew: ?" class="drawn-text"/>
+        </ui:VisualElement>
+
+        <!-- Self Area -->
+        <ui:VisualElement name="SelfArea" class="player-area self-area">
+            <ui:Label name="SelfName" text="You" class="player-name"/>
+            <ui:Label name="SelfScore" text="0 pts" class="player-score"/>
+            <ui:VisualElement name="SelfCards" class="cards-container">
+                <ui:VisualElement name="SelfCard0" class="card"/>
+                <ui:VisualElement name="SelfCard1" class="card"/>
+                <ui:VisualElement name="SelfCard2" class="card"/>
+                <ui:VisualElement name="SelfCard3" class="card"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Action Buttons -->
+        <ui:VisualElement name="ActionPanel" class="action-panel">
+            <ui:Button name="BtnDraw" text="Draw" class="action-btn btn-primary"/>
+            <ui:Button name="BtnTakeDiscard" text="Take Discard" class="action-btn btn-primary"/>
+            <ui:Button name="BtnCallSteady" text="Cabo!" class="action-btn btn-danger"/>
+            <ui:Button name="BtnDiscardDrawn" text="Discard" class="action-btn btn-secondary hidden"/>
+            <ui:Button name="BtnReplace0" text="Swap 0" class="action-btn btn-replace hidden"/>
+            <ui:Button name="BtnReplace1" text="Swap 1" class="action-btn btn-replace hidden"/>
+            <ui:Button name="BtnReplace2" text="Swap 2" class="action-btn btn-replace hidden"/>
+            <ui:Button name="BtnReplace3" text="Swap 3" class="action-btn btn-replace hidden"/>
+        </ui:VisualElement>
+
+        <!-- Round End Panel (hidden by default) -->
+        <ui:VisualElement name="RoundEndPanel" class="overlay-panel hidden">
+            <ui:Label name="RoundEndText" text="" class="overlay-text"/>
+            <ui:Button name="BtnRoundEndClose" text="Continue" class="overlay-btn"/>
+        </ui:VisualElement>
+
+        <!-- Game Over Panel (hidden by default) -->
+        <ui:VisualElement name="GameOverPanel" class="overlay-panel hidden">
+            <ui:Label name="GameOverText" text="" class="overlay-text"/>
+            <ui:Button name="BtnBackToLobby" text="Back to Lobby" class="overlay-btn"/>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

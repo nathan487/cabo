@@ -199,6 +199,8 @@ message ActionResultNotify {
   bool turn_ended = 10;
   int64 next_player_id = 11;  // 下一位回合玩家（turn_ended=true时有效）
   .game.common.ExchangeAttemptResult exchange_result = 12; // 替换/多张替换结果（如有）
+  int32 source_slot = 13;   // 操作的己方槽位（peek/swap/replace）
+  int32 target_slot = 14;   // 目标槽位（spy/swap的对方槽位）
 }
 
 // 亮牌计分通知（最终轮结束后广播）

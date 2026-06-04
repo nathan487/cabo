@@ -27,7 +27,7 @@
 2. 再建可复用 Prefab
 - 玩家槽位
 - 手牌槽位
-- 弹窗（Confirm/Toast/SkillPrompt）
+- 弹窗（Confirm/Toast/Peek/Spy/Swap/Result）
 
 3. 最后做引用绑定
 - 控制器脚本字段绑定

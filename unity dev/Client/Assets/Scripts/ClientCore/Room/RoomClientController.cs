@@ -32,6 +32,24 @@ namespace Cabo.Client.Room
             BuildGateway();
         }
 
+        /// <summary>
+        /// Inject an externally-created ProtoGateway (with host/port config).
+        /// Replaces the placeholder created by BuildGateway() for ProtoPlaceholder mode.
+        /// </summary>
+        public void SetProtoGateway(Cabo.Client.Network.ProtoGateway realGateway)
+        {
+            if (gateway != null)
+            {
+                Unsubscribe(gateway);
+                if (gateway is Cabo.Client.Network.ProtoGateway old)
+                    old.Dispose();
+            }
+
+            gateway = realGateway;
+            Subscribe(gateway);
+            Debug.Log("[RoomClientController] Switched to real ProtoGateway");
+        }
+
         private void Awake()
         {
             BuildGateway();
@@ -97,6 +115,14 @@ namespace Cabo.Client.Room
             gateway.StartGame();
         }
 
+        /// <summary>
+        /// Access the underlying gateway (for game actions not in IBackendGateway).
+        /// </summary>
+        public T GetGateway<T>() where T : class
+        {
+            return gateway as T;
+        }
+
         public string BuildRoomSummary()
         {
             if (CurrentRoom == null)
@@ -146,6 +172,7 @@ namespace Cabo.Client.Room
         private void OnRoomUpdated(RoomSnapshot snapshot)
         {
             CurrentRoom = snapshot;
+            Debug.Log($"[RoomClientController] Room updated: code={snapshot.RoomCode}, players={snapshot.Players.Count}");
             RoomUpdated?.Invoke(snapshot);
         }
 

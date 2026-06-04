@@ -13,7 +13,7 @@ public class CaboGameManager : MonoBehaviour
     [Header("Game Config")]
     public int playerCount = 2;
     public int scoreLimit = 100;
-    public string[] playerNames = new string[] { "玩家 1", "玩家 2" };
+    public string[] playerNames = new string[] { "Player 1", "Player 2" };
 
     // Game state
     public Deck Deck { get; private set; }
@@ -28,6 +28,11 @@ public class CaboGameManager : MonoBehaviour
     public int SteadyCallerIndex { get; private set; }
     public bool FinalRoundActive { get; private set; }
     private int finalRoundTurnsRemaining;
+
+    // Round result tracking (for UI display)
+    public bool LastRoundHadKamikaze { get; private set; }
+    public Player LastRoundKamikazePlayer { get; private set; }
+    public List<Player> LastRoundHundredResets { get; private set; } = new List<Player>();
 
     // Drawn card state (current turn)
     public Card CurrentDrawnCard { get; private set; }
@@ -65,7 +70,7 @@ public class CaboGameManager : MonoBehaviour
         Players.Clear();
         for (int i = 0; i < playerCount; i++)
         {
-            var name = i < playerNames.Length ? playerNames[i] : $"玩家 {i + 1}";
+            var name = i < playerNames.Length ? playerNames[i] : $"Player {i + 1}";
             Players.Add(new Player(name, i));
         }
 
@@ -110,6 +115,9 @@ public class CaboGameManager : MonoBehaviour
         HasDrawn = false;
         CurrentPlayerIndex = 0;
         CurrentPhase = TurnPhase.WaitingForAction;
+        LastRoundHadKamikaze = false;
+        LastRoundKamikazePlayer = null;
+        LastRoundHundredResets.Clear();
 
         OnTurnStarted?.Invoke(CurrentPlayerIndex);
     }
@@ -236,33 +244,45 @@ public class CaboGameManager : MonoBehaviour
 
     /// <summary>
     /// Discard the drawn card without replacing.
+    /// Per rules: if discarded from deck draw AND the card is 7-12,
+    /// the skill is triggered as part of the discard action.
+    /// Cards 0-6 and 13 are discarded directly with no skill.
     /// </summary>
     public void ActionDiscardDrawn()
     {
         if (!HasDrawn || DrewFromDiscard) return; // Can only discard if from draw pile
+
+        // Per game rules: 7-12 skill cards trigger their ability when discarded from a deck draw.
+        // 13 has no skill, 0-6 have no skill.
+        if (CurrentDrawnCard != null && CurrentDrawnCard.IsSkillCard)
+        {
+            // Transition to skill phase — the skill card is still held, not yet in discard.
+            // CompleteSkill() or DeclineSkillAndDiscard() will place it in the discard pile.
+            CurrentPhase = TurnPhase.SkillActive;
+        }
+        else
+        {
+            // Non-skill card: discard immediately and end turn.
+            Deck.Discard(CurrentDrawnCard);
+            EndTurn();
+        }
+    }
+
+    /// <summary>
+    /// Called after a skill has been resolved. Discards the skill card and ends the turn.
+    /// </summary>
+    public void CompleteSkill()
+    {
         Deck.Discard(CurrentDrawnCard);
         EndTurn();
     }
 
     /// <summary>
-    /// Use the skill of the drawn card (7-12).
-    /// Only available when drawing from the deck (not discard).
+    /// Called when the player declines to use the skill on a 7-12 card
+    /// they just discarded from a deck draw. The card still goes to discard,
+    /// but no skill effect is applied.
     /// </summary>
-    public void ActionUseSkill()
-    {
-        if (!HasDrawn || DrewFromDiscard) return;
-        if (CurrentDrawnCard == null || !CurrentDrawnCard.IsSkillCard) return;
-
-        var skill = CurrentDrawnCard.Skill;
-        CurrentPhase = TurnPhase.SkillActive;
-        // Actual skill resolution is handled by UI + SkillSystem
-        // After skill resolves, the skill card goes to discard and turn ends
-    }
-
-    /// <summary>
-    /// Called after a skill has been resolved. Discards the skill card.
-    /// </summary>
-    public void CompleteSkill()
+    public void DeclineSkillAndDiscard()
     {
         Deck.Discard(CurrentDrawnCard);
         EndTurn();
@@ -474,7 +494,12 @@ public class CaboGameManager : MonoBehaviour
             for (int i = 0; i < p.Cards.Count; i++)
                 p.MarkKnown(i, p.Cards[i].Value);
 
-        // ═══ Check Kamikaze (神风特攻队) first ═══
+        // Reset round tracking
+        LastRoundHadKamikaze = false;
+        LastRoundKamikazePlayer = null;
+        LastRoundHundredResets.Clear();
+
+        // ═══ Check Kamikaze (KAMIKAZE特攻队) first ═══
         // If any player has exactly two 12s and two 13s, they get 0, others get 50.
         Player kamikazePlayer = null;
         foreach (var p in Players)
@@ -488,7 +513,9 @@ public class CaboGameManager : MonoBehaviour
 
         if (kamikazePlayer != null)
         {
-            Debug.Log($"[Game] 神风特攻队！{kamikazePlayer.Name} has 12,12,13,13!");
+            LastRoundHadKamikaze = true;
+            LastRoundKamikazePlayer = kamikazePlayer;
+            Debug.Log($"[Game] KAMIKAZE特攻队！{kamikazePlayer.Name} has 12,12,13,13!");
             foreach (var p in Players)
             {
                 if (p == kamikazePlayer)
@@ -508,36 +535,47 @@ public class CaboGameManager : MonoBehaviour
                 if (s < minScore) minScore = s;
             }
 
-            int steadyScore = Players[SteadyCallerIndex].GetRoundScore();
-            bool steadyWon = steadyScore <= minScore;
-
-            // Apply scores
-            foreach (var p in Players)
+            // Safety guard: SteadyCallerIndex must be valid
+            if (SteadyCallerIndex >= 0 && SteadyCallerIndex < Players.Count)
             {
-                if (p.PlayerIndex == SteadyCallerIndex)
+                int steadyScore = Players[SteadyCallerIndex].GetRoundScore();
+                bool steadyWon = steadyScore <= minScore;
+
+                // Apply scores
+                foreach (var p in Players)
                 {
-                    if (steadyWon)
-                        p.TotalScore += 0; // 0 points this round!
+                    if (p.PlayerIndex == SteadyCallerIndex)
+                    {
+                        if (steadyWon)
+                            p.TotalScore += 0; // 0 points this round!
+                        else
+                            p.TotalScore += p.GetRoundScore() + 10; // penalty
+                    }
                     else
-                        p.TotalScore += p.GetRoundScore() + 10; // penalty
+                    {
+                        p.TotalScore += p.GetRoundScore();
+                    }
                 }
-                else
-                {
+            }
+            else
+            {
+                // Fallback: no steady caller — everyone gets their round score
+                Debug.LogWarning("[Game] RevealAndScore called with invalid SteadyCallerIndex. Using fallback scoring.");
+                foreach (var p in Players)
                     p.TotalScore += p.GetRoundScore();
-                }
             }
         }
 
         OnRoundEnded?.Invoke(RoundNumber, SteadyCallerIndex);
 
         // ═══ 翻大浪 (Once per game, if exactly 100, reset to 50) ═══
-        // Note: reset is automatic in MVP (can be made optional later with UI prompt)
         foreach (var p in Players)
         {
             if (p.TotalScore == 100 && !p.HasUsedReset)
             {
                 p.TotalScore = 50;
                 p.HasUsedReset = true;
+                LastRoundHundredResets.Add(p);
                 Debug.Log($"[Game] 翻大浪！{p.Name} hit exactly 100 → reset to 50 (used).");
             }
             else if (p.TotalScore == 100 && p.HasUsedReset)

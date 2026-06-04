@@ -36,8 +36,7 @@
 
 4. 挂起步骤恢复
 - STEP_TYPE_WAITING_DRAW_DECISION：恢复二段决策弹窗
-- STEP_TYPE_WAITING_BLIND_SWAP：仅目标玩家可操作
-- STEP_TYPE_WAITING_LOOK_SWAP：仅发起者可做换牌决策
+- 最新协议已废弃旧版 WAITING_BLIND_SWAP / WAITING_LOOK_SWAP；不要实现旧的目标响应或 13 看+换恢复流程
 
 5. 幂等保护
 - 按 server_seq 去重
