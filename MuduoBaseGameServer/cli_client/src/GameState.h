@@ -4,6 +4,12 @@
 #include <vector>
 #include <cstdint>
 
+namespace game {
+namespace messages {
+    class ServerMessage;
+}
+}
+
 namespace cabo {
 
 struct Card {
@@ -71,6 +77,9 @@ public:
     bool isMyTurn() const;
     int getMyPlayerIndex() const;
     std::vector<int> getOpponentIndices() const;
+
+    // 消息更新处理
+    void updateFromMessage(const game::messages::ServerMessage& msg);
 };
 
 } // namespace cabo
