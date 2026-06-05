@@ -1,0 +1,35 @@
+#pragma once
+
+#include "NetworkClient.h"
+#include "GameState.h"
+#include "UIRenderer.h"
+#include <string>
+#include <vector>
+
+namespace cabo {
+
+class ClientApp {
+public:
+    void run();
+
+private:
+    NetworkClient network_;
+    GameState state_;
+    UIRenderer renderer_;
+    bool running_ = true;
+
+    // 流程方法
+    void connectToServer();
+    void loginFlow();
+    void roomFlow();
+    void waitingRoomLoop();
+    void gameLoop();
+
+    // 输入处理
+    void handleGameInput();
+
+    // 工具方法
+    std::vector<int> parseSlotIndices(const std::string& input);
+};
+
+} // namespace cabo
