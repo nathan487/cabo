@@ -363,19 +363,19 @@ void RoomService::handleReady(const TcpConnectionPtr& conn,
             return;
         }
         room = it->second;
-    }
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
+        // Update player ready state while holding lock
         for (auto& p : room->players) {
             if (p->playerId == playerId) {
                 p->isReady = ready;
+                LOG_INFO("[Room] Player %s set ready=%d in room %s",
+                         p->nickname.c_str(), ready, room->roomCode.c_str());
                 break;
             }
         }
     }
 
-    // ReadyRsp
+    // Send ReadyRsp to the requesting player
     ::game::messages::ServerMessage rspMsg;
     auto* rsp = rspMsg.mutable_ready_rsp();
     rsp->set_request_id(req.request_id());
@@ -383,10 +383,11 @@ void RoomService::handleReady(const TcpConnectionPtr& conn,
     rsp->set_is_ready(ready);
     sendTo(conn, rspMsg);
 
-    // Broadcast updated room state to all
+    // Broadcast updated room state to all players
     for (auto& p : room->players) {
-        if (p->conn && p->isConnected)
+        if (p->conn && p->isConnected) {
             sendRoomState(room->roomId, p->conn);
+        }
     }
 }
 

@@ -246,43 +246,9 @@ void ClientApp::roomFlow() {
         return;
     }
 
-    // 等待ReadyRsp，可能会先收到其他通知消息
-    bool readyConfirmed = false;
-    int attempts = 0;
-    const int MAX_ATTEMPTS = 10;
-
-    while (!readyConfirmed && attempts < MAX_ATTEMPTS) {
-        game::messages::ServerMessage msg;
-        if (!network_.receive(msg, 5000)) {
-            std::cout << "ERROR: Timeout waiting for ReadyRsp!" << std::endl;
-            running_ = false;
-            return;
-        }
-
-        // 更新状态（可能是RoomStateNotify等）
-        state_.updateFromMessage(msg);
-
-        // 检查是否是ReadyRsp
-        if (msg.has_ready_rsp()) {
-            if (msg.ready_rsp().error().code() == 0) {
-                readyConfirmed = true;
-                std::cout << ">>> Ready!" << std::endl;
-            } else {
-                std::cout << "ERROR: Failed to ready up: "
-                          << msg.ready_rsp().error().message() << std::endl;
-                running_ = false;
-                return;
-            }
-        }
-
-        attempts++;
-    }
-
-    if (!readyConfirmed) {
-        std::cout << "ERROR: Did not receive ReadyRsp after " << MAX_ATTEMPTS << " messages!" << std::endl;
-        running_ = false;
-        return;
-    }
+    std::cout << ">>> Ready signal sent! Waiting for others..." << std::endl;
+    // 注意：不等待ReadyRsp，因为服务端可能通过RoomStateNotify异步更新状态
+    // 直接进入waitingRoomLoop，在那里会收到状态更新
 }
 
 void ClientApp::waitingRoomLoop() {
