@@ -40,6 +40,10 @@ private:
     void handleSpySkill();
     void handleSwapSkill();
 
+    // 错误处理
+    void handleServerError(const game::messages::ServerMessage& msg);
+    bool getIntInput(int& out, int min, int max);
+
     // 工具方法
     std::vector<int> parseSlotIndices(const std::string& input);
 };

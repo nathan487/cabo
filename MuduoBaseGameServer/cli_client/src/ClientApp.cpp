@@ -370,6 +370,7 @@ void ClientApp::gameLoop() {
                 running_ = false;
                 break;
             }
+            handleServerError(msg);  // 先检查错误
             state_.updateFromMessage(msg);
             renderer_.render(state_);
         }
@@ -977,6 +978,52 @@ void ClientApp::handleTakeFromDiscard() {
         }
         return;
     }
+}
+
+void ClientApp::handleServerError(const game::messages::ServerMessage& msg) {
+    // 检查各种响应中的error字段
+    if (msg.has_create_room_rsp() && msg.create_room_rsp().error().code() != 0) {
+        std::cout << "ERROR: " << msg.create_room_rsp().error().message() << std::endl;
+        std::cout << ">>> Press Enter to continue..." << std::endl;
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.get();
+    }
+    else if (msg.has_join_room_rsp() && msg.join_room_rsp().error().code() != 0) {
+        std::cout << "ERROR: " << msg.join_room_rsp().error().message() << std::endl;
+        std::cout << ">>> Press Enter to continue..." << std::endl;
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.get();
+    }
+    else if (msg.has_draw_card_rsp() && msg.draw_card_rsp().error().code() != 0) {
+        std::cout << "ERROR: " << msg.draw_card_rsp().error().message() << std::endl;
+        renderer_.render(state_);
+    }
+    else if (msg.has_take_from_discard_rsp() && msg.take_from_discard_rsp().error().code() != 0) {
+        std::cout << "ERROR: " << msg.take_from_discard_rsp().error().message() << std::endl;
+        renderer_.render(state_);
+    }
+    else if (msg.has_use_skill_rsp() && msg.use_skill_rsp().error().code() != 0) {
+        std::cout << "ERROR: " << msg.use_skill_rsp().error().message() << std::endl;
+        renderer_.render(state_);
+    }
+}
+
+bool ClientApp::getIntInput(int& out, int min, int max) {
+    std::cin >> out;
+
+    if (std::cin.fail()) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << ">>> Invalid input! Please enter a number." << std::endl;
+        return false;
+    }
+
+    if (out < min || out > max) {
+        std::cout << ">>> Input out of range! Please enter " << min << "-" << max << "." << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 } // namespace cabo
