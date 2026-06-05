@@ -17,7 +17,7 @@ std::string UIRenderer::formatCard(const Card& card) {
 
 void UIRenderer::renderHeader(const GameState& state) {
     std::cout << "================================================================================" << std::endl;
-    std::cout << "                        Cabo Game - " << state.players.size() << " Players" << std::endl;
+    std::cout << "                        Cabo Game - " << GameState::PLAYER_COUNT << " Players" << std::endl;
     if (state.phase == GameState::PLAYING) {
         std::cout << "                          Round " << state.roundNumber
                   << ", Turn " << state.turnNumber << std::endl;
@@ -93,17 +93,7 @@ void UIRenderer::renderMyCards(const GameState& state) {
 void UIRenderer::renderActionMenu(const GameState& state) {
     if (state.phase != GameState::PLAYING) return;
 
-    if (state.isMyTurn()) {
-        std::cout << ">>> Your Turn! Choose action:" << std::endl;
-        std::cout << "    1. Draw from draw pile" << std::endl;
-        std::cout << "    2. Take from discard pile";
-        if (state.discardTopValue >= 0) {
-            std::cout << " (current top: " << state.discardTopValue << ")";
-        }
-        std::cout << std::endl;
-        std::cout << "    3. Call CABO" << std::endl;
-        std::cout << ">>> Enter choice: ";
-    } else {
+    if (!state.isMyTurn()) {
         // 找到当前玩家昵称
         std::string currentPlayerName = "Player";
         for (const auto& p : state.players) {
@@ -115,11 +105,18 @@ void UIRenderer::renderActionMenu(const GameState& state) {
         std::cout << ">>> Waiting for " << currentPlayerName << " to act..." << std::endl;
         std::cout << ">>> (Press Ctrl+C to quit)" << std::endl;
     }
+    // 当自己回合时，操作菜单由ClientApp状态机统一管理（showPrompt）
 }
 
 void UIRenderer::render(const GameState& state) {
     clearScreen();
     renderHeader(state);
+
+    // 回合结算优先：即使GameStartNotify已将phase覆盖为PLAYING，也先显示结算
+    if (state.roundJustRevealed) {
+        renderRoundReveal(state);
+        return;
+    }
 
     if (state.phase == GameState::PLAYING) {
         renderPiles(state);

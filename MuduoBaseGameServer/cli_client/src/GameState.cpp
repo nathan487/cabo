@@ -165,6 +165,34 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                   << ", ready=" << isReady << std::endl;
     }
 
+    // 处理 ReadyRsp
+    else if (msg.has_ready_rsp()) {
+        const auto& rsp = msg.ready_rsp();
+        if (rsp.error().code() == 0) {
+            std::cout << "[GameState] ReadyRsp: success" << std::endl;
+        } else {
+            std::cerr << "[GameState] ReadyRsp error: " << rsp.error().message() << std::endl;
+        }
+    }
+
+    // 处理 StartGameRsp (房主会收到)
+    else if (msg.has_start_game_rsp()) {
+        const auto& rsp = msg.start_game_rsp();
+        if (rsp.error().code() == 0) {
+            gameStartConfirmed = true;  // 标记服务器已确认游戏启动
+            std::cout << "[GameState] StartGameRsp: success, game starting" << std::endl;
+        } else {
+            std::cerr << "[GameState] StartGameRsp error: " << rsp.error().message() << std::endl;
+        }
+    }
+
+    // 处理 RoomStartNotify (所有玩家会收到)
+    else if (msg.has_room_start_notify()) {
+        const auto& notify = msg.room_start_notify();
+        std::cout << "[GameState] RoomStartNotify: roomId=" << notify.room_id() << std::endl;
+        // 房间开始游戏，等待 GameStartNotify
+    }
+
     // 处理 GameStartNotify
     else if (msg.has_game_start_notify()) {
         const auto& notify = msg.game_start_notify();
@@ -235,9 +263,17 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         currentPlayerId = notify.current_player_id();
         turnNumber = notify.turn_number();
         roundNumber = notify.round_number();
-        hasDrawnCard = false;  // 重置抽牌状态
-        drawnCardValue = 0;
-        drawnCardSkill = 0;
+
+        // 仅在自己的回合开始时重置等待标志和抽牌状态
+        if (notify.current_player_id() == myPlayerId) {
+            hasDrawnCard = false;
+            drawnCardValue = 0;
+            drawnCardSkill = 0;
+            waitingForDrawResponse = false;
+            waitingForTakeResponse = false;
+            waitingForCallSteadyResponse = false;
+            waitingForSkillResponse = false;
+        }
 
         // 更新游戏阶段
         if (notify.phase() == GAME_PHASE_FINAL_ROUND) {
@@ -272,6 +308,7 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
     // 处理 DrawCardRsp
     else if (msg.has_draw_card_rsp()) {
         const auto& rsp = msg.draw_card_rsp();
+        waitingForDrawResponse = false;  // 清除等待标志
         if (rsp.error().code() == 0) {
             hasDrawnCard = true;
             drawnCardValue = rsp.value();
@@ -288,7 +325,10 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
     else if (msg.has_discard_drawn_rsp()) {
         const auto& rsp = msg.discard_drawn_rsp();
         if (rsp.error().code() == 0) {
-            // 弃牌成功，等待 ActionResultNotify 更新弃牌堆
+            // Bug #7 Fix: 清除抽牌状态，操作已完成
+            hasDrawnCard = false;
+            drawnCardValue = 0;
+            drawnCardSkill = 0;
             std::cout << "[GameState] DiscardDrawnRsp: success" << std::endl;
         } else {
             std::cerr << "[GameState] DiscardDrawnRsp error: " << rsp.error().message() << std::endl;
@@ -327,6 +367,11 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                     std::cout << "[GameState] ReplaceWithDrawnRsp: failed, card added to hand" << std::endl;
                 }
             }
+
+            // Bug #7 Fix: 清除抽牌状态，操作已完成
+            hasDrawnCard = false;
+            drawnCardValue = 0;
+            drawnCardSkill = 0;
         } else {
             std::cerr << "[GameState] ReplaceWithDrawnRsp error: " << rsp.error().message() << std::endl;
         }
@@ -335,6 +380,7 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
     // 处理 TakeFromDiscardRsp
     else if (msg.has_take_from_discard_rsp()) {
         const auto& rsp = msg.take_from_discard_rsp();
+        waitingForTakeResponse = false;  // Bug #8 Fix: 清除等待标志
         if (rsp.error().code() == 0) {
             if (rsp.has_exchange_result()) {
                 const auto& result = rsp.exchange_result();
@@ -371,9 +417,12 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
     // 处理 UseSkillRsp
     else if (msg.has_use_skill_rsp()) {
         const auto& rsp = msg.use_skill_rsp();
+        waitingForSkillResponse = false;  // 清除等待标志
         if (rsp.error().code() == 0) {
-            // Important Fix #4: 技能使用成功
-            // 注意：无法从Rsp中确定是peek_self还是spy，需要配合ActionResultNotify更新状态
+            // 保存技能结果，供ClientApp更新手牌状态
+            lastPeekedValue = rsp.peeked_value();
+            lastSwapOccurred = rsp.swap_occurred();
+
             if (rsp.peeked_value() >= 0) {
                 std::cout << "[GameState] UseSkillRsp: peeked value=" << rsp.peeked_value() << std::endl;
             }
@@ -383,6 +432,20 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
             }
         } else {
             std::cerr << "[GameState] UseSkillRsp error: " << rsp.error().message() << std::endl;
+        }
+    }
+
+    // 处理 CallSteadyRsp (Call CABO)
+    else if (msg.has_call_steady_rsp()) {
+        const auto& rsp = msg.call_steady_rsp();
+        waitingForCallSteadyResponse = false;  // Bug #8 Fix: 清除等待标志
+        if (rsp.error().code() == 0) {
+            std::cout << "[GameState] CallSteadyRsp: CABO call accepted" << std::endl;
+            // 游戏进入最终轮，等待后续的通知消息
+        } else {
+            std::cerr << "[GameState] CallSteadyRsp error: " << rsp.error().message() << std::endl;
+            // 显示错误给用户
+            std::cerr << ">>> Call CABO failed: " << rsp.error().message() << std::endl;
         }
     }
 
@@ -396,7 +459,6 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         }
         if (notify.has_discard_pile()) {
             discardPileCount = notify.discard_pile().count();
-            // Critical Fix #3: 验证弃牌堆顶牌的值范围（0-13）
             if (notify.discard_pile().has_top_card()) {
                 int32_t topValue = notify.discard_pile().top_card().value();
                 if (topValue >= 0 && topValue <= 13) {
@@ -405,6 +467,28 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                     std::cerr << "[GameState] WARNING: Invalid discard top card value: "
                               << topValue << ", setting to -1" << std::endl;
                     discardTopValue = -1;
+                }
+            }
+        }
+
+        // 处理Swap技能：通过ActionResultNotify广播更新受影响的双方手牌状态
+        if (notify.swap_occurred()) {
+            // 发起交换的玩家：其source_slot变为未知
+            if (notify.source_player_id() == myPlayerId) {
+                int32_t slot = notify.source_slot();
+                if (slot >= 0 && slot < static_cast<int32_t>(myCards.size())) {
+                    myCards[slot].isKnown = false;
+                    std::cout << "[GameState] Swap: my slot " << slot
+                              << " now unknown (blind swap, via broadcast)" << std::endl;
+                }
+            }
+            // 被交换的玩家：其target_slot变为未知
+            if (notify.target_player_id() == myPlayerId) {
+                int32_t slot = notify.target_slot();
+                if (slot >= 0 && slot < static_cast<int32_t>(myCards.size())) {
+                    myCards[slot].isKnown = false;
+                    std::cout << "[GameState] Swap: my slot " << slot
+                              << " now unknown (blind swap, via broadcast)" << std::endl;
                 }
             }
         }
@@ -424,6 +508,7 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         const auto& notify = msg.round_reveal_notify();
 
         phase = ROUND_REVEAL;
+        roundJustRevealed = true;  // 标记回合已结算，确保结算界面显示
 
         // 填充详细的结算信息
         lastRoundResults.clear();

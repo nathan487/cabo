@@ -100,10 +100,36 @@ void GameService::sendToPlayer(const TcpConnectionPtr& conn,
                                 const ::game::messages::ServerMessage& msg) {
     if (!sendFunc_) { LOG_INFO("[Game] sendToPlayer: no sendFunc!"); return; }
     if (!conn) { LOG_INFO("[Game] sendToPlayer: null conn!"); return; }
+
+    // 获取消息类型用于日志
+    std::string msgType = "Unknown";
+    if (msg.has_create_room_rsp()) msgType = "CreateRoomRsp";
+    else if (msg.has_join_room_rsp()) msgType = "JoinRoomRsp";
+    else if (msg.has_room_state_notify()) msgType = "RoomStateNotify";
+    else if (msg.has_player_join_notify()) msgType = "PlayerJoinNotify";
+    else if (msg.has_player_leave_notify()) msgType = "PlayerLeaveNotify";
+    else if (msg.has_player_ready_notify()) msgType = "PlayerReadyNotify";
+    else if (msg.has_ready_rsp()) msgType = "ReadyRsp";
+    else if (msg.has_start_game_rsp()) msgType = "StartGameRsp";
+    else if (msg.has_room_start_notify()) msgType = "RoomStartNotify";
+    else if (msg.has_game_start_notify()) msgType = "GameStartNotify";
+    else if (msg.has_turn_start_notify()) msgType = "TurnStartNotify";
+    else if (msg.has_draw_card_rsp()) msgType = "DrawCardRsp";
+    else if (msg.has_discard_drawn_rsp()) msgType = "DiscardDrawnRsp";
+    else if (msg.has_replace_with_drawn_rsp()) msgType = "ReplaceWithDrawnRsp";
+    else if (msg.has_take_from_discard_rsp()) msgType = "TakeFromDiscardRsp";
+    else if (msg.has_use_skill_rsp()) msgType = "UseSkillRsp";
+    else if (msg.has_call_steady_rsp()) msgType = "CallSteadyRsp";
+    else if (msg.has_action_result_notify()) msgType = "ActionResultNotify";
+    else if (msg.has_round_reveal_notify()) msgType = "RoundRevealNotify";
+    else if (msg.has_score_update_notify()) msgType = "ScoreUpdateNotify";
+    else if (msg.has_game_over_notify()) msgType = "GameOverNotify";
+    else if (msg.has_state_sync_notify()) msgType = "StateSyncNotify";
+
     std::string payload;
     msg.SerializeToString(&payload);
     auto frame = game::MessageCodec::encode(payload);
-    LOG_INFO("[Game] sendToPlayer: sending %zu bytes", frame.size());
+    LOG_INFO("[Game] sendToPlayer: %s (%zu bytes)", msgType.c_str(), frame.size());
     sendFunc_(conn, frame);
 }
 
@@ -734,8 +760,12 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
 
-    // Skill can be used by current player in Playing or WaitingDrawDecision state
+    // Skill can only be used after drawing and discarding a skill card
     if (!isCurrentPlayer(*room, req.player_id())) return;
+    if (room->step != GameStep::WaitingDrawDecision) {
+        LOG_INFO("[Game] UseSkill: not in WaitingDrawDecision step (current=%d)", (int)room->step);
+        return;
+    }
 
     int64_t targetPlayer = 0;
     int32_t srcSlot = -1, dstSlot = -1;
@@ -777,6 +807,12 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
             LOG_INFO("[Game] Swap: %s[%d] <-> %s[%d]",
                      player->nickname.c_str(), srcSlot,
                      target->nickname.c_str(), dstSlot);
+        } else {
+            // Swap failed — invalid target or slot
+            LOG_INFO("[Game] Swap FAILED: %s slot=%d -> player=%lld slot=%d (bounds check failed)",
+                     player->nickname.c_str(), srcSlot,
+                     (long long)targetPlayer, dstSlot);
+            stype = ::game::common::SKILL_TYPE_NONE;  // 防止swap_occurred被设为true
         }
     }
 
@@ -793,6 +829,7 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
         stype == ::game::common::SKILL_TYPE_SWAP, nullptr, srcSlot, dstSlot);
 
     // Skill ends the turn (skill card goes to discard, turn passes)
+    room->step = GameStep::Playing;
     endTurn(*room);
 }
 
@@ -803,6 +840,10 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     if (!room) return;
     if (room->steadyCallerSeat >= 0) return; // Already called
     if (!isCurrentPlayer(*room, req.player_id())) return;
+    if (room->step != GameStep::Playing) {
+        LOG_INFO("[Game] CallSteady: not in Playing step (current=%d)", (int)room->step);
+        return;
+    }
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;

@@ -69,9 +69,23 @@ public:
     int32_t drawnCardValue = 0;
     int32_t drawnCardSkill = 0;
 
-    // 最终轮标志
+    // 请求等待标志（防止重复发送）
+    bool waitingForDrawResponse = false;
+    bool waitingForTakeResponse = false;
+    bool waitingForCallSteadyResponse = false;
+    bool waitingForSkillResponse = false;
+
+    // 技能结果暂存（UseSkillRsp后更新myCards用）
+    int32_t lastPeekedValue = -1;
+    bool lastSwapOccurred = false;
     bool isFinalRound = false;
     int32_t finalRoundRemaining = 0;
+
+    // 游戏启动确认（用于房主超时检查）
+    bool gameStartConfirmed = false;
+
+    // 回合结算标记（确保GameStartNotify不会跳过结算界面）
+    bool roundJustRevealed = false;
 
     // 结算信息
     struct RoundResult {

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <limits>
 #include <chrono>
+#include <sys/select.h>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -11,19 +12,22 @@
 
 namespace cabo {
 
+// ============================================================================
+// 流程方法（保持原有逻辑，移除nextSeq_引用）
+// ============================================================================
+
 void ClientApp::connectToServer() {
     while (running_) {
         std::string hostPort;
         std::cout << ">>> Enter server IP:port (e.g., 127.0.0.1:8888): ";
         std::cin >> hostPort;
 
-        // 解析host和port
         size_t colonPos = hostPort.find(':');
         if (colonPos == std::string::npos) {
             std::cout << "ERROR: Invalid format! Use IP:port" << std::endl;
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            continue;  // 重试
+            continue;
         }
 
         std::string host = hostPort.substr(0, colonPos);
@@ -42,17 +46,15 @@ void ClientApp::connectToServer() {
                 running_ = false;
                 return;
             }
-            continue;  // 重试
+            continue;
         }
 
         std::cout << ">>> Connected!" << std::endl;
-        return;  // 成功连接
+        return;
     }
 }
 
 void ClientApp::loginFlow() {
-    // 登录流程已简化，仅用于占位
-    // 昵称将在创建/加入房间时一并发送
     std::cout << ">>> Ready to create or join a room..." << std::endl;
 }
 
@@ -87,7 +89,6 @@ void ClientApp::roomFlow() {
         std::cin >> choice;
 
         if (choice == 1) {
-            // 创建房间流程
             std::string nickname;
             std::cout << ">>> Enter your nickname: ";
             std::cin >> nickname;
@@ -96,15 +97,12 @@ void ClientApp::roomFlow() {
                 std::cout << "ERROR: Nickname must be 1-20 characters!" << std::endl;
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                continue;  // 重试
+                continue;
             }
 
-            // 构建CreateRoomReq
             game::messages::ClientMessage reqMsg;
-            reqMsg.set_seq(nextSeq_);
             auto* createReq = reqMsg.mutable_create_room_req();
-            createReq->set_request_id(nextSeq_);
-            nextSeq_++;
+            createReq->set_request_id(network_.nextRequestId());
             createReq->set_max_players(4);
             createReq->set_nickname(nickname);
 
@@ -115,7 +113,6 @@ void ClientApp::roomFlow() {
                 return;
             }
 
-            // 等待CreateRoomRsp
             game::messages::ServerMessage rspMsg;
             if (!network_.receive(rspMsg, 5000)) {
                 std::cout << "ERROR: Timeout waiting for CreateRoomRsp!" << std::endl;
@@ -134,14 +131,16 @@ void ClientApp::roomFlow() {
                 return;
             }
 
+            // 处理CreateRoom后服务端发送的RoomStateNotify等后续消息
+            drainMessages(false);
+
             std::cout << ">>> Room created successfully!" << std::endl;
             std::cout << ">>> Room Code: " << state_.roomCode << std::endl;
             std::cout << ">>> Room ID: " << state_.roomId << std::endl;
             std::cout << ">>> Your Player ID: " << state_.myPlayerId << std::endl;
-            break;  // 成功，退出循环
+            break;
 
         } else if (choice == 2) {
-            // 加入房间流程
             std::string nickname, roomCode;
             std::cout << ">>> Enter your nickname: ";
             std::cin >> nickname;
@@ -150,7 +149,7 @@ void ClientApp::roomFlow() {
                 std::cout << "ERROR: Nickname must be 1-20 characters!" << std::endl;
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                continue;  // 重试
+                continue;
             }
 
             std::cout << ">>> Enter room code: ";
@@ -160,15 +159,12 @@ void ClientApp::roomFlow() {
                 std::cout << "ERROR: Room code cannot be empty!" << std::endl;
                 std::cin.clear();
                 std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                continue;  // 重试
+                continue;
             }
 
-            // 构建JoinRoomReq
             game::messages::ClientMessage reqMsg;
-            reqMsg.set_seq(nextSeq_);
             auto* joinReq = reqMsg.mutable_join_room_req();
-            joinReq->set_request_id(nextSeq_);
-            nextSeq_++;
+            joinReq->set_request_id(network_.nextRequestId());
             joinReq->set_room_code(roomCode);
             joinReq->set_nickname(nickname);
 
@@ -179,7 +175,6 @@ void ClientApp::roomFlow() {
                 return;
             }
 
-            // 等待JoinRoomRsp，可能会先收到其他通知消息
             bool joinConfirmed = false;
             int attempts = 0;
             const int MAX_ATTEMPTS = 10;
@@ -197,6 +192,10 @@ void ClientApp::roomFlow() {
                 if (rspMsg.has_join_room_rsp()) {
                     if (rspMsg.join_room_rsp().error().code() == 0) {
                         joinConfirmed = true;
+
+                        // 处理JoinRoom后服务端发送的后续消息
+                        drainMessages(false);
+
                         std::cout << ">>> Joined room successfully!" << std::endl;
                         std::cout << ">>> Room ID: " << state_.roomId << std::endl;
                         std::cout << ">>> Your Player ID: " << state_.myPlayerId << std::endl;
@@ -207,7 +206,6 @@ void ClientApp::roomFlow() {
                         return;
                     }
                 }
-
                 attempts++;
             }
 
@@ -217,44 +215,37 @@ void ClientApp::roomFlow() {
                 return;
             }
 
-            break;  // 成功，退出循环
+            break;
 
         } else {
             std::cout << "ERROR: Invalid choice!" << std::endl;
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-            continue;  // 重试
+            continue;
         }
     }
 
     if (!running_) return;
-
-    // 不再自动ready，进入等待室后用户手动输入ready命令
 }
 
 void ClientApp::waitingRoomLoop() {
     std::cout << "\n>>> Entering waiting room..." << std::endl;
     std::cout << ">>> Type 'ready' and press Enter to mark yourself as ready" << std::endl;
 
-    // 先主动接收pending消息
-    while (network_.hasMessage(50)) {
-        game::messages::ServerMessage msg;
-        if (network_.receive(msg, 100)) {
-            state_.updateFromMessage(msg);
-        }
-    }
+    // 先处理pending消息
+    drainMessages(false);
 
     bool isHost = false;
     bool autoStartSent = false;
     size_t lastPlayerCount = 0;
     bool lastAllReady = false;
     auto startSentTime = std::chrono::steady_clock::time_point();
-    const int START_TIMEOUT_MS = 10000;  // 10秒超时
+    const int START_TIMEOUT_MS = 10000;
 
     while (running_) {
-        // 非阻塞检查是否有新消息
+        // 非阻塞检查并处理所有消息
         bool hasNewMessage = false;
-        while (network_.hasMessage(0)) {  // 0 = 非阻塞
+        while (network_.hasMessage(0)) {
             game::messages::ServerMessage msg;
             if (!network_.receive(msg, 1000)) {
                 std::cerr << "ERROR: Failed to receive message, connection may be lost" << std::endl;
@@ -265,10 +256,9 @@ void ClientApp::waitingRoomLoop() {
             hasNewMessage = true;
         }
 
-        // 检查phase是否已变为PLAYING（必须在外面，即使没有新消息也要检查）
+        // 检查phase是否已变为PLAYING
         if (state_.phase == GameState::PLAYING) {
             std::cout << "\n>>> Game starting! Transitioning to game loop..." << std::endl;
-            std::cout << "[DEBUG] Current phase: PLAYING, breaking from waitingRoomLoop" << std::endl;
             break;
         }
 
@@ -297,14 +287,14 @@ void ClientApp::waitingRoomLoop() {
             allReady = false;
         }
 
-        // 检查用户输入（非阻塞）
+        // 检查用户输入（非阻塞select on stdin）
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 10000;  // 10ms timeout
+        tv.tv_usec = 10000;  // 10ms
 
         int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
 
@@ -313,7 +303,6 @@ void ClientApp::waitingRoomLoop() {
             std::getline(std::cin, input);
 
             if (input == "ready") {
-                // 检查是否已经ready
                 bool alreadyReady = false;
                 for (const auto& p : state_.players) {
                     if (p.playerId == state_.myPlayerId && p.isReady) {
@@ -325,12 +314,9 @@ void ClientApp::waitingRoomLoop() {
                 if (alreadyReady) {
                     std::cout << ">>> You are already ready!" << std::endl;
                 } else {
-                    // 发送ReadyReq
                     game::messages::ClientMessage readyMsg;
-                    readyMsg.set_seq(nextSeq_);
                     auto* readyReq = readyMsg.mutable_ready_req();
-                    readyReq->set_request_id(nextSeq_);
-                    nextSeq_++;
+                    readyReq->set_request_id(network_.nextRequestId());
                     readyReq->set_player_id(state_.myPlayerId);
                     readyReq->set_room_id(state_.roomId);
                     readyReq->set_is_ready(true);
@@ -340,11 +326,9 @@ void ClientApp::waitingRoomLoop() {
                         running_ = false;
                         return;
                     }
-
                     std::cout << ">>> Ready signal sent!" << std::endl;
                 }
             } else if (input == "start") {
-                // 只有房主且所有人ready才能start
                 if (!isHost) {
                     std::cout << ">>> Only host can start the game!" << std::endl;
                 } else if (autoStartSent) {
@@ -353,10 +337,8 @@ void ClientApp::waitingRoomLoop() {
                     std::cout << ">>> Cannot start: not all players are ready!" << std::endl;
                 } else {
                     game::messages::ClientMessage startMsg;
-                    startMsg.set_seq(nextSeq_);
                     auto* startReq = startMsg.mutable_start_game_req();
-                    startReq->set_request_id(nextSeq_);
-                    nextSeq_++;
+                    startReq->set_request_id(network_.nextRequestId());
                     startReq->set_player_id(state_.myPlayerId);
                     startReq->set_room_id(state_.roomId);
 
@@ -379,7 +361,6 @@ void ClientApp::waitingRoomLoop() {
             lastPlayerCount = state_.players.size();
             lastAllReady = allReady;
 
-            // 显示提示信息
             if (allReady && state_.players.size() == 4) {
                 if (isHost) {
                     std::cout << "\n>>> All players ready! Type 'start' to begin the game" << std::endl;
@@ -390,7 +371,7 @@ void ClientApp::waitingRoomLoop() {
         }
 
         // 检查启动超时
-        if (autoStartSent) {
+        if (autoStartSent && !state_.gameStartConfirmed) {
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - startSentTime
             ).count();
@@ -401,16 +382,164 @@ void ClientApp::waitingRoomLoop() {
             }
         }
 
-        // 如果本次循环没有新消息，短暂休眠避免CPU空转
         if (!hasNewMessage) {
             #ifdef _WIN32
                 Sleep(10);
             #else
-                usleep(10000);  // 10ms
+                usleep(10000);
             #endif
         }
     }
 }
+
+// ============================================================================
+// 状态机核心方法
+// ============================================================================
+
+void ClientApp::drainMessages(bool render) {
+    bool stateChanged = false;
+    while (network_.hasMessage(0)) {
+        game::messages::ServerMessage msg;
+        if (!network_.receive(msg, 100)) break;
+        handleServerError(msg);
+        state_.updateFromMessage(msg);
+        stateChanged = true;
+    }
+    if (stateChanged && render) {
+        renderer_.render(state_);
+    }
+}
+
+bool ClientApp::tryReadLine(std::string& line) {
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+    struct timeval tv = {0, 0};
+    int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+    if (ret <= 0) return false;
+
+    std::getline(std::cin, line);
+    if (std::cin.eof()) {
+        running_ = false;
+        return false;
+    }
+    return true;
+}
+
+void ClientApp::transitionTo(GameSubState newState) {
+    subState_ = newState;
+}
+
+bool ClientApp::isExpectingInput() const {
+    switch (subState_) {
+        case GameSubState::AWAITING_MAIN_INPUT:
+        case GameSubState::AWAITING_DRAWN_DECISION:
+        case GameSubState::AWAITING_REPLACE_SLOTS:
+        case GameSubState::AWAITING_TAKE_SLOTS:
+        case GameSubState::SKILL_PEEK_SLOT:
+        case GameSubState::SKILL_SPY_TARGET:
+        case GameSubState::SKILL_SPY_SLOT:
+        case GameSubState::SKILL_SWAP_MY_SLOT:
+        case GameSubState::SKILL_SWAP_TARGET_PLAYER:
+        case GameSubState::SKILL_SWAP_TARGET_SLOT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+void ClientApp::showPrompt() {
+    switch (subState_) {
+        case GameSubState::AWAITING_MAIN_INPUT:
+            std::cout << ">>> Your Turn! Choose action:" << std::endl;
+            std::cout << "    1. Draw from draw pile" << std::endl;
+            std::cout << "    2. Take from discard pile";
+            if (state_.discardTopValue >= 0) {
+                std::cout << " (current top: " << state_.discardTopValue << ")";
+            }
+            std::cout << std::endl;
+            if (!state_.isFinalRound) {
+                std::cout << "    3. Call CABO" << std::endl;
+            }
+            std::cout << ">>> Enter choice: " << std::flush;
+            break;
+
+        case GameSubState::AWAITING_DRAWN_DECISION: {
+            bool hasSkill = (state_.drawnCardSkill != SKILL_TYPE_NONE);
+            std::cout << "\n>>> You drew: [" << state_.drawnCardValue << "]" << std::endl;
+            if (hasSkill) {
+                std::cout << ">>> This card has a skill!" << std::endl;
+            }
+            std::cout << ">>> Choose what to do:" << std::endl;
+            std::cout << "    1. Discard" << std::endl;
+            std::cout << "    2. Replace your cards with this card" << std::endl;
+            if (hasSkill) {
+                std::cout << "    3. Use skill: ";
+                if (state_.drawnCardSkill == 2) {
+                    std::cout << "Peek one of your cards" << std::endl;
+                } else if (state_.drawnCardSkill == 3) {
+                    std::cout << "Spy on opponent's card" << std::endl;
+                } else if (state_.drawnCardSkill == 4) {
+                    std::cout << "Swap your card with opponent's card" << std::endl;
+                } else {
+                    std::cout << "Unknown skill (type=" << state_.drawnCardSkill << ")" << std::endl;
+                }
+            }
+            std::cout << ">>> Enter choice: " << std::flush;
+            break;
+        }
+
+        case GameSubState::AWAITING_REPLACE_SLOTS:
+            std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): " << std::flush;
+            break;
+
+        case GameSubState::AWAITING_TAKE_SLOTS:
+            std::cout << ">>> Taking top card [" << state_.discardTopValue
+                      << "] from discard pile" << std::endl;
+            std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): " << std::flush;
+            break;
+
+        case GameSubState::SKILL_PEEK_SLOT:
+            std::cout << "\n>>> Peek Self Skill: Choose your slot to peek (0-3): " << std::flush;
+            break;
+
+        case GameSubState::SKILL_SPY_TARGET:
+            std::cout << "\n>>> Spy Skill: Enter opponent player ID: " << std::flush;
+            break;
+
+        case GameSubState::SKILL_SPY_SLOT:
+            std::cout << ">>> Choose slot to spy (0-3): " << std::flush;
+            break;
+
+        case GameSubState::SKILL_SWAP_MY_SLOT:
+            std::cout << "\n>>> Swap Skill: Choose your slot (0-3): " << std::flush;
+            break;
+
+        case GameSubState::SKILL_SWAP_TARGET_PLAYER:
+            std::cout << ">>> Enter opponent player ID: " << std::flush;
+            break;
+
+        case GameSubState::SKILL_SWAP_TARGET_SLOT:
+            std::cout << ">>> Choose opponent slot (0-3): " << std::flush;
+            break;
+
+        default:
+            break;
+    }
+}
+
+bool ClientApp::sendRequestAndWait(game::messages::ClientMessage& req, GameSubState waitState) {
+    if (!network_.send(req)) {
+        std::cout << ">>> Failed to send request!" << std::endl;
+        return false;
+    }
+    transitionTo(waitState);
+    return true;
+}
+
+// ============================================================================
+// 非阻塞游戏主循环
+// ============================================================================
 
 void ClientApp::gameLoop() {
     std::cout << "[DEBUG] Entered gameLoop, phase=" << state_.phase << std::endl;
@@ -418,70 +547,179 @@ void ClientApp::gameLoop() {
               << ", currentPlayerId=" << state_.currentPlayerId << std::endl;
 
     renderer_.render(state_);
+    subState_ = GameSubState::IDLE;
 
-    while (running_ && state_.phase == GameState::PLAYING) {
-        // 检查服务端消息
-        if (network_.hasMessage(100)) {
-            game::messages::ServerMessage msg;
-            if (!network_.receive(msg, 1000)) {
-                std::cerr << "ERROR: Failed to receive message, connection lost" << std::endl;
-                running_ = false;
-                break;
-            }
-            handleServerError(msg);  // 先检查错误
-            state_.updateFromMessage(msg);
+    while (running_ && state_.phase != GameState::GAME_OVER) {
+        if (state_.phase != GameState::PLAYING) break;
+
+        bool activity = false;
+
+        // ---- Step 1: 处理所有pending消息 ----
+        drainMessages(true);
+
+        // 回合结算：即使GameStartNotify已将phase重置为PLAYING，
+        // 也要先显示结算界面再继续
+        if (state_.roundJustRevealed) {
+            handleRoundRevealPhase();
+            state_.roundJustRevealed = false;
+            // 结算后可能game over或继续下一轮
+            if (state_.phase == GameState::GAME_OVER) break;
+            // 下一轮已开始，重置子状态
+            subState_ = GameSubState::IDLE;
             renderer_.render(state_);
         }
 
-        // 如果是我的回合且没有抽牌状态
-        if (state_.isMyTurn() && !state_.hasDrawnCard) {
-            handleGameInput();
+        if (state_.phase != GameState::PLAYING) break;
+
+        // ---- Step 2: 评估状态转换 ----
+
+        // 非自己回合 → IDLE
+        if (!state_.isMyTurn() && subState_ != GameSubState::IDLE &&
+            subState_ != GameSubState::WAITING_DRAW_RSP &&
+            subState_ != GameSubState::WAITING_DISCARD_RSP &&
+            subState_ != GameSubState::WAITING_REPLACE_RSP &&
+            subState_ != GameSubState::WAITING_TAKE_RSP &&
+            subState_ != GameSubState::WAITING_SKILL_RSP &&
+            subState_ != GameSubState::WAITING_CALL_STEADY_RSP) {
+            transitionTo(GameSubState::IDLE);
         }
 
-        // 如果抽了牌，处理抽牌后决策
-        if (state_.hasDrawnCard) {
-            handleDrawnCardDecision();
+        // DrawCardRsp已到达：waitingForDrawResponse被清除
+        if (subState_ == GameSubState::WAITING_DRAW_RSP && !state_.waitingForDrawResponse) {
+            if (state_.hasDrawnCard) {
+                transitionTo(GameSubState::AWAITING_DRAWN_DECISION);
+                showPrompt();
+            } else {
+                transitionTo(GameSubState::IDLE);
+            }
         }
 
-        // 非当前回合，短暂休眠
-        if (!state_.isMyTurn()) {
-            #ifdef _WIN32
-                Sleep(100);
-            #else
-                usleep(100000);  // 100ms
-            #endif
+        // TakeFromDiscardRsp已到达
+        if (subState_ == GameSubState::WAITING_TAKE_RSP && !state_.waitingForTakeResponse) {
+            transitionTo(GameSubState::IDLE);
         }
-    }
 
-    // 处理结算阶段
-    if (state_.phase == GameState::ROUND_REVEAL) {
-        renderer_.render(state_);
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cin.get();
+        // CallSteadyRsp已到达
+        if (subState_ == GameSubState::WAITING_CALL_STEADY_RSP && !state_.waitingForCallSteadyResponse) {
+            transitionTo(GameSubState::IDLE);
+        }
 
-        // 等待下一轮或游戏结束
-        while (running_ && state_.phase == GameState::ROUND_REVEAL) {
-            if (network_.hasMessage(100)) {
-                game::messages::ServerMessage msg;
-                if (network_.receive(msg, 1000)) {
-                    state_.updateFromMessage(msg);
-                    if (state_.phase == GameState::PLAYING) {
-                        // 进入下一轮
-                        return gameLoop();
-                    } else if (state_.phase == GameState::GAME_OVER) {
-                        break;
+        // DiscardDrawnRsp已到达（hasDrawnCard被清除）
+        if (subState_ == GameSubState::WAITING_DISCARD_RSP && !state_.hasDrawnCard) {
+            if (skillTypePending_ > 0) {
+                // Discard + Use Skill: 进入技能流程
+                switch (skillTypePending_) {
+                    case 2: transitionTo(GameSubState::SKILL_PEEK_SLOT); break;
+                    case 3: transitionTo(GameSubState::SKILL_SPY_TARGET); break;
+                    case 4: transitionTo(GameSubState::SKILL_SWAP_MY_SLOT); break;
+                    default: transitionTo(GameSubState::IDLE); break;
+                }
+                showPrompt();
+            } else if (skillTypePending_ == -1) {
+                // 技能牌丢弃但不使用：发空UseSkillReq通知服务端结束回合
+                skillTypePending_ = 0;
+                sendSkipSkillRequest();
+            } else {
+                transitionTo(GameSubState::IDLE);
+            }
+        }
+
+        // ReplaceWithDrawnRsp已到达（hasDrawnCard被清除）
+        if (subState_ == GameSubState::WAITING_REPLACE_RSP && !state_.hasDrawnCard) {
+            transitionTo(GameSubState::IDLE);
+        }
+
+        // UseSkillRsp已到达
+        if (subState_ == GameSubState::WAITING_SKILL_RSP && !state_.waitingForSkillResponse) {
+            // 根据技能类型更新手牌状态
+            if (skillTypeJustCompleted_ == 2) {
+                // PEEK_SELF: 偷看自己的牌 → 标记为已知
+                int slot = skillPending_.mySlot;
+                if (slot >= 0 && slot < static_cast<int>(state_.myCards.size())) {
+                    state_.myCards[slot].isKnown = true;
+                    if (state_.lastPeekedValue >= 0) {
+                        state_.myCards[slot].value = state_.lastPeekedValue;
                     }
+                    std::cout << ">>> You peeked your slot " << slot
+                              << ": [" << state_.lastPeekedValue << "]" << std::endl;
+                }
+            } else if (skillTypeJustCompleted_ == 3) {
+                // SPY: 偷看对手的牌 → 仅显示数值，不影响自己手牌
+                if (state_.lastPeekedValue >= 0) {
+                    std::cout << ">>> You spied opponent's card: [" << state_.lastPeekedValue << "]" << std::endl;
+                }
+            } else if (skillTypeJustCompleted_ == 4) {
+                // SWAP: 交换 → 自己的槽位变为未知（盲换）
+                int slot = skillPending_.mySlot;
+                if (slot >= 0 && slot < static_cast<int>(state_.myCards.size())) {
+                    state_.myCards[slot].isKnown = false;
+                    std::cout << ">>> Swap completed! Your slot " << slot
+                              << " is now unknown (blind swap)." << std::endl;
                 }
             }
+            skillTypeJustCompleted_ = 0;
+            transitionTo(GameSubState::IDLE);
+            renderer_.render(state_);  // 立即渲染以反映手牌变化
+        }
+
+        // ---- Step 3: 自己回合且空闲 → 进入主输入状态 ----
+        if (state_.isMyTurn() && subState_ == GameSubState::IDLE &&
+            !state_.hasDrawnCard &&
+            !state_.waitingForDrawResponse &&
+            !state_.waitingForTakeResponse &&
+            !state_.waitingForCallSteadyResponse) {
+            transitionTo(GameSubState::AWAITING_MAIN_INPUT);
+            showPrompt();
+        }
+
+        // ---- Step 4: 等待中显示状态 ----
+        if (subState_ == GameSubState::IDLE && !state_.isMyTurn()) {
+            // 找到当前玩家的昵称
+            std::string currentPlayerName = "Player";
+            for (const auto& p : state_.players) {
+                if (p.playerId == state_.currentPlayerId) {
+                    currentPlayerName = p.nickname;
+                    break;
+                }
+            }
+        }
+
+        // ---- Step 5: 如果需要输入，select()检查stdin ----
+        if (isExpectingInput()) {
+            fd_set readfds;
+            FD_ZERO(&readfds);
+            FD_SET(STDIN_FILENO, &readfds);
+            struct timeval tv = {0, 50000};  // 50ms
+            int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+            if (ret > 0) {
+                std::string line;
+                if (tryReadLine(line)) {
+                    activity = true;
+                    handleInputLine(line);
+                }
+            }
+        }
+
+        // ---- Step 6: 空闲时短暂休眠（避免CPU空转） ----
+        if (!activity) {
             #ifdef _WIN32
-                Sleep(100);
+                Sleep(50);
             #else
-                usleep(100000);
+                usleep(50000);
             #endif
         }
     }
 
-    // 处理游戏结束
+    // ---- 阶段转换处理（替代递归调用） ----
+    if (state_.phase == GameState::ROUND_REVEAL) {
+        handleRoundRevealPhase();
+        // 如果进入下一轮，继续gameLoop
+        if (state_.phase == GameState::PLAYING) {
+            gameLoop();
+            return;
+        }
+    }
+
     if (state_.phase == GameState::GAME_OVER) {
         renderer_.render(state_);
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
@@ -489,56 +727,394 @@ void ClientApp::gameLoop() {
     }
 }
 
-void ClientApp::handleGameInput() {
-    int choice;
-    std::cin >> choice;
+void ClientApp::handleRoundRevealPhase() {
+    // 先处理所有pending消息
+    drainMessages(true);
+    renderer_.render(state_);
 
-    // 检查EOF
-    if (std::cin.eof()) {
-        std::cout << "\n>>> EOF detected, exiting..." << std::endl;
-        running_ = false;
-        return;
+    // 等待用户按Enter（同时继续处理消息）
+    while (running_ && state_.phase == GameState::ROUND_REVEAL) {
+        drainMessages(true);
+        if (state_.phase != GameState::ROUND_REVEAL) break;
+
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        struct timeval tv = {0, 100000};  // 100ms
+        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+        if (ret > 0) {
+            std::string line;
+            std::getline(std::cin, line);  // consume the Enter
+            break;
+        }
     }
 
-    if (std::cin.fail() || choice < 1 || choice > 3) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid input! Please enter 1, 2, or 3." << std::endl;
-        renderer_.render(state_);
+    // 再次处理可能在等待Enter期间到达的消息
+    drainMessages(true);
+}
+
+// ============================================================================
+// 输入分发
+// ============================================================================
+
+void ClientApp::handleInputLine(const std::string& line) {
+    switch (subState_) {
+        case GameSubState::AWAITING_MAIN_INPUT:
+            onMainMenuInput(line);
+            break;
+        case GameSubState::AWAITING_DRAWN_DECISION:
+            onDrawnCardDecision(line);
+            break;
+        case GameSubState::AWAITING_REPLACE_SLOTS:
+            onSlotListInput(line, false);
+            break;
+        case GameSubState::AWAITING_TAKE_SLOTS:
+            onSlotListInput(line, true);
+            break;
+        case GameSubState::SKILL_PEEK_SLOT:
+        case GameSubState::SKILL_SPY_TARGET:
+        case GameSubState::SKILL_SPY_SLOT:
+        case GameSubState::SKILL_SWAP_MY_SLOT:
+        case GameSubState::SKILL_SWAP_TARGET_PLAYER:
+        case GameSubState::SKILL_SWAP_TARGET_SLOT:
+            onSkillInputLine(line);
+            break;
+        default:
+            break;
+    }
+}
+
+// ============================================================================
+// 主菜单输入处理
+// ============================================================================
+
+void ClientApp::onMainMenuInput(const std::string& line) {
+    int maxChoice = state_.isFinalRound ? 2 : 3;
+    int choice;
+    if (!parseInt(line, choice, 1, maxChoice)) {
+        showPrompt();
         return;
     }
 
     game::messages::ClientMessage req;
+    int64_t reqId = network_.nextRequestId();
 
     if (choice == 1) {
         // 抽牌
         auto* drawReq = req.mutable_draw_card_req();
         drawReq->set_player_id(state_.myPlayerId);
         drawReq->set_room_id(state_.roomId);
-        drawReq->set_request_id(nextSeq_);
-        req.set_seq(nextSeq_++);
+        drawReq->set_request_id(reqId);
 
-        if (network_.send(req)) {
+        if (sendRequestAndWait(req, GameSubState::WAITING_DRAW_RSP)) {
             std::cout << ">>> Drawing card..." << std::endl;
+            state_.waitingForDrawResponse = true;
         }
-
     } else if (choice == 2) {
-        // 从弃牌堆拿牌
-        handleTakeFromDiscard();
-
+        // 从弃牌堆拿牌 → 先输入槽位
+        transitionTo(GameSubState::AWAITING_TAKE_SLOTS);
+        showPrompt();
     } else if (choice == 3) {
         // 喊CABO
+        if (state_.waitingForCallSteadyResponse) {
+            std::cout << ">>> Already waiting for CABO response from server!" << std::endl;
+            showPrompt();
+            return;
+        }
         auto* caboReq = req.mutable_call_steady_req();
         caboReq->set_player_id(state_.myPlayerId);
         caboReq->set_room_id(state_.roomId);
-        caboReq->set_request_id(nextSeq_);
-        req.set_seq(nextSeq_++);
+        caboReq->set_request_id(reqId);
 
-        if (network_.send(req)) {
+        if (sendRequestAndWait(req, GameSubState::WAITING_CALL_STEADY_RSP)) {
             std::cout << ">>> Called CABO!" << std::endl;
+            state_.waitingForCallSteadyResponse = true;
         }
     }
 }
+
+// ============================================================================
+// 抽牌后决策输入处理
+// ============================================================================
+
+void ClientApp::onDrawnCardDecision(const std::string& line) {
+    bool hasSkill = (state_.drawnCardSkill != SKILL_TYPE_NONE);
+    int maxChoice = hasSkill ? 3 : 2;
+
+    int choice;
+    if (!parseInt(line, choice, 1, maxChoice)) {
+        showPrompt();
+        return;
+    }
+
+    int64_t reqId = network_.nextRequestId();
+    game::messages::ClientMessage req;
+
+    if (choice == 1) {
+        // 弃掉（不使用技能）
+        auto* discardReq = req.mutable_discard_drawn_req();
+        discardReq->set_player_id(state_.myPlayerId);
+        discardReq->set_room_id(state_.roomId);
+        discardReq->set_request_id(reqId);
+
+        if (sendRequestAndWait(req, GameSubState::WAITING_DISCARD_RSP)) {
+            std::cout << ">>> Discarding..." << std::endl;
+            // 技能牌丢弃但不使用：标记为 -1，稍后发空UseSkillReq通知服务端结束回合
+            // 非技能牌：标记为 0，DiscardDrawnRsp后服务端已自动结束回合
+            skillTypePending_ = hasSkill ? -1 : 0;
+        }
+    } else if (choice == 2) {
+        // 替换
+        transitionTo(GameSubState::AWAITING_REPLACE_SLOTS);
+        showPrompt();
+    } else if (choice == 3) {
+        // 弃掉并使用技能
+        auto* discardReq = req.mutable_discard_drawn_req();
+        discardReq->set_player_id(state_.myPlayerId);
+        discardReq->set_room_id(state_.roomId);
+        discardReq->set_request_id(reqId);
+
+        if (sendRequestAndWait(req, GameSubState::WAITING_DISCARD_RSP)) {
+            std::cout << ">>> Discarding and using skill..." << std::endl;
+            skillTypePending_ = state_.drawnCardSkill;
+        }
+    }
+}
+
+// ============================================================================
+// 槽位列表输入处理（替换/从弃牌堆拿牌共用）
+// ============================================================================
+
+void ClientApp::onSlotListInput(const std::string& line, bool fromDiscard) {
+    std::vector<int> slots = parseSlotIndices(line);
+
+    if (slots.empty()) {
+        std::cout << ">>> No valid slots entered. Please enter space-separated slot numbers." << std::endl;
+        showPrompt();
+        return;
+    }
+
+    int64_t reqId = network_.nextRequestId();
+    game::messages::ClientMessage req;
+
+    if (fromDiscard) {
+        auto* takeReq = req.mutable_take_from_discard_req();
+        takeReq->set_player_id(state_.myPlayerId);
+        takeReq->set_room_id(state_.roomId);
+        takeReq->set_request_id(reqId);
+        for (int s : slots) takeReq->add_slot_indices(s);
+    } else {
+        auto* replaceReq = req.mutable_replace_with_drawn_req();
+        replaceReq->set_player_id(state_.myPlayerId);
+        replaceReq->set_room_id(state_.roomId);
+        replaceReq->set_request_id(reqId);
+        for (int s : slots) replaceReq->add_slot_indices(s);
+    }
+
+    GameSubState waitState = fromDiscard ? GameSubState::WAITING_TAKE_RSP : GameSubState::WAITING_REPLACE_RSP;
+
+    if (fromDiscard) {
+        state_.waitingForTakeResponse = true;
+    }
+
+    std::cout << ">>> Attempting to replace slots [";
+    for (size_t i = 0; i < slots.size(); ++i) {
+        std::cout << slots[i];
+        if (i < slots.size() - 1) std::cout << ", ";
+    }
+    std::cout << "]..." << std::endl;
+
+    if (!sendRequestAndWait(req, waitState)) {
+        if (fromDiscard) state_.waitingForTakeResponse = false;
+        transitionTo(GameSubState::IDLE);
+    }
+}
+
+// ============================================================================
+// 技能输入处理（链式状态机）
+// ============================================================================
+
+void ClientApp::onSkillInputLine(const std::string& line) {
+    switch (subState_) {
+        case GameSubState::SKILL_PEEK_SLOT: {
+            int slot;
+            if (!parseInt(line, slot, 0, 3)) { showPrompt(); return; }
+            skillPending_.mySlot = slot;
+            sendSkillRequest();
+            break;
+        }
+        case GameSubState::SKILL_SPY_TARGET: {
+            int64_t pid;
+            if (!parseInt64(line, pid)) { showPrompt(); return; }
+            bool found = false;
+            for (const auto& p : state_.players) {
+                if (p.playerId == pid && p.playerId != state_.myPlayerId) {
+                    found = true; break;
+                }
+            }
+            if (!found) {
+                std::cout << ">>> Player ID not found or is yourself. Try again." << std::endl;
+                showPrompt(); return;
+            }
+            skillPending_.targetPlayerId = pid;
+            transitionTo(GameSubState::SKILL_SPY_SLOT);
+            showPrompt();
+            break;
+        }
+        case GameSubState::SKILL_SPY_SLOT: {
+            int slot;
+            if (!parseInt(line, slot, 0, 3)) { showPrompt(); return; }
+            skillPending_.targetSlot = slot;
+            sendSkillRequest();
+            break;
+        }
+        case GameSubState::SKILL_SWAP_MY_SLOT: {
+            int slot;
+            if (!parseInt(line, slot, 0, 3)) { showPrompt(); return; }
+            skillPending_.mySlot = slot;
+            transitionTo(GameSubState::SKILL_SWAP_TARGET_PLAYER);
+            showPrompt();
+            break;
+        }
+        case GameSubState::SKILL_SWAP_TARGET_PLAYER: {
+            int64_t pid;
+            if (!parseInt64(line, pid)) { showPrompt(); return; }
+            bool found = false;
+            for (const auto& p : state_.players) {
+                if (p.playerId == pid && p.playerId != state_.myPlayerId) {
+                    found = true; break;
+                }
+            }
+            if (!found) {
+                std::cout << ">>> Player ID not found or is yourself. Try again." << std::endl;
+                showPrompt(); return;
+            }
+            skillPending_.targetPlayerId = pid;
+            transitionTo(GameSubState::SKILL_SWAP_TARGET_SLOT);
+            showPrompt();
+            break;
+        }
+        case GameSubState::SKILL_SWAP_TARGET_SLOT: {
+            int slot;
+            if (!parseInt(line, slot, 0, 3)) { showPrompt(); return; }
+            skillPending_.targetSlot = slot;
+            sendSkillRequest();
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void ClientApp::sendSkillRequest() {
+    int64_t reqId = network_.nextRequestId();
+    game::messages::ClientMessage req;
+    auto* skillReq = req.mutable_use_skill_req();
+    skillReq->set_player_id(state_.myPlayerId);
+    skillReq->set_room_id(state_.roomId);
+    skillReq->set_request_id(reqId);
+    skillReq->set_card_id(0);
+
+    switch (skillTypePending_) {
+        case 2: {  // PEEK_SELF
+            auto* params = skillReq->mutable_peek_self();
+            params->set_slot_index(skillPending_.mySlot);
+            std::cout << ">>> Using Peek Self skill on slot " << skillPending_.mySlot << "..." << std::endl;
+            break;
+        }
+        case 3: {  // SPY
+            auto* params = skillReq->mutable_spy();
+            params->set_target_player_id(skillPending_.targetPlayerId);
+            params->set_target_slot_index(skillPending_.targetSlot);
+            std::cout << ">>> Using Spy skill on player " << skillPending_.targetPlayerId
+                      << " slot " << skillPending_.targetSlot << "..." << std::endl;
+            break;
+        }
+        case 4: {  // SWAP
+            auto* params = skillReq->mutable_swap();
+            params->set_own_slot_index(skillPending_.mySlot);
+            params->set_target_player_id(skillPending_.targetPlayerId);
+            params->set_target_slot_index(skillPending_.targetSlot);
+            std::cout << ">>> Using Swap skill: your slot " << skillPending_.mySlot
+                      << " <-> player " << skillPending_.targetPlayerId
+                      << " slot " << skillPending_.targetSlot << "..." << std::endl;
+            break;
+        }
+    }
+
+    skillTypeJustCompleted_ = skillTypePending_;  // 保存以在UseSkillRsp后更新手牌
+    skillTypePending_ = 0;  // 清除待处理技能
+
+    if (sendRequestAndWait(req, GameSubState::WAITING_SKILL_RSP)) {
+        state_.waitingForSkillResponse = true;
+    } else {
+        skillTypeJustCompleted_ = 0;
+        transitionTo(GameSubState::IDLE);
+    }
+}
+
+void ClientApp::sendSkipSkillRequest() {
+    // 发空参数UseSkillReq通知服务端：丢弃了技能牌但不使用技能，请结束回合
+    int64_t reqId = network_.nextRequestId();
+    game::messages::ClientMessage req;
+    auto* skillReq = req.mutable_use_skill_req();
+    skillReq->set_player_id(state_.myPlayerId);
+    skillReq->set_room_id(state_.roomId);
+    skillReq->set_request_id(reqId);
+    skillReq->set_card_id(0);
+    // 不设置任何技能参数 → 服务端识别为"skip skill"
+
+    std::cout << ">>> Skipping skill, ending turn..." << std::endl;
+
+    if (sendRequestAndWait(req, GameSubState::WAITING_SKILL_RSP)) {
+        state_.waitingForSkillResponse = true;
+    } else {
+        transitionTo(GameSubState::IDLE);
+    }
+}
+
+// ============================================================================
+// 解析辅助方法
+// ============================================================================
+
+bool ClientApp::parseInt(const std::string& str, int& out, int min, int max) {
+    try {
+        size_t pos;
+        int val = std::stoi(str, &pos);
+        if (pos != str.length()) {
+            std::cout << ">>> Please enter just a number." << std::endl;
+            return false;
+        }
+        if (val < min || val > max) {
+            std::cout << ">>> Please enter " << min << "-" << max << "." << std::endl;
+            return false;
+        }
+        out = val;
+        return true;
+    } catch (...) {
+        std::cout << ">>> Invalid number." << std::endl;
+        return false;
+    }
+}
+
+bool ClientApp::parseInt64(const std::string& str, int64_t& out) {
+    try {
+        size_t pos;
+        out = std::stoll(str, &pos);
+        if (pos != str.length()) {
+            std::cout << ">>> Please enter just a number." << std::endl;
+            return false;
+        }
+        return true;
+    } catch (...) {
+        std::cout << ">>> Invalid number." << std::endl;
+        return false;
+    }
+}
+
+// ============================================================================
+// 工具方法
+// ============================================================================
 
 std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {
     std::vector<int> result;
@@ -552,9 +1128,7 @@ std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {
                     if (slot >= 0 && slot < MAX_SLOT_INDEX) {
                         result.push_back(slot);
                     }
-                } catch (...) {
-                    // 忽略非法输入
-                }
+                } catch (...) {}
                 token.clear();
             }
         } else if (c >= '0' && c <= '9') {
@@ -562,7 +1136,6 @@ std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {
         }
     }
 
-    // 处理最后一个token
     if (!token.empty()) {
         try {
             int slot = std::stoi(token);
@@ -575,471 +1148,11 @@ std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {
     return result;
 }
 
-void ClientApp::handleDrawnCardDecision() {
-    std::cout << "\n>>> You drew: [" << state_.drawnCardValue << "]" << std::endl;
-
-    if (state_.drawnCardSkill != SKILL_TYPE_NONE) {
-        std::cout << ">>> This card has a skill!" << std::endl;
-    }
-
-    std::cout << ">>> Choose what to do:" << std::endl;
-    std::cout << "    1. Discard";
-    if (state_.drawnCardSkill != SKILL_TYPE_NONE) {
-        std::cout << " and use skill";
-    }
-    std::cout << std::endl;
-    std::cout << "    2. Replace your cards with this card" << std::endl;
-    std::cout << ">>> Enter choice: ";
-
-    int choice;
-    std::cin >> choice;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        state_.hasDrawnCard = false;
-        return;
-    }
-
-    if (std::cin.fail() || (choice != 1 && choice != 2)) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid choice! Please enter 1 or 2." << std::endl;
-        renderer_.render(state_);
-        // 添加短暂延迟避免busy loop
-        #ifdef _WIN32
-            Sleep(100);
-        #else
-            usleep(100000);
-        #endif
-        return;  // 重新提示
-    }
-
-    if (choice == 1) {
-        // 弃掉
-        game::messages::ClientMessage req;
-        req.set_seq(nextSeq_);
-        auto* discardReq = req.mutable_discard_drawn_req();
-        discardReq->set_player_id(state_.myPlayerId);
-        discardReq->set_room_id(state_.roomId);
-        discardReq->set_request_id(nextSeq_++);
-
-        if (!network_.send(req)) {
-            std::cout << ">>> Failed to send DiscardDrawnReq!" << std::endl;
-            state_.hasDrawnCard = false;
-            return;
-        }
-
-        std::cout << ">>> Discarding..." << std::endl;
-
-        // 等待服务端确认
-        game::messages::ServerMessage rsp;
-        if (!network_.receive(rsp, 5000)) {
-            std::cout << ">>> Timeout waiting for DiscardDrawnRsp!" << std::endl;
-            state_.hasDrawnCard = false;
-            return;
-        }
-
-        if (rsp.has_discard_drawn_rsp() && rsp.discard_drawn_rsp().error().code() == 0) {
-            // 成功后清除状态
-            state_.hasDrawnCard = false;
-
-            // 如果有技能，处理技能输入
-            if (state_.drawnCardSkill != SKILL_TYPE_NONE) {
-                handleSkillInput(state_.drawnCardSkill);
-            }
-        } else {
-            std::cout << ">>> Discard failed!" << std::endl;
-            state_.hasDrawnCard = false;
-        }
-
-    } else if (choice == 2) {
-        // 替换
-        handleReplaceWithDrawn();
-    }
-}
-
-void ClientApp::handleReplaceWithDrawn() {
-    const int MAX_RETRIES = 5;
-    int retryCount = 0;
-
-    while (retryCount < MAX_RETRIES) {
-        std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): ";
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-        std::string line;
-        std::getline(std::cin, line);
-
-        if (std::cin.eof()) {
-            running_ = false;
-            return;
-        }
-
-        std::vector<int> slots = parseSlotIndices(line);
-
-        if (slots.empty()) {
-            retryCount++;
-            std::cout << ">>> No valid slots entered! "
-                      << (MAX_RETRIES - retryCount) << " attempts remaining." << std::endl;
-            if (retryCount < MAX_RETRIES) {
-                renderer_.render(state_);
-                continue;
-            } else {
-                std::cout << ">>> Max retries reached. Canceling replace action." << std::endl;
-                state_.hasDrawnCard = false;
-                return;
-            }
-        }
-
-        // 找到有效输入，继续处理
-        game::messages::ClientMessage req;
-        req.set_seq(nextSeq_);
-        auto* replaceReq = req.mutable_replace_with_drawn_req();
-        replaceReq->set_player_id(state_.myPlayerId);
-        replaceReq->set_room_id(state_.roomId);
-        replaceReq->set_request_id(nextSeq_++);
-
-        for (int slot : slots) {
-            replaceReq->add_slot_indices(slot);
-        }
-
-        if (network_.send(req)) {
-            std::cout << ">>> Attempting to replace slots [";
-            for (size_t i = 0; i < slots.size(); ++i) {
-                std::cout << slots[i];
-                if (i < slots.size() - 1) std::cout << ", ";
-            }
-            std::cout << "]..." << std::endl;
-
-            // 等待服务端确认后再清除状态
-            game::messages::ServerMessage rsp;
-            if (network_.receive(rsp, 5000) && rsp.has_replace_with_drawn_rsp()) {
-                if (rsp.replace_with_drawn_rsp().error().code() == 0) {
-                    state_.hasDrawnCard = false;
-                } else {
-                    std::cout << ">>> Replace failed: "
-                              << rsp.replace_with_drawn_rsp().error().message() << std::endl;
-                    state_.hasDrawnCard = false;
-                }
-            }
-        }
-        return;
-    }
-}
-
-void ClientApp::handleSkillInput(int skillType) {
-    // 7-8: Peek Self
-    // 9-10: Spy
-    // 11-12: Swap
-    if (skillType == 7 || skillType == 8) {
-        handlePeekSelfSkill();
-    } else if (skillType == 9 || skillType == 10) {
-        handleSpySkill();
-    } else if (skillType == 11 || skillType == 12) {
-        handleSwapSkill();
-    }
-}
-
-void ClientApp::handlePeekSelfSkill() {
-    std::cout << "\n>>> Peek Self Skill: Choose your slot to peek (0-3): ";
-    int slot;
-    std::cin >> slot;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail() || slot < 0 || slot >= 4) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid slot! Must be 0-3." << std::endl;
-        return;
-    }
-
-    // 构建UseSkillReq
-    game::messages::ClientMessage req;
-    req.set_seq(nextSeq_);
-    auto* skillReq = req.mutable_use_skill_req();
-    skillReq->set_player_id(state_.myPlayerId);
-    skillReq->set_room_id(state_.roomId);
-    skillReq->set_request_id(nextSeq_++);
-    skillReq->set_card_id(0);  // 服务端会忽略此字段
-
-    auto* params = skillReq->mutable_peek_self();
-    params->set_slot_index(slot);
-
-    if (!network_.send(req)) {
-        std::cout << ">>> Failed to send UseSkillReq!" << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Using Peek Self skill on slot " << slot << "..." << std::endl;
-
-    // 等待UseSkillRsp
-    game::messages::ServerMessage rsp;
-    if (!network_.receive(rsp, 5000)) {
-        std::cout << ">>> Timeout waiting for UseSkillRsp!" << std::endl;
-        return;
-    }
-
-    if (rsp.has_use_skill_rsp()) {
-        if (rsp.use_skill_rsp().error().code() == 0) {
-            std::cout << ">>> You peeked slot " << slot << ": ["
-                      << rsp.use_skill_rsp().peeked_value() << "]" << std::endl;
-        } else {
-            std::cout << ">>> Skill failed: " << rsp.use_skill_rsp().error().message() << std::endl;
-        }
-    }
-}
-
-void ClientApp::handleSpySkill() {
-    std::cout << "\n>>> Spy Skill: Choose opponent player ID: ";
-    int targetPlayerId;
-    std::cin >> targetPlayerId;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail()) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid player ID!" << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Choose slot to spy (0-3): ";
-    int slot;
-    std::cin >> slot;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail() || slot < 0 || slot >= 4) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid slot! Must be 0-3." << std::endl;
-        return;
-    }
-
-    // 构建UseSkillReq
-    game::messages::ClientMessage req;
-    req.set_seq(nextSeq_);
-    auto* skillReq = req.mutable_use_skill_req();
-    skillReq->set_player_id(state_.myPlayerId);
-    skillReq->set_room_id(state_.roomId);
-    skillReq->set_request_id(nextSeq_++);
-    skillReq->set_card_id(0);
-
-    auto* params = skillReq->mutable_spy();
-    params->set_target_player_id(targetPlayerId);
-    params->set_target_slot_index(slot);
-
-    if (!network_.send(req)) {
-        std::cout << ">>> Failed to send UseSkillReq!" << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Using Spy skill on player " << targetPlayerId
-              << " slot " << slot << "..." << std::endl;
-
-    // 等待UseSkillRsp
-    game::messages::ServerMessage rsp;
-    if (!network_.receive(rsp, 5000)) {
-        std::cout << ">>> Timeout waiting for UseSkillRsp!" << std::endl;
-        return;
-    }
-
-    if (rsp.has_use_skill_rsp()) {
-        if (rsp.use_skill_rsp().error().code() == 0) {
-            std::cout << ">>> You spied player " << targetPlayerId
-                      << " slot " << slot << ": ["
-                      << rsp.use_skill_rsp().peeked_value() << "]" << std::endl;
-        } else {
-            std::cout << ">>> Skill failed: " << rsp.use_skill_rsp().error().message() << std::endl;
-        }
-    }
-}
-
-void ClientApp::handleSwapSkill() {
-    std::cout << "\n>>> Swap Skill: Choose your slot (0-3): ";
-    int mySlot;
-    std::cin >> mySlot;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail() || mySlot < 0 || mySlot >= 4) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid slot! Must be 0-3." << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Choose opponent player ID: ";
-    int targetPlayerId;
-    std::cin >> targetPlayerId;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail()) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid player ID!" << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Choose opponent slot (0-3): ";
-    int targetSlot;
-    std::cin >> targetSlot;
-
-    if (std::cin.eof()) {
-        running_ = false;
-        return;
-    }
-
-    if (std::cin.fail() || targetSlot < 0 || targetSlot >= 4) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid slot! Must be 0-3." << std::endl;
-        return;
-    }
-
-    // 构建UseSkillReq
-    game::messages::ClientMessage req;
-    req.set_seq(nextSeq_);
-    auto* skillReq = req.mutable_use_skill_req();
-    skillReq->set_player_id(state_.myPlayerId);
-    skillReq->set_room_id(state_.roomId);
-    skillReq->set_request_id(nextSeq_++);
-    skillReq->set_card_id(0);
-
-    auto* params = skillReq->mutable_swap();
-    params->set_own_slot_index(mySlot);
-    params->set_target_player_id(targetPlayerId);
-    params->set_target_slot_index(targetSlot);
-
-    if (!network_.send(req)) {
-        std::cout << ">>> Failed to send UseSkillReq!" << std::endl;
-        return;
-    }
-
-    std::cout << ">>> Using Swap skill: your slot " << mySlot
-              << " <-> player " << targetPlayerId << " slot " << targetSlot << "..." << std::endl;
-
-    // 等待UseSkillRsp
-    game::messages::ServerMessage rsp;
-    if (!network_.receive(rsp, 5000)) {
-        std::cout << ">>> Timeout waiting for UseSkillRsp!" << std::endl;
-        return;
-    }
-
-    if (rsp.has_use_skill_rsp()) {
-        if (rsp.use_skill_rsp().error().code() == 0) {
-            std::cout << ">>> Swap successful!" << std::endl;
-        } else {
-            std::cout << ">>> Skill failed: " << rsp.use_skill_rsp().error().message() << std::endl;
-        }
-    }
-}
-
-void ClientApp::handleTakeFromDiscard() {
-    const int MAX_RETRIES = 5;
-    int retryCount = 0;
-
-    while (retryCount < MAX_RETRIES) {
-        std::cout << ">>> Taking top card [" << state_.discardTopValue
-                  << "] from discard pile" << std::endl;
-        std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): ";
-
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::string line;
-        std::getline(std::cin, line);
-
-        if (std::cin.eof()) {
-            running_ = false;
-            return;
-        }
-
-        std::vector<int> slots = parseSlotIndices(line);
-
-        if (slots.empty()) {
-            retryCount++;
-            std::cout << ">>> No valid slots entered! "
-                      << (MAX_RETRIES - retryCount) << " attempts remaining." << std::endl;
-            if (retryCount < MAX_RETRIES) {
-                renderer_.render(state_);
-                continue;
-            } else {
-                std::cout << ">>> Max retries reached. Canceling take action." << std::endl;
-                return;
-            }
-        }
-
-        // 找到有效输入，继续处理
-        game::messages::ClientMessage req;
-        req.set_seq(nextSeq_);
-        auto* takeReq = req.mutable_take_from_discard_req();
-        takeReq->set_player_id(state_.myPlayerId);
-        takeReq->set_room_id(state_.roomId);
-        takeReq->set_request_id(nextSeq_++);
-
-        for (int slot : slots) {
-            takeReq->add_slot_indices(slot);
-        }
-
-        if (!network_.send(req)) {
-            std::cout << ">>> Failed to send TakeFromDiscardReq!" << std::endl;
-            return;
-        }
-
-        std::cout << ">>> Attempting to replace slots [";
-        for (size_t i = 0; i < slots.size(); ++i) {
-            std::cout << slots[i];
-            if (i < slots.size() - 1) std::cout << ", ";
-        }
-        std::cout << "]..." << std::endl;
-
-        // 等待服务端响应
-        game::messages::ServerMessage rsp;
-        if (!network_.receive(rsp, 5000)) {
-            std::cout << ">>> Timeout waiting for TakeFromDiscardRsp!" << std::endl;
-            return;
-        }
-
-        if (rsp.has_take_from_discard_rsp()) {
-            const auto& takeRsp = rsp.take_from_discard_rsp();
-            if (takeRsp.error().code() == 0) {
-                if (takeRsp.has_exchange_result()) {
-                    const auto& result = takeRsp.exchange_result();
-                    if (result.success()) {
-                        std::cout << ">>> Replace successful!" << std::endl;
-                    } else {
-                        std::cout << ">>> Replace FAILED! Cards have different values." << std::endl;
-                        std::cout << ">>> Card added to your hand." << std::endl;
-                        if (result.drew_extra_penalty_card()) {
-                            std::cout << ">>> Extra penalty card added (3+ cards attempted)." << std::endl;
-                        }
-                    }
-                }
-            } else {
-                std::cout << ">>> Take from discard failed: " << takeRsp.error().message() << std::endl;
-            }
-        }
-        return;
-    }
-}
+// ============================================================================
+// 错误处理
+// ============================================================================
 
 void ClientApp::handleServerError(const game::messages::ServerMessage& msg) {
-    // 检查各种响应中的error字段
     if (msg.has_create_room_rsp() && msg.create_room_rsp().error().code() != 0) {
         std::cout << "ERROR: " << msg.create_room_rsp().error().message() << std::endl;
         std::cout << ">>> Press Enter to continue..." << std::endl;
@@ -1052,8 +1165,22 @@ void ClientApp::handleServerError(const game::messages::ServerMessage& msg) {
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         std::cin.get();
     }
+    else if (msg.has_ready_rsp() && msg.ready_rsp().error().code() != 0) {
+        std::cout << "ERROR: Ready failed - " << msg.ready_rsp().error().message() << std::endl;
+    }
+    else if (msg.has_start_game_rsp() && msg.start_game_rsp().error().code() != 0) {
+        std::cout << "ERROR: Start game failed - " << msg.start_game_rsp().error().message() << std::endl;
+    }
     else if (msg.has_draw_card_rsp() && msg.draw_card_rsp().error().code() != 0) {
         std::cout << "ERROR: " << msg.draw_card_rsp().error().message() << std::endl;
+        renderer_.render(state_);
+    }
+    else if (msg.has_discard_drawn_rsp() && msg.discard_drawn_rsp().error().code() != 0) {
+        std::cout << "ERROR: Discard failed - " << msg.discard_drawn_rsp().error().message() << std::endl;
+        renderer_.render(state_);
+    }
+    else if (msg.has_replace_with_drawn_rsp() && msg.replace_with_drawn_rsp().error().code() != 0) {
+        std::cout << "ERROR: Replace failed - " << msg.replace_with_drawn_rsp().error().message() << std::endl;
         renderer_.render(state_);
     }
     else if (msg.has_take_from_discard_rsp() && msg.take_from_discard_rsp().error().code() != 0) {
@@ -1064,24 +1191,10 @@ void ClientApp::handleServerError(const game::messages::ServerMessage& msg) {
         std::cout << "ERROR: " << msg.use_skill_rsp().error().message() << std::endl;
         renderer_.render(state_);
     }
-}
-
-bool ClientApp::getIntInput(int& out, int min, int max) {
-    std::cin >> out;
-
-    if (std::cin.fail()) {
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        std::cout << ">>> Invalid input! Please enter a number." << std::endl;
-        return false;
+    else if (msg.has_call_steady_rsp() && msg.call_steady_rsp().error().code() != 0) {
+        std::cout << "ERROR: Call CABO failed - " << msg.call_steady_rsp().error().message() << std::endl;
+        renderer_.render(state_);
     }
-
-    if (out < min || out > max) {
-        std::cout << ">>> Input out of range! Please enter " << min << "-" << max << "." << std::endl;
-        return false;
-    }
-
-    return true;
 }
 
 } // namespace cabo

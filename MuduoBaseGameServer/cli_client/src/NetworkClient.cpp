@@ -144,9 +144,9 @@ bool NetworkClient::decodeFrame(const std::vector<uint8_t>& buffer,
 bool NetworkClient::send(const game::messages::ClientMessage& msg) {
     if (sockfd_ < 0) return false;
 
-    // 设置seq
+    // 设置seq（先不递增，发送成功后再递增）
     game::messages::ClientMessage msgWithSeq = msg;
-    msgWithSeq.set_seq(clientSeq_++);
+    msgWithSeq.set_seq(clientSeq_);
 
     // 序列化
     std::string payload;
@@ -159,13 +159,39 @@ bool NetworkClient::send(const game::messages::ClientMessage& msg) {
     std::string frame = encodeFrame(payload);
 
     // 发送
-    return sendRaw(frame.data(), frame.size());
+    if (!sendRaw(frame.data(), frame.size())) {
+        return false;
+    }
+
+    // 发送成功后才递增序列号
+    clientSeq_++;
+    return true;
 }
 
 // Step 5: 实现hasMessage方法
 bool NetworkClient::hasMessage(int timeoutMs) {
     if (sockfd_ < 0) return false;
 
+    // CRITICAL FIX: Check recvBuffer_ first before checking socket
+    // Multiple messages can arrive in one recv() call and sit in buffer
+    if (recvBuffer_.size() >= 4) {
+        // Check if we have at least a complete frame header
+        uint32_t len = (static_cast<uint32_t>(recvBuffer_[0]) << 24)
+                     | (static_cast<uint32_t>(recvBuffer_[1]) << 16)
+                     | (static_cast<uint32_t>(recvBuffer_[2]) << 8)
+                     | static_cast<uint32_t>(recvBuffer_[3]);
+
+        // Validate frame length to avoid false positives from corrupted data
+        if (len > 0 && len <= 10 * 1024 * 1024) {
+            size_t frameLen = 4 + len;
+            if (recvBuffer_.size() >= frameLen) {
+                // We have a complete message in buffer
+                return true;
+            }
+        }
+    }
+
+    // No complete message in buffer, check if socket has data
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(sockfd_, &readfds);

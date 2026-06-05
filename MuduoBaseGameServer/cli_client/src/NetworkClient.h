@@ -28,6 +28,9 @@ public:
     bool hasMessage(int timeoutMs = 0);
     bool receive(game::messages::ServerMessage& outMsg, int timeoutMs = 1000);
 
+    // 获取下一个请求ID（用于request_id字段）
+    int64_t nextRequestId() const { return clientSeq_; }
+
 private:
     int sockfd_ = -1;
     std::vector<uint8_t> recvBuffer_;
