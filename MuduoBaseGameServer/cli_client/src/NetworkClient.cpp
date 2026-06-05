@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
+#include <sys/select.h>
 
 namespace cabo {
 
@@ -61,7 +62,7 @@ bool NetworkClient::sendRaw(const void* data, size_t len) {
     size_t remaining = len;
 
     while (remaining > 0) {
-        ssize_t sent = send(sockfd_, ptr, remaining, 0);
+        ssize_t sent = ::send(sockfd_, ptr, remaining, 0);
         if (sent <= 0) {
             if (sent < 0) {
                 std::cerr << "Send failed" << std::endl;
@@ -81,6 +82,124 @@ int NetworkClient::recvRaw(void* buffer, size_t maxLen, int timeoutMs) {
     // TODO: 添加select超时控制
     ssize_t n = recv(sockfd_, buffer, maxLen, 0);
     return static_cast<int>(n);
+}
+
+// Step 2: 实现encodeFrame
+std::string NetworkClient::encodeFrame(const std::string& payload) {
+    uint32_t len = static_cast<uint32_t>(payload.size());
+    std::string frame;
+    frame.resize(4 + len);
+
+    // 大端序写入长度
+    frame[0] = static_cast<char>((len >> 24) & 0xFF);
+    frame[1] = static_cast<char>((len >> 16) & 0xFF);
+    frame[2] = static_cast<char>((len >> 8) & 0xFF);
+    frame[3] = static_cast<char>(len & 0xFF);
+
+    // 拷贝payload
+    std::memcpy(&frame[4], payload.data(), len);
+    return frame;
+}
+
+// Step 3: 实现decodeFrame
+bool NetworkClient::decodeFrame(const std::vector<uint8_t>& buffer,
+                                 size_t& frameLen,
+                                 std::vector<uint8_t>& payload) {
+    if (buffer.size() < 4) return false;
+
+    // 大端序读取长度
+    uint32_t len = (static_cast<uint32_t>(buffer[0]) << 24)
+                 | (static_cast<uint32_t>(buffer[1]) << 16)
+                 | (static_cast<uint32_t>(buffer[2]) << 8)
+                 | static_cast<uint32_t>(buffer[3]);
+
+    if (len > 10 * 1024 * 1024) {  // max 10MB
+        return false;  // 非法帧
+    }
+
+    frameLen = 4 + len;
+    if (buffer.size() < frameLen) return false;  // 半包
+
+    // 提取payload
+    payload.assign(buffer.begin() + 4, buffer.begin() + frameLen);
+    return true;
+}
+
+// Step 4: 实现send方法
+bool NetworkClient::send(const game::messages::ClientMessage& msg) {
+    if (sockfd_ < 0) return false;
+
+    // 设置seq
+    game::messages::ClientMessage msgWithSeq = msg;
+    msgWithSeq.set_seq(clientSeq_++);
+
+    // 序列化
+    std::string payload;
+    if (!msgWithSeq.SerializeToString(&payload)) {
+        std::cerr << "Failed to serialize ClientMessage" << std::endl;
+        return false;
+    }
+
+    // 编码为帧
+    std::string frame = encodeFrame(payload);
+
+    // 发送
+    return sendRaw(frame.data(), frame.size());
+}
+
+// Step 5: 实现hasMessage方法
+bool NetworkClient::hasMessage(int timeoutMs) {
+    if (sockfd_ < 0) return false;
+
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sockfd_, &readfds);
+
+    struct timeval tv;
+    tv.tv_sec = timeoutMs / 1000;
+    tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+    int ret = select(sockfd_ + 1, &readfds, nullptr, nullptr, &tv);
+    return ret > 0;
+}
+
+// Step 6: 实现extractOneMessage方法
+bool NetworkClient::extractOneMessage(game::messages::ServerMessage& outMsg) {
+    size_t frameLen;
+    std::vector<uint8_t> payload;
+
+    if (!decodeFrame(recvBuffer_, frameLen, payload)) {
+        return false;  // 没有完整帧
+    }
+
+    // 解析protobuf
+    if (!outMsg.ParseFromArray(payload.data(), static_cast<int>(payload.size()))) {
+        std::cerr << "Failed to parse ServerMessage" << std::endl;
+        recvBuffer_.clear();
+        return false;
+    }
+
+    // 移除已处理的帧
+    recvBuffer_.erase(recvBuffer_.begin(), recvBuffer_.begin() + frameLen);
+    return true;
+}
+
+// Step 7: 实现receive方法
+bool NetworkClient::receive(game::messages::ServerMessage& outMsg, int timeoutMs) {
+    // 先检查缓冲区是否有完整消息
+    if (extractOneMessage(outMsg)) {
+        return true;
+    }
+
+    // 从socket读取更多数据
+    uint8_t temp[4096];
+    int n = recvRaw(temp, sizeof(temp), timeoutMs);
+    if (n <= 0) return false;
+
+    recvBuffer_.insert(recvBuffer_.end(), temp, temp + n);
+
+    // 再次尝试提取消息
+    return extractOneMessage(outMsg);
 }
 
 } // namespace cabo

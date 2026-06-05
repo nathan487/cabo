@@ -20,7 +20,7 @@ endif()
 # 包含目录
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/proto
     ${PROTOBUF_INCLUDE_DIR}
 )
 
