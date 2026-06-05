@@ -28,6 +28,8 @@ private:
 
     // 输入处理
     void handleGameInput();
+    void handleDrawnCardDecision();
+    void handleReplaceWithDrawn();
 
     // 工具方法
     std::vector<int> parseSlotIndices(const std::string& input);

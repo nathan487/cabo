@@ -379,6 +379,11 @@ void ClientApp::gameLoop() {
             handleGameInput();
         }
 
+        // 如果抽了牌，处理抽牌后决策
+        if (state_.hasDrawnCard) {
+            handleDrawnCardDecision();
+        }
+
         // 非当前回合，短暂休眠
         if (!state_.isMyTurn()) {
             #ifdef _WIN32
@@ -443,8 +448,135 @@ void ClientApp::handleGameInput() {
 }
 
 std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {
-    // TODO: 稍后实现
-    return {};
+    std::vector<int> result;
+    std::string token;
+
+    for (char c : input) {
+        if (c == ' ' || c == ',') {
+            if (!token.empty()) {
+                try {
+                    int slot = std::stoi(token);
+                    if (slot >= 0 && slot < 10) {  // 最多10张牌
+                        result.push_back(slot);
+                    }
+                } catch (...) {
+                    // 忽略非法输入
+                }
+                token.clear();
+            }
+        } else if (c >= '0' && c <= '9') {
+            token += c;
+        }
+    }
+
+    // 处理最后一个token
+    if (!token.empty()) {
+        try {
+            int slot = std::stoi(token);
+            if (slot >= 0 && slot < 10) {
+                result.push_back(slot);
+            }
+        } catch (...) {}
+    }
+
+    return result;
+}
+
+void ClientApp::handleDrawnCardDecision() {
+    std::cout << "\n>>> You drew: [" << state_.drawnCardValue << "]" << std::endl;
+
+    if (state_.drawnCardSkill != 1) {  // SKILL_TYPE_NONE = 1
+        std::cout << ">>> This card has a skill!" << std::endl;
+    }
+
+    std::cout << ">>> Choose what to do:" << std::endl;
+    std::cout << "    1. Discard";
+    if (state_.drawnCardSkill != 1) {
+        std::cout << " and use skill";
+    }
+    std::cout << std::endl;
+    std::cout << "    2. Replace your cards with this card" << std::endl;
+    std::cout << ">>> Enter choice: ";
+
+    int choice;
+    std::cin >> choice;
+
+    if (std::cin.eof()) {
+        running_ = false;
+        return;
+    }
+
+    if (std::cin.fail() || (choice != 1 && choice != 2)) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << ">>> Invalid choice! Please enter 1 or 2." << std::endl;
+        return;  // 重新提示
+    }
+
+    if (choice == 1) {
+        // 弃掉
+        game::messages::ClientMessage req;
+        req.set_seq(nextSeq_);
+        auto* discardReq = req.mutable_discard_drawn_req();
+        discardReq->set_player_id(state_.myPlayerId);
+        discardReq->set_room_id(state_.roomId);
+        discardReq->set_request_id(nextSeq_++);
+
+        if (network_.send(req)) {
+            std::cout << ">>> Discarding..." << std::endl;
+            state_.hasDrawnCard = false;
+
+            // 如果有技能，处理技能输入（Task 11实现）
+            // if (state_.drawnCardSkill != 1) {
+            //     handleSkillInput(state_.drawnCardSkill);
+            // }
+        }
+
+    } else if (choice == 2) {
+        // 替换
+        handleReplaceWithDrawn();
+    }
+}
+
+void ClientApp::handleReplaceWithDrawn() {
+    std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): ";
+    std::cin.ignore();
+
+    std::string line;
+    std::getline(std::cin, line);
+
+    if (std::cin.eof()) {
+        running_ = false;
+        return;
+    }
+
+    std::vector<int> slots = parseSlotIndices(line);
+
+    if (slots.empty()) {
+        std::cout << ">>> No valid slots entered!" << std::endl;
+        return;  // 重新提示
+    }
+
+    game::messages::ClientMessage req;
+    req.set_seq(nextSeq_);
+    auto* replaceReq = req.mutable_replace_with_drawn_req();
+    replaceReq->set_player_id(state_.myPlayerId);
+    replaceReq->set_room_id(state_.roomId);
+    replaceReq->set_request_id(nextSeq_++);
+
+    for (int slot : slots) {
+        replaceReq->add_slot_indices(slot);
+    }
+
+    if (network_.send(req)) {
+        std::cout << ">>> Attempting to replace slots [";
+        for (size_t i = 0; i < slots.size(); ++i) {
+            std::cout << slots[i];
+            if (i < slots.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]..." << std::endl;
+        state_.hasDrawnCard = false;
+    }
 }
 
 } // namespace cabo
