@@ -384,12 +384,7 @@ void ClientApp::waitingRoomLoop() {
             break;
         }
 
-        // 短暂休眠避免CPU占用过高
-        #ifdef _WIN32
-            Sleep(100);
-        #else
-            usleep(100000);
-        #endif
+        // 不需要额外休眠，因为hasMessage已经有50ms超时，足够避免CPU占用过高
     }
 }
 
