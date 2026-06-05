@@ -179,28 +179,44 @@ void ClientApp::roomFlow() {
                 return;
             }
 
-            // 等待JoinRoomRsp
-            game::messages::ServerMessage rspMsg;
-            if (!network_.receive(rspMsg, 5000)) {
-                std::cout << "ERROR: Timeout waiting for JoinRoomRsp!" << std::endl;
-                running_ = false;
-                return;
-            }
+            // 等待JoinRoomRsp，可能会先收到其他通知消息
+            bool joinConfirmed = false;
+            int attempts = 0;
+            const int MAX_ATTEMPTS = 10;
 
-            state_.updateFromMessage(rspMsg);
-
-            if (!rspMsg.has_join_room_rsp() || rspMsg.join_room_rsp().error().code() != 0) {
-                std::cout << "ERROR: Failed to join room!" << std::endl;
-                if (rspMsg.has_join_room_rsp()) {
-                    std::cout << "       " << rspMsg.join_room_rsp().error().message() << std::endl;
+            while (!joinConfirmed && attempts < MAX_ATTEMPTS) {
+                game::messages::ServerMessage rspMsg;
+                if (!network_.receive(rspMsg, 5000)) {
+                    std::cout << "ERROR: Timeout waiting for JoinRoomRsp!" << std::endl;
+                    running_ = false;
+                    return;
                 }
+
+                state_.updateFromMessage(rspMsg);
+
+                if (rspMsg.has_join_room_rsp()) {
+                    if (rspMsg.join_room_rsp().error().code() == 0) {
+                        joinConfirmed = true;
+                        std::cout << ">>> Joined room successfully!" << std::endl;
+                        std::cout << ">>> Room ID: " << state_.roomId << std::endl;
+                        std::cout << ">>> Your Player ID: " << state_.myPlayerId << std::endl;
+                    } else {
+                        std::cout << "ERROR: Failed to join room: "
+                                  << rspMsg.join_room_rsp().error().message() << std::endl;
+                        running_ = false;
+                        return;
+                    }
+                }
+
+                attempts++;
+            }
+
+            if (!joinConfirmed) {
+                std::cout << "ERROR: Did not receive JoinRoomRsp after " << MAX_ATTEMPTS << " messages!" << std::endl;
                 running_ = false;
                 return;
             }
 
-            std::cout << ">>> Joined room successfully!" << std::endl;
-            std::cout << ">>> Room ID: " << state_.roomId << std::endl;
-            std::cout << ">>> Your Player ID: " << state_.myPlayerId << std::endl;
             break;  // 成功，退出循环
 
         } else {
