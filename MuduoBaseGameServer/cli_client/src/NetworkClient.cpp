@@ -79,7 +79,22 @@ bool NetworkClient::sendRaw(const void* data, size_t len) {
 int NetworkClient::recvRaw(void* buffer, size_t maxLen, int timeoutMs) {
     if (sockfd_ < 0) return -1;
 
-    // TODO: 添加select超时控制
+    // 超时控制
+    if (timeoutMs > 0) {
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(sockfd_, &readfds);
+
+        struct timeval tv;
+        tv.tv_sec = timeoutMs / 1000;
+        tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+        int ret = select(sockfd_ + 1, &readfds, nullptr, nullptr, &tv);
+        if (ret <= 0) {
+            return ret;  // 超时或错误
+        }
+    }
+
     ssize_t n = recv(sockfd_, buffer, maxLen, 0);
     return static_cast<int>(n);
 }
@@ -175,7 +190,8 @@ bool NetworkClient::extractOneMessage(game::messages::ServerMessage& outMsg) {
     // 解析protobuf
     if (!outMsg.ParseFromArray(payload.data(), static_cast<int>(payload.size()))) {
         std::cerr << "Failed to parse ServerMessage" << std::endl;
-        recvBuffer_.clear();
+        // 只移除当前错误的帧，保留后续数据
+        recvBuffer_.erase(recvBuffer_.begin(), recvBuffer_.begin() + frameLen);
         return false;
     }
 
