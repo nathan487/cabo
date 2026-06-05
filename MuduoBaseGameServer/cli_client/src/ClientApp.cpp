@@ -270,8 +270,8 @@ void ClientApp::waitingRoomLoop() {
     const int START_TIMEOUT_MS = 10000;  // 10秒超时
 
     while (running_) {
-        // 检查是否有新消息（100ms超时）
-        if (network_.hasMessage(100)) {
+        // 检查是否有新消息（使用短超时以快速响应）
+        if (network_.hasMessage(50)) {
             game::messages::ServerMessage msg;
             if (!network_.receive(msg, 1000)) {
                 std::cerr << "ERROR: Failed to receive message, connection may be lost" << std::endl;
