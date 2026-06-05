@@ -380,6 +380,7 @@ void ClientApp::waitingRoomLoop() {
         // 检查phase是否已变为PLAYING
         if (state_.phase == GameState::PLAYING) {
             std::cout << "\n>>> Game starting! Transitioning to game loop..." << std::endl;
+            std::cout << "[DEBUG] Current phase: PLAYING, breaking from waitingRoomLoop" << std::endl;
             break;
         }
 
@@ -393,6 +394,10 @@ void ClientApp::waitingRoomLoop() {
 }
 
 void ClientApp::gameLoop() {
+    std::cout << "[DEBUG] Entered gameLoop, phase=" << state_.phase << std::endl;
+    std::cout << "[DEBUG] myPlayerId=" << state_.myPlayerId
+              << ", currentPlayerId=" << state_.currentPlayerId << std::endl;
+
     renderer_.render(state_);
 
     while (running_ && state_.phase == GameState::PLAYING) {
