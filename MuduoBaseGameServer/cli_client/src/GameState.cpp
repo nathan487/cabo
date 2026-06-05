@@ -200,6 +200,8 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         phase = PLAYING;
         roundNumber = notify.round_number();
         currentPlayerId = notify.first_player_id();
+        isFinalRound = false;  // 新回合开始，重置最终轮标志
+        finalRoundRemaining = 0;
 
         // 初始化自己的手牌（从 PlayerGameView）
         if (notify.has_your_view()) {

@@ -376,8 +376,20 @@ void GameService::revealAndScore(GameRoom& room) {
             bool isLowest = p->roundScore() <= minScore;
 
             int32_t penalty = 0;
-            if (isSteady && !isLowest) penalty = 10;
-            int32_t roundSc = p->roundScore() + penalty;
+            int32_t roundSc;
+            if (isSteady && isLowest) {
+                // CABO caller who is lowest (or tied) scores 0
+                penalty = 0;
+                roundSc = 0;
+            } else if (isSteady && !isLowest) {
+                // CABO caller who is NOT lowest: card sum + 10 penalty
+                penalty = 10;
+                roundSc = p->roundScore() + penalty;
+            } else {
+                // Non-caller: card sum
+                penalty = 0;
+                roundSc = p->roundScore();
+            }
             p->totalScore += roundSc;
 
             auto* rh = rn->add_revealed_hands();
@@ -503,7 +515,18 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
         return;
     }
     if (room->step != GameStep::Playing) { LOG_INFO("[Game] DrawCard: not in Playing step"); return; }
-    if (room->drawPile.empty()) { LOG_INFO("[Game] DrawCard: deck empty"); return; }
+    if (room->drawPile.empty()) {
+        LOG_INFO("[Game] DrawCard: deck empty, ending round");
+        // 牌库抽空时结束当前轮，触发结算
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp2 = errMsg.mutable_draw_card_rsp();
+        rsp2->set_request_id(req.request_id());
+        rsp2->mutable_error()->set_code(0);
+        rsp2->mutable_error()->set_message("Deck empty, round ending");
+        sendToPlayer(conn, errMsg);
+        revealAndScore(*room);
+        return;
+    }
 
     auto card = drawCard(*room);
     room->pendingDrawnCard = card;
@@ -572,9 +595,6 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
 
 void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
                                           const ::game::messages::ClientMessage& msg) {
-    doMultiReplace(*std::static_pointer_cast<GameRoom>(
-        std::shared_ptr<void>{}), msg, false); // placeholder — see below
-
     const auto& req = msg.replace_with_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
