@@ -73,6 +73,32 @@ public:
     bool isFinalRound = false;
     int32_t finalRoundRemaining = 0;
 
+    // 结算信息
+    struct RoundResult {
+        int64_t playerId;
+        std::string nickname;
+        std::vector<int> cardValues;
+        int32_t handTotal;
+        int32_t penalty;
+        int32_t roundScore;
+        int32_t cumulativeScore;
+        bool isSteadyCaller;
+        bool isLowest;
+        bool isKamikaze;
+    };
+
+    std::vector<RoundResult> lastRoundResults;
+
+    struct FinalRank {
+        int32_t rank;
+        int64_t playerId;
+        std::string nickname;
+        int32_t finalScore;
+        bool isWinner;
+    };
+
+    std::vector<FinalRank> finalRankings;
+
     // 辅助方法
     bool isMyTurn() const;
     int getMyPlayerIndex() const;
