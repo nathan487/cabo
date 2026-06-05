@@ -57,8 +57,22 @@ void NetworkClient::disconnect() {
 bool NetworkClient::sendRaw(const void* data, size_t len) {
     if (sockfd_ < 0) return false;
 
-    ssize_t sent = send(sockfd_, data, len, 0);
-    return sent == static_cast<ssize_t>(len);
+    const char* ptr = static_cast<const char*>(data);
+    size_t remaining = len;
+
+    while (remaining > 0) {
+        ssize_t sent = send(sockfd_, ptr, remaining, 0);
+        if (sent <= 0) {
+            if (sent < 0) {
+                std::cerr << "Send failed" << std::endl;
+            }
+            return false;
+        }
+        ptr += sent;
+        remaining -= sent;
+    }
+
+    return true;
 }
 
 int NetworkClient::recvRaw(void* buffer, size_t maxLen, int timeoutMs) {

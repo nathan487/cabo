@@ -11,6 +11,10 @@ public:
     NetworkClient();
     ~NetworkClient();
 
+    // 禁止拷贝（socket资源不可共享）
+    NetworkClient(const NetworkClient&) = delete;
+    NetworkClient& operator=(const NetworkClient&) = delete;
+
     bool connect(const std::string& host, int port);
     void disconnect();
     bool isConnected() const { return sockfd_ >= 0; }
