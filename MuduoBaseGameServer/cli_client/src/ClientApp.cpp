@@ -252,43 +252,7 @@ void ClientApp::waitingRoomLoop() {
     const int START_TIMEOUT_MS = 10000;  // 10秒超时
 
     while (running_) {
-        // 检查用户输入（非阻塞）
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(STDIN_FILENO, &readfds);
-
-        struct timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = 10000;  // 10ms timeout
-
-        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
-
-        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
-            std::string input;
-            std::getline(std::cin, input);
-
-            if (input == "ready") {
-                // 发送ReadyReq
-                game::messages::ClientMessage readyMsg;
-                readyMsg.set_seq(nextSeq_);
-                auto* readyReq = readyMsg.mutable_ready_req();
-                readyReq->set_request_id(nextSeq_);
-                nextSeq_++;
-                readyReq->set_player_id(state_.myPlayerId);
-                readyReq->set_room_id(state_.roomId);
-                readyReq->set_is_ready(true);
-
-                if (!network_.send(readyMsg)) {
-                    std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
-                    running_ = false;
-                    return;
-                }
-
-                std::cout << ">>> Ready signal sent!" << std::endl;
-            }
-        }
-
-        // 检查是否有新消息（使用短超时以快速响应）
+        // 先检查是否有新消息（使用短超时以快速响应）
         if (network_.hasMessage(50)) {
             game::messages::ServerMessage msg;
             if (!network_.receive(msg, 1000)) {
@@ -324,41 +288,81 @@ void ClientApp::waitingRoomLoop() {
             allReady = false;
         }
 
+        // 检查用户输入（非阻塞）
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 10000;  // 10ms timeout
+
+        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+
+        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
+            std::string input;
+            std::getline(std::cin, input);
+
+            if (input == "ready") {
+                // 发送ReadyReq
+                game::messages::ClientMessage readyMsg;
+                readyMsg.set_seq(nextSeq_);
+                auto* readyReq = readyMsg.mutable_ready_req();
+                readyReq->set_request_id(nextSeq_);
+                nextSeq_++;
+                readyReq->set_player_id(state_.myPlayerId);
+                readyReq->set_room_id(state_.roomId);
+                readyReq->set_is_ready(true);
+
+                if (!network_.send(readyMsg)) {
+                    std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
+                    running_ = false;
+                    return;
+                }
+
+                std::cout << ">>> Ready signal sent!" << std::endl;
+            } else if (input == "start") {
+                // 只有房主且所有人ready才能start
+                if (!isHost) {
+                    std::cout << ">>> Only host can start the game!" << std::endl;
+                } else if (!allReady || state_.players.size() != 4) {
+                    std::cout << ">>> Cannot start: not all players are ready!" << std::endl;
+                } else if (!autoStartSent) {
+                    game::messages::ClientMessage startMsg;
+                    startMsg.set_seq(nextSeq_);
+                    auto* startReq = startMsg.mutable_start_game_req();
+                    startReq->set_request_id(nextSeq_);
+                    nextSeq_++;
+                    startReq->set_player_id(state_.myPlayerId);
+                    startReq->set_room_id(state_.roomId);
+
+                    if (!network_.send(startMsg)) {
+                        std::cout << "ERROR: Failed to send StartGameReq!" << std::endl;
+                        running_ = false;
+                        return;
+                    }
+
+                    autoStartSent = true;
+                    startSentTime = std::chrono::steady_clock::now();
+                    std::cout << ">>> StartGameReq sent!" << std::endl;
+                }
+            }
+        }
+
         // 只在状态变化时渲染
         if (state_.players.size() != lastPlayerCount || allReady != lastAllReady) {
             renderer_.render(state_);
             lastPlayerCount = state_.players.size();
             lastAllReady = allReady;
-        }
 
-        // 如果是房主且所有人都ready，自动发送StartGameReq
-        if (isHost && allReady && !autoStartSent) {
-            std::cout << "\n>>> All players ready! Starting game in 1 second..." << std::endl;
-
-            // 延迟1秒
-            #ifdef _WIN32
-                Sleep(1000);
-            #else
-                usleep(1000000);
-            #endif
-
-            game::messages::ClientMessage startMsg;
-            startMsg.set_seq(nextSeq_);
-            auto* startReq = startMsg.mutable_start_game_req();
-            startReq->set_request_id(nextSeq_);
-            nextSeq_++;
-            startReq->set_player_id(state_.myPlayerId);
-            startReq->set_room_id(state_.roomId);
-
-            if (!network_.send(startMsg)) {
-                std::cout << "ERROR: Failed to send StartGameReq!" << std::endl;
-                running_ = false;
-                return;
+            // 显示提示信息
+            if (allReady && state_.players.size() == 4) {
+                if (isHost) {
+                    std::cout << "\n>>> All players ready! Type 'start' to begin the game" << std::endl;
+                } else {
+                    std::cout << "\n>>> All players ready! Waiting for host to start..." << std::endl;
+                }
             }
-
-            autoStartSent = true;
-            startSentTime = std::chrono::steady_clock::now();
-            std::cout << ">>> StartGameReq sent!" << std::endl;
         }
 
         // 检查启动超时
