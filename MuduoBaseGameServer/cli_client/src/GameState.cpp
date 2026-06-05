@@ -103,16 +103,29 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         const auto& notify = msg.player_join_notify();
         const auto& pinfo = notify.player();
 
-        Player p;
-        p.playerId = pinfo.player_id();
-        p.nickname = pinfo.nickname();
-        p.seatId = pinfo.seat_id();
-        p.isReady = pinfo.is_ready();
-        p.isHost = pinfo.is_host();
-        p.totalScore = pinfo.total_score();
-        players.push_back(p);
+        // Critical Fix #2: 检查玩家是否已存在，避免重复添加
+        bool playerExists = false;
+        for (const auto& existing : players) {
+            if (existing.playerId == pinfo.player_id()) {
+                playerExists = true;
+                std::cerr << "[GameState] WARNING: Player " << pinfo.player_id()
+                          << " already exists, skipping duplicate join" << std::endl;
+                break;
+            }
+        }
 
-        std::cout << "[GameState] PlayerJoinNotify: " << p.nickname << " joined" << std::endl;
+        if (!playerExists) {
+            Player p;
+            p.playerId = pinfo.player_id();
+            p.nickname = pinfo.nickname();
+            p.seatId = pinfo.seat_id();
+            p.isReady = pinfo.is_ready();
+            p.isHost = pinfo.is_host();
+            p.totalScore = pinfo.total_score();
+            players.push_back(p);
+
+            std::cout << "[GameState] PlayerJoinNotify: " << p.nickname << " joined" << std::endl;
+        }
     }
 
     // 处理 PlayerLeaveNotify
@@ -133,11 +146,19 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         int64_t readyPlayerId = notify.player_id();
         bool isReady = notify.is_ready();
 
+        // Important Fix #5: 添加玩家未找到警告
+        bool found = false;
         for (auto& p : players) {
             if (p.playerId == readyPlayerId) {
                 p.isReady = isReady;
+                found = true;
                 break;
             }
+        }
+
+        if (!found) {
+            std::cerr << "[GameState] WARNING: Player " << readyPlayerId
+                      << " not found for ready status update" << std::endl;
         }
 
         std::cout << "[GameState] PlayerReadyNotify: playerId=" << readyPlayerId
@@ -171,18 +192,33 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
             }
             if (view.has_discard_pile()) {
                 discardPileCount = view.discard_pile().count();
+                // Critical Fix #3: 验证弃牌堆顶牌的值范围（0-13）
                 if (view.discard_pile().has_top_card()) {
-                    discardTopValue = view.discard_pile().top_card().value();
+                    int32_t topValue = view.discard_pile().top_card().value();
+                    if (topValue >= 0 && topValue <= 13) {
+                        discardTopValue = topValue;
+                    } else {
+                        std::cerr << "[GameState] WARNING: Invalid discard top card value: "
+                                  << topValue << ", setting to -1" << std::endl;
+                        discardTopValue = -1;
+                    }
                 }
             }
 
             // 更新玩家手牌数量
             for (const auto& oppHand : view.opponent_hands()) {
+                // Important Fix #5: 添加玩家未找到警告
+                bool found = false;
                 for (auto& p : players) {
                     if (p.playerId == oppHand.player_id()) {
                         p.cardCount = oppHand.card_count();
+                        found = true;
                         break;
                     }
+                }
+                if (!found) {
+                    std::cerr << "[GameState] WARNING: Player " << oppHand.player_id()
+                              << " not found for card count update" << std::endl;
                 }
             }
         }
@@ -215,8 +251,16 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         }
         if (notify.has_discard_pile()) {
             discardPileCount = notify.discard_pile().count();
+            // Critical Fix #3: 验证弃牌堆顶牌的值范围（0-13）
             if (notify.discard_pile().has_top_card()) {
-                discardTopValue = notify.discard_pile().top_card().value();
+                int32_t topValue = notify.discard_pile().top_card().value();
+                if (topValue >= 0 && topValue <= 13) {
+                    discardTopValue = topValue;
+                } else {
+                    std::cerr << "[GameState] WARNING: Invalid discard top card value: "
+                              << topValue << ", setting to -1" << std::endl;
+                    discardTopValue = -1;
+                }
             }
         }
 
@@ -257,24 +301,28 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         if (rsp.error().code() == 0) {
             if (rsp.has_exchange_result()) {
                 const auto& result = rsp.exchange_result();
+                int32_t incomingValue = result.incoming_card_value();
+                int32_t addedCardCount = result.selected_slot_indices_size();
 
                 if (result.success()) {
                     // 替换成功，更新对应槽位
                     for (int32_t slotIdx : result.selected_slot_indices()) {
                         if (slotIdx >= 0 && slotIdx < static_cast<int32_t>(myCards.size())) {
-                            myCards[slotIdx].value = result.incoming_card_value();
+                            myCards[slotIdx].value = incomingValue;
                             myCards[slotIdx].isKnown = true;
                         }
                     }
                     std::cout << "[GameState] ReplaceWithDrawnRsp: success, replaced "
-                              << result.selected_slot_indices_size() << " cards" << std::endl;
+                              << addedCardCount << " cards" << std::endl;
                 } else {
-                    // 替换失败，牌加入手牌区
-                    Card c;
-                    c.slotIndex = static_cast<int32_t>(myCards.size());
-                    c.value = result.incoming_card_value();
-                    c.isKnown = true;
-                    myCards.push_back(c);
+                    // Critical Fix #1: 替换失败，正确设置slotIndex
+                    for (int i = 0; i < addedCardCount; ++i) {
+                        Card c;
+                        c.slotIndex = static_cast<int32_t>(myCards.size());
+                        c.value = incomingValue;
+                        c.isKnown = true;
+                        myCards.push_back(c);
+                    }
 
                     std::cout << "[GameState] ReplaceWithDrawnRsp: failed, card added to hand" << std::endl;
                 }
@@ -290,23 +338,27 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         if (rsp.error().code() == 0) {
             if (rsp.has_exchange_result()) {
                 const auto& result = rsp.exchange_result();
+                int32_t incomingValue = result.incoming_card_value();
+                int32_t addedCardCount = result.selected_slot_indices_size();
 
                 if (result.success()) {
                     // 替换成功
                     for (int32_t slotIdx : result.selected_slot_indices()) {
                         if (slotIdx >= 0 && slotIdx < static_cast<int32_t>(myCards.size())) {
-                            myCards[slotIdx].value = result.incoming_card_value();
+                            myCards[slotIdx].value = incomingValue;
                             myCards[slotIdx].isKnown = true;
                         }
                     }
                     std::cout << "[GameState] TakeFromDiscardRsp: success" << std::endl;
                 } else {
-                    // 替换失败
-                    Card c;
-                    c.slotIndex = static_cast<int32_t>(myCards.size());
-                    c.value = result.incoming_card_value();
-                    c.isKnown = true;
-                    myCards.push_back(c);
+                    // Critical Fix #1: 替换失败，正确设置slotIndex
+                    for (int i = 0; i < addedCardCount; ++i) {
+                        Card c;
+                        c.slotIndex = static_cast<int32_t>(myCards.size());
+                        c.value = incomingValue;
+                        c.isKnown = true;
+                        myCards.push_back(c);
+                    }
 
                     std::cout << "[GameState] TakeFromDiscardRsp: failed, card added to hand" << std::endl;
                 }
@@ -320,11 +372,12 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
     else if (msg.has_use_skill_rsp()) {
         const auto& rsp = msg.use_skill_rsp();
         if (rsp.error().code() == 0) {
-            // 技能使用成功
+            // Important Fix #4: 技能使用成功
+            // 注意：无法从Rsp中确定是peek_self还是spy，需要配合ActionResultNotify更新状态
             if (rsp.peeked_value() >= 0) {
-                // 偷看技能，更新对应槽位
                 std::cout << "[GameState] UseSkillRsp: peeked value=" << rsp.peeked_value() << std::endl;
             }
+
             if (rsp.swap_occurred()) {
                 std::cout << "[GameState] UseSkillRsp: swap occurred" << std::endl;
             }
@@ -343,8 +396,16 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         }
         if (notify.has_discard_pile()) {
             discardPileCount = notify.discard_pile().count();
+            // Critical Fix #3: 验证弃牌堆顶牌的值范围（0-13）
             if (notify.discard_pile().has_top_card()) {
-                discardTopValue = notify.discard_pile().top_card().value();
+                int32_t topValue = notify.discard_pile().top_card().value();
+                if (topValue >= 0 && topValue <= 13) {
+                    discardTopValue = topValue;
+                } else {
+                    std::cerr << "[GameState] WARNING: Invalid discard top card value: "
+                              << topValue << ", setting to -1" << std::endl;
+                    discardTopValue = -1;
+                }
             }
         }
 
@@ -366,11 +427,18 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
 
         // 更新玩家分数
         for (const auto& scoreDetail : notify.scores()) {
+            // Important Fix #5: 添加玩家未找到警告
+            bool found = false;
             for (auto& p : players) {
                 if (p.playerId == scoreDetail.player_id()) {
                     p.totalScore = scoreDetail.cumulative_score();
+                    found = true;
                     break;
                 }
+            }
+            if (!found) {
+                std::cerr << "[GameState] WARNING: Player " << scoreDetail.player_id()
+                          << " not found for score update" << std::endl;
             }
         }
 
@@ -383,11 +451,18 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
 
         // 更新玩家总分
         for (const auto& scoreInfo : notify.scores()) {
+            // Important Fix #5: 添加玩家未找到警告
+            bool found = false;
             for (auto& p : players) {
                 if (p.playerId == scoreInfo.player_id()) {
                     p.totalScore = scoreInfo.total_score();
+                    found = true;
                     break;
                 }
+            }
+            if (!found) {
+                std::cerr << "[GameState] WARNING: Player " << scoreInfo.player_id()
+                          << " not found for score update" << std::endl;
             }
         }
 
@@ -462,8 +537,16 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                 }
                 if (view.has_discard_pile()) {
                     discardPileCount = view.discard_pile().count();
+                    // Critical Fix #3: 验证弃牌堆顶牌的值范围（0-13）
                     if (view.discard_pile().has_top_card()) {
-                        discardTopValue = view.discard_pile().top_card().value();
+                        int32_t topValue = view.discard_pile().top_card().value();
+                        if (topValue >= 0 && topValue <= 13) {
+                            discardTopValue = topValue;
+                        } else {
+                            std::cerr << "[GameState] WARNING: Invalid discard top card value: "
+                                      << topValue << ", setting to -1" << std::endl;
+                            discardTopValue = -1;
+                        }
                     }
                 }
             }
