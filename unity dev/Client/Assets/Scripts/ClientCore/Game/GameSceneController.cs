@@ -11,28 +11,43 @@ namespace Cabo.Client.Game
     /// </summary>
     public class GameSceneController : MonoBehaviour
     {
+        private static GameSceneController _instance;
+
         public ProtoGateway Gateway { get; private set; }
         public GameClientController GameCtrl { get; private set; }
 
+        private void Awake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                Debug.LogWarning($"[GameSceneController] ⚠️ Duplicate instance detected on '{gameObject.name}'. Destroying to prevent conflicts.");
+                Debug.LogWarning($"[GameSceneController] ⚠️ Existing instance: '{_instance.gameObject.name}', Current instance: '{gameObject.name}'");
+                Destroy(gameObject);
+                return;
+            }
+
+            _instance = this;
+            Debug.Log($"[GameSceneController] ✅ Singleton instance set on '{gameObject.name}'");
+        }
+
         private void Start()
         {
+            if (_instance != this)
+            {
+                Debug.LogWarning("[GameSceneController] ⚠️ This is not the singleton instance, skipping Start()");
+                return;
+            }
+
             Debug.Log("[GameSceneController] ===== Start() 开始 =====");
+            Debug.Log($"[GameSceneController] PendingGameStart status: {(GameSceneBootstrap.PendingGameStart != null ? "AVAILABLE" : "NULL")}");
 
             var bootstrap = FindObjectOfType<ClientAppBootstrap>();
             Debug.Log($"[GameSceneController] FindObjectOfType<ClientAppBootstrap>: {(bootstrap != null ? "找到" : "未找到")}");
 
             if (bootstrap == null)
             {
-                Debug.LogWarning("[GameSceneController] ClientAppBootstrap not found! GameScene 独立运行模式 - 仅测试 UI 显示");
-
-                // 独立运行模式：直接初始化 UI（仅用于测试）
-                var uiToolkit = FindObjectOfType<GameTableUIToolkit>();
-                if (uiToolkit != null)
-                {
-                    Debug.Log("[GameSceneController] 独立模式：尝试初始化 GameTableUIToolkit");
-                    // 传入 null 参数，UI 会显示但不会连接网络
-                    uiToolkit.Initialize(null, null);
-                }
+                Debug.LogError("[GameSceneController] ❌ ClientAppBootstrap not found!");
+                Debug.LogError("[GameSceneController] ❌ Cannot run GameScene standalone. Please start from MainMenu → Lobby → Start Game.");
                 return;
             }
 
@@ -60,12 +75,23 @@ namespace Cabo.Client.Game
             var tableUIToolkit = FindObjectOfType<GameTableUIToolkit>();
             if (tableUIToolkit != null)
             {
+                Debug.Log($"[GameSceneController] Found GameTableUIToolkit, about to initialize...");
                 tableUIToolkit.Initialize(Gateway, GameCtrl);
                 Debug.Log($"[GameSceneController] GameTableUIToolkit initialized (Gateway: {(Gateway != null ? "✅" : "❌ null")})");
             }
             else
             {
                 Debug.LogError("[GameSceneController] ❌ GameTableUIToolkit not found in scene!");
+            }
+
+            Debug.Log("[GameSceneController] ===== Start() 完成 =====");
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+            {
+                _instance = null;
             }
         }
     }

@@ -48,8 +48,13 @@ int32_t GameService::getPlayerSeat(GameRoom& room, int64_t playerId) {
 }
 
 bool GameService::isCurrentPlayer(GameRoom& room, int64_t playerId) {
-    auto p = getPlayer(room, playerId);
-    return p && p->seatId == room.currentPlayerSeat;
+    // Use array index instead of seatId to match sendTurnStart() logic
+    // This ensures consistency and robustness for future features (reconnect, etc.)
+    if (room.currentPlayerSeat < 0 ||
+        room.currentPlayerSeat >= static_cast<int32_t>(room.players.size())) {
+        return false;
+    }
+    return room.players[room.currentPlayerSeat]->playerId == playerId;
 }
 
 // ── Deck ──

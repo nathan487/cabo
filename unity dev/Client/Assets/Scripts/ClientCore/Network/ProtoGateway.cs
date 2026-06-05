@@ -49,8 +49,11 @@ namespace Cabo.Client.Network
         public int CurrentRoundNumber { get; private set; }
         public event Action GameStateChanged;
 
+        // Pending notification cache (to handle race condition during scene load)
+        private TurnStartNotify pendingTurnStart = null;
+
         // Game events for UI layer (fired from game notification handlers)
-        public event Action<GameStartNotify> OnStartGame;
+        // Note: OnStartGame removed - GameStartNotify is consumed via GameSceneBootstrap.PendingGameStart
         public event Action<TurnStartNotify> OnTurnStart;
         public event Action<ActionResultNotify> OnActionResult;
         public event Action<RoundRevealNotify> OnRoundReveal;
@@ -467,18 +470,51 @@ namespace Cabo.Client.Network
 
         private void OnGameStartNotify(GameStartNotify notify)
         {
-            Debug.Log($"[ProtoGateway] Game started: round={notify.RoundNumber}, firstPlayer={notify.FirstPlayerId}");
+            Debug.Log($"[ProtoGateway] ========== GameStartNotify Received ==========");
+            Debug.Log($"[ProtoGateway] Round: {notify.RoundNumber}, FirstPlayer: {notify.FirstPlayerId}");
+            Debug.Log($"[ProtoGateway] YourView: {(notify.YourView != null ? "NOT NULL" : "NULL")}");
+            Debug.Log($"[ProtoGateway] Current PendingGameStart: {(GameSceneBootstrap.PendingGameStart != null ? "NOT NULL (ALREADY SET!)" : "NULL")}");
+
+            // CRITICAL: Check if PendingGameStart is already set (indicates duplicate processing)
+            if (GameSceneBootstrap.PendingGameStart != null)
+            {
+                Debug.LogError("[ProtoGateway] ⚠️⚠️⚠️ PendingGameStart is already set! This should not happen!");
+                Debug.LogError("[ProtoGateway] ⚠️⚠️⚠️ This indicates either:");
+                Debug.LogError("[ProtoGateway]    1. Multiple GameStartNotify received (server bug)");
+                Debug.LogError("[ProtoGateway]    2. Scene not loaded yet but another notification arrived");
+                Debug.LogError("[ProtoGateway] ⚠️⚠️⚠️ Overwriting with new notification...");
+            }
+
+            // Set pending game start data
             GameSceneBootstrap.PendingGameStart = notify;
+            Debug.Log($"[ProtoGateway] ✅ PendingGameStart set successfully");
+            Debug.Log($"[ProtoGateway] ✅ Verify: PendingGameStart is now {(GameSceneBootstrap.PendingGameStart != null ? "NOT NULL" : "NULL")}");
+
             // Defer scene load to avoid interrupting message processing loop
             if (coroutineOwner != null)
+            {
+                Debug.Log($"[ProtoGateway] Starting LoadGameSceneNextFrame coroutine...");
                 coroutineOwner.StartCoroutine(LoadGameSceneNextFrame());
-            OnStartGame?.Invoke(notify);
+            }
+            else
+            {
+                Debug.LogError("[ProtoGateway] ❌ coroutineOwner is null! Cannot load scene.");
+            }
+
+            Debug.Log($"[ProtoGateway] ================================================");
+
+            // Don't invoke event here - let GameTableUIToolkit consume via PendingGameStart
+            // to avoid processing in wrong scene and ensure correct initialization order
+            // OnStartGame?.Invoke(notify);
         }
 
         private System.Collections.IEnumerator LoadGameSceneNextFrame()
         {
+            Debug.Log("[ProtoGateway] LoadGameSceneNextFrame: waiting one frame...");
             yield return null; // wait one frame
+            Debug.Log($"[ProtoGateway] LoadGameSceneNextFrame: about to load scene. PendingGameStart is {(GameSceneBootstrap.PendingGameStart != null ? "NOT NULL" : "NULL")}");
             GameSceneBootstrap.LoadGameScene();
+            Debug.Log("[ProtoGateway] LoadGameSceneNextFrame: GameSceneBootstrap.LoadGameScene() called");
         }
 
         private void OnTurnStartNotify(TurnStartNotify notify)
@@ -490,12 +526,37 @@ namespace Cabo.Client.Network
             Debug.Log($"[ProtoGateway] Round: {notify.RoundNumber}");
             Debug.Log($"[ProtoGateway] Local Player ID: '{LocalPlayerId}'");
             Debug.Log($"[ProtoGateway] OnTurnStart subscribers: {(OnTurnStart?.GetInvocationList().Length ?? 0)}");
-            Debug.Log($"[ProtoGateway] ================================================");
 
             CurrentTurnPlayerId = notify.CurrentPlayerId;
             CurrentRoundNumber = notify.RoundNumber;
             GameStateChanged?.Invoke();
-            OnTurnStart?.Invoke(notify);
+
+            // Fix race condition: if no subscribers yet (during scene load), cache the notification
+            if (OnTurnStart == null || OnTurnStart.GetInvocationList().Length == 0)
+            {
+                Debug.LogWarning("[ProtoGateway] ⚠️ No OnTurnStart subscribers yet, caching notification for later delivery");
+                pendingTurnStart = notify;
+            }
+            else
+            {
+                Debug.Log($"[ProtoGateway] ✅ Delivering TurnStartNotify to {OnTurnStart.GetInvocationList().Length} subscriber(s)");
+                OnTurnStart?.Invoke(notify);
+            }
+            Debug.Log($"[ProtoGateway] ================================================");
+        }
+
+        /// <summary>
+        /// Get and clear any pending TurnStartNotify. Called by GameTableUIToolkit after subscribing.
+        /// </summary>
+        public TurnStartNotify GetPendingTurnStart()
+        {
+            var result = pendingTurnStart;
+            pendingTurnStart = null;
+            if (result != null)
+            {
+                Debug.Log($"[ProtoGateway] 📥 Returning cached TurnStartNotify (Turn {result.TurnNumber})");
+            }
+            return result;
         }
 
         private void OnActionResultNotify(ActionResultNotify notify)

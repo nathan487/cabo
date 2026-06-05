@@ -343,11 +343,77 @@ void ClientApp::waitingRoomLoop() {
 }
 
 void ClientApp::gameLoop() {
-    // TODO: 稍后实现
+    renderer_.render(state_);
+
+    while (running_ && state_.phase == GameState::PLAYING) {
+        // 检查服务端消息
+        if (network_.hasMessage(100)) {
+            game::messages::ServerMessage msg;
+            if (network_.receive(msg, 1000)) {
+                state_.updateFromMessage(msg);
+                renderer_.render(state_);
+            }
+        }
+
+        // 如果是我的回合且没有抽牌状态
+        if (state_.isMyTurn() && !state_.hasDrawnCard) {
+            handleGameInput();
+        }
+
+        // 非当前回合，短暂休眠
+        if (!state_.isMyTurn()) {
+            #ifdef _WIN32
+                Sleep(100);
+            #else
+                usleep(100000);  // 100ms
+            #endif
+        }
+    }
 }
 
 void ClientApp::handleGameInput() {
-    // TODO: 稍后实现
+    int choice;
+    std::cin >> choice;
+
+    if (std::cin.fail() || choice < 1 || choice > 3) {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << ">>> Invalid input! Please enter 1, 2, or 3." << std::endl;
+        renderer_.render(state_);
+        return;
+    }
+
+    game::messages::ClientMessage req;
+
+    if (choice == 1) {
+        // 抽牌
+        auto* drawReq = req.mutable_draw_card_req();
+        drawReq->set_player_id(state_.myPlayerId);
+        drawReq->set_room_id(state_.roomId);
+        drawReq->set_request_id(nextSeq_);
+        req.set_seq(nextSeq_++);
+
+        if (network_.send(req)) {
+            std::cout << ">>> Drawing card..." << std::endl;
+        }
+
+    } else if (choice == 2) {
+        // 从弃牌堆拿牌
+        // TODO: Task 12实现
+        std::cout << ">>> Take from discard pile - not implemented yet" << std::endl;
+
+    } else if (choice == 3) {
+        // 喊CABO
+        auto* caboReq = req.mutable_call_steady_req();
+        caboReq->set_player_id(state_.myPlayerId);
+        caboReq->set_room_id(state_.roomId);
+        caboReq->set_request_id(nextSeq_);
+        req.set_seq(nextSeq_++);
+
+        if (network_.send(req)) {
+            std::cout << ">>> Called CABO!" << std::endl;
+        }
+    }
 }
 
 std::vector<int> ClientApp::parseSlotIndices(const std::string& input) {

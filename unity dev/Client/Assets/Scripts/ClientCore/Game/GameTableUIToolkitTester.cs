@@ -5,19 +5,27 @@ namespace Cabo.Client.Game
 {
     /// <summary>
     /// UI Toolkit 测试脚本 - 用于在没有服务端时预览 UI
+    /// NOTE: DISABLED - This component is disabled to prevent "Test Mode" from appearing during real games
     /// </summary>
     public class GameTableUIToolkitTester : MonoBehaviour
     {
         [SerializeField] private UIDocument uiDocument;
-        [SerializeField] private bool enableTestMode = true;
+        [SerializeField] private bool enableTestMode = false;
 
         void Start()
         {
+            // DISABLED: This tester interferes with real game sessions
+            Debug.Log("[UIToolkitTester] Tester is DISABLED - use only for standalone UI testing");
+            enabled = false;
+            return;
+
+            // ===========================================
+            // CODE BELOW IS DISABLED (unreachable)
+            // To re-enable: remove the "return;" above
+            // ===========================================
+#pragma warning disable CS0162 // Unreachable code detected
+
             if (!enableTestMode)
-            {
-                Debug.Log("[UIToolkitTester] 测试模式已禁用");
-                return;
-            }
 
             // 自动获取 UIDocument
             if (uiDocument == null)
@@ -43,6 +51,7 @@ namespace Cabo.Client.Game
 
             // 填充测试数据
             FillTestData(root);
+#pragma warning restore CS0162
         }
 
         private void FillTestData(VisualElement root)

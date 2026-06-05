@@ -40,7 +40,18 @@
       "Bash(protoc '--csharp_out=/mnt/c/Users/Admin/Desktop/Cabo GameObject/unity dev/Client/Assets/Scripts/Proto/Generated' '--proto_path=/mnt/c/Users/Admin/Desktop/Cabo GameObject/Proto' '/mnt/c/Users/Admin/Desktop/Cabo GameObject/Proto/game.proto')",
       "Bash(protoc '--cpp_out=/mnt/c/Users/Admin/Desktop/Cabo GameObject/MuduoBaseGameServer/src/proto' '--proto_path=/mnt/c/Users/Admin/Desktop/Cabo GameObject/Proto' '/mnt/c/Users/Admin/Desktop/Cabo GameObject/Proto/game.proto')",
       "Bash(make -j1)",
-      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: 8db49088438b4b269d599e4546cbb44e' -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"refresh_unity\",\"arguments\":{\"compile\":\"request\"}},\"id\":132}')"
+      "Bash(curl -s --noproxy * http://127.0.0.1:8080/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -H 'Mcp-Session-Id: 8db49088438b4b269d599e4546cbb44e' -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"refresh_unity\",\"arguments\":{\"compile\":\"request\"}},\"id\":132}')",
+      "Bash(cmake ..)",
+      "Bash(make)",
+      "Bash(timeout 2 ./cabo_cli_client)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(./cabo_cli_client)",
+      "Bash(timeout 8 ./test_ui)",
+      "Bash(git show *)",
+      "Bash(make clean *)",
+      "Bash(make -j4)",
+      "Bash(cmake --build build)"
     ]
   }
 }

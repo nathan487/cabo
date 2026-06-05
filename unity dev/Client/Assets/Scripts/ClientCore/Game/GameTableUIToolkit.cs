@@ -60,6 +60,9 @@ namespace Cabo.Client.Game
         private long myPlayerId;
         private long opponentPlayerId;
 
+        // Button debouncing - prevent double clicks
+        private bool isActionPending = false;
+
         public void Initialize(ProtoGateway gw, GameClientController gc)
         {
             gateway = gw;
@@ -89,7 +92,7 @@ namespace Cabo.Client.Game
             if (gw != null)
             {
                 Debug.Log("[GameTableUIToolkit] Subscribing to gateway events...");
-                gw.OnStartGame += OnGameStarted;
+                // Note: OnStartGame event removed - GameStartNotify consumed via PendingGameStart
                 gw.OnTurnStart += OnTurnStarted;
                 gw.OnActionResult += OnActionReceived;
                 gw.OnRoundReveal += OnRoundRevealed;
@@ -102,20 +105,57 @@ namespace Cabo.Client.Game
                 Debug.Log("[GameTableUIToolkit] ✅ All events subscribed");
             }
 
-            // 加载待处理的游戏开始数据
+            // IMPORTANT: Process GameStartNotify FIRST (initializes game state)
+            Debug.Log($"[GameTableUIToolkit] Checking PendingGameStart...");
+            Debug.Log($"[GameTableUIToolkit] GameSceneBootstrap.PendingGameStart is {(GameSceneBootstrap.PendingGameStart != null ? "NOT NULL" : "NULL")}");
+
             var gs = GameSceneBootstrap.PendingGameStart;
             if (gs != null)
             {
+                Debug.Log($"[GameTableUIToolkit] 📥 Processing PendingGameStart (Round {gs.RoundNumber}, FirstPlayer {gs.FirstPlayerId})");
                 GameSceneBootstrap.PendingGameStart = null;
                 OnGameStarted(gs);
             }
             else
             {
-                Debug.Log("[GameTableUIToolkit] Standalone mode: showing test UI");
-                // Standalone test mode: show default UI state
-                roundInfo.text = "UI Toolkit Test Mode";
-                phaseText.text = "Font test: English 123";
+                Debug.LogError("[GameTableUIToolkit] ❌ PendingGameStart is null! Cannot initialize game UI without game data.");
+                Debug.LogError("[GameTableUIToolkit] ❌ This usually means:");
+                Debug.LogError("[GameTableUIToolkit]    1. GameStartNotify was not received from server");
+                Debug.LogError("[GameTableUIToolkit]    2. Scene was loaded before PendingGameStart was set");
+                Debug.LogError("[GameTableUIToolkit]    3. PendingGameStart was already consumed by another instance (check for duplicate GameSceneController)");
+                Debug.LogError("[GameTableUIToolkit] ❌ Check ProtoGateway logs for GameStartNotify reception.");
+                Debug.LogError("[GameTableUIToolkit] ❌ If you see 'Test Mode' on screen, check if GameTableUIToolkitTester is enabled in the scene.");
+
+                // Show error on UI instead of just returning
+                if (phaseText != null)
+                {
+                    phaseText.text = "ERROR: Game data not loaded!";
+                    phaseText.style.color = new Color(1f, 0.2f, 0.2f); // Red
+                }
+                if (roundInfo != null)
+                {
+                    roundInfo.text = "Check Console for details";
+                }
+
+                return;  // Exit early, don't initialize
             }
+
+            // THEN process TurnStartNotify (shows turn buttons)
+            if (gw != null)
+            {
+                var pendingTurn = gw.GetPendingTurnStart();
+                if (pendingTurn != null)
+                {
+                    Debug.Log($"[GameTableUIToolkit] 📥 Processing cached TurnStartNotify (Turn {pendingTurn.TurnNumber})");
+                    OnTurnStarted(pendingTurn);
+                }
+                else
+                {
+                    Debug.Log("[GameTableUIToolkit] No pending TurnStartNotify");
+                }
+            }
+
+            Debug.Log("[GameTableUIToolkit] ✅ Initialize complete");
         }
 
         private void QueryElements()
@@ -181,14 +221,101 @@ namespace Cabo.Client.Game
         {
             if (gateway != null)
             {
-                btnDraw.clicked += () => gateway.DrawCard();
-                btnTakeDiscard.clicked += () => gateway.TakeFromDiscard(0);
-                btnCallSteady.clicked += () => gateway.CallSteady();
-                btnDiscardDrawn.clicked += () => gateway.DiscardDrawn();
-                btnReplace0.clicked += () => gateway.ReplaceWithDrawn(0);
-                btnReplace1.clicked += () => gateway.ReplaceWithDrawn(1);
-                btnReplace2.clicked += () => gateway.ReplaceWithDrawn(2);
-                btnReplace3.clicked += () => gateway.ReplaceWithDrawn(3);
+                btnDraw.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] DrawCard clicked");
+                    gateway.DrawCard();
+                };
+
+                btnTakeDiscard.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] TakeFromDiscard clicked");
+                    gateway.TakeFromDiscard(0);
+                };
+
+                btnCallSteady.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] CallSteady clicked");
+                    gateway.CallSteady();
+                };
+
+                btnDiscardDrawn.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] DiscardDrawn clicked");
+                    gateway.DiscardDrawn();
+                };
+
+                btnReplace0.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] ReplaceWithDrawn slot 0 clicked");
+                    gateway.ReplaceWithDrawn(0);
+                };
+
+                btnReplace1.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] ReplaceWithDrawn slot 1 clicked");
+                    gateway.ReplaceWithDrawn(1);
+                };
+
+                btnReplace2.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] ReplaceWithDrawn slot 2 clicked");
+                    gateway.ReplaceWithDrawn(2);
+                };
+
+                btnReplace3.clicked += () =>
+                {
+                    if (isActionPending)
+                    {
+                        Debug.LogWarning("[GameTableUIToolkit] Action already pending, ignoring click");
+                        return;
+                    }
+                    isActionPending = true;
+                    Debug.Log("[GameTableUIToolkit] ReplaceWithDrawn slot 3 clicked");
+                    gateway.ReplaceWithDrawn(3);
+                };
             }
             else
             {
@@ -245,21 +372,13 @@ namespace Cabo.Client.Game
             discardTop.text = gs.YourView?.DiscardPile?.TopCard != null ? gs.YourView.DiscardPile.TopCard.Value.ToString() : "-";
 
             roundInfo.text = $"Round {gs.RoundNumber}";
-            phaseText.text = "Waiting...";
 
-            // Show buttons if first player
-            if (gs.FirstPlayerId == myPlayerId)
-            {
-                ShowMainButtons();
-                phaseText.text = ">>> YOUR TURN <<<";
-                Debug.Log($"[GameTableUIToolkit] You are first player! Showing buttons.");
-            }
-            else
-            {
-                HideAllButtons();
-                phaseText.text = "Opponent's turn...";
-                Debug.Log($"[GameTableUIToolkit] Not your turn. Hiding buttons.");
-            }
+            // Don't show buttons yet - wait for TurnStartNotify to avoid duplicate UI updates
+            // This prevents button flicker when both GameStartNotify and TurnStartNotify arrive quickly
+            HideAllButtons();
+            phaseText.text = "Waiting for turn start...";
+            phaseText.style.color = new Color(0.8f, 0.8f, 0.8f); // Gray
+            Debug.Log($"[GameTableUIToolkit] Game initialized. Waiting for TurnStartNotify to show buttons.");
 
             Debug.Log("[GameTableUIToolkit] Game started, UI initialized");
         }
@@ -272,6 +391,16 @@ namespace Cabo.Client.Game
             Debug.Log($"[GameTableUIToolkit] Is My Turn: {ts.CurrentPlayerId == myPlayerId}");
             Debug.Log($"[GameTableUIToolkit] Turn: {ts.TurnNumber}, Round: {ts.RoundNumber}");
             Debug.Log($"[GameTableUIToolkit] =============================================");
+
+            // Check if UI objects are still valid (not destroyed during scene transition)
+            if (roundInfo == null || phaseText == null)
+            {
+                Debug.LogWarning("[GameTableUIToolkit] ⚠️ UI objects destroyed, cannot update turn state");
+                return;
+            }
+
+            // Clear action pending flag for new turn
+            isActionPending = false;
 
             bool isMyTurn = ts.CurrentPlayerId == myPlayerId;
             roundInfo.text = $"Round {ts.RoundNumber} - Turn {ts.TurnNumber}";
@@ -346,6 +475,12 @@ namespace Cabo.Client.Game
 
         private void OnDrawCardRsp(DrawCardRsp rsp)
         {
+            Debug.Log($"[GameTableUIToolkit] ========== OnDrawCardRsp Called ==========");
+            Debug.Log($"[GameTableUIToolkit] Drew card: value={rsp.Value}, skill={rsp.Skill}");
+
+            // Clear action pending flag
+            isActionPending = false;
+
             drawnText.text = $"Drew: {rsp.Value}";
             if (rsp.Skill != global::Game.Common.SkillType.None)
                 drawnText.text += " [Skill!]";
@@ -354,31 +489,92 @@ namespace Cabo.Client.Game
 
             // Show discard and replace buttons
             ShowReplaceButtons();
+
+            Debug.Log($"[GameTableUIToolkit] ✅ Replace buttons shown");
+            Debug.Log($"[GameTableUIToolkit] BtnDiscardDrawn visible: {!btnDiscardDrawn.ClassListContains("hidden")}");
+            Debug.Log($"[GameTableUIToolkit] ================================================");
         }
 
         private void OnReplaceResult(ReplaceWithDrawnRsp rsp)
         {
+            Debug.Log($"[GameTableUIToolkit] ========== OnReplaceResult Called ==========");
+            Debug.Log($"[GameTableUIToolkit] RequestId: {rsp.RequestId}");
+            Debug.Log($"[GameTableUIToolkit] Success: {rsp.ExchangeResult?.Success}");
+
+            // Clear action pending flag
+            isActionPending = false;
+
+            // Hide drawn card preview
             drawnPreview.AddToClassList("hidden");
 
+            // Update card display if exchange succeeded
             if (rsp.ExchangeResult?.Success == true)
             {
                 foreach (var si in rsp.ExchangeResult.SelectedSlotIndices)
+                {
                     SetCardKnown(selfCards[si], rsp.ExchangeResult.IncomingCardValue);
+                    Debug.Log($"[GameTableUIToolkit] Card at slot {si} replaced with value {rsp.ExchangeResult.IncomingCardValue}");
+                }
             }
+
+            // Hide all buttons - wait for TurnStartNotify to show appropriate buttons
+            HideAllButtons();
+
+            phaseText.text = "Waiting for next turn...";
+            phaseText.style.color = new Color(0.8f, 0.8f, 0.8f); // Gray
+
+            Debug.Log($"[GameTableUIToolkit] ✅ Replace handled, waiting for TurnStartNotify");
+            Debug.Log($"[GameTableUIToolkit] ================================================");
         }
 
         private void OnTakeDiscardResult(TakeFromDiscardRsp rsp)
         {
+            Debug.Log($"[GameTableUIToolkit] ========== OnTakeDiscardResult Called ==========");
+            Debug.Log($"[GameTableUIToolkit] RequestId: {rsp.RequestId}");
+            Debug.Log($"[GameTableUIToolkit] Success: {rsp.ExchangeResult?.Success}");
+
+            // Clear action pending flag
+            isActionPending = false;
+
+            // Update card display if exchange succeeded
             if (rsp.ExchangeResult?.Success == true)
             {
                 foreach (var si in rsp.ExchangeResult.SelectedSlotIndices)
+                {
                     SetCardKnown(selfCards[si], rsp.ExchangeResult.IncomingCardValue);
+                    Debug.Log($"[GameTableUIToolkit] Card at slot {si} replaced with discard pile card value {rsp.ExchangeResult.IncomingCardValue}");
+                }
             }
+
+            // Hide all buttons - wait for TurnStartNotify to show appropriate buttons
+            HideAllButtons();
+
+            phaseText.text = "Waiting for next turn...";
+            phaseText.style.color = new Color(0.8f, 0.8f, 0.8f); // Gray
+
+            Debug.Log($"[GameTableUIToolkit] ✅ TakeDiscard handled, waiting for TurnStartNotify");
+            Debug.Log($"[GameTableUIToolkit] ================================================");
         }
 
         private void OnDiscardResult(DiscardDrawnRsp rsp)
         {
+            Debug.Log($"[GameTableUIToolkit] ========== OnDiscardResult Called ==========");
+            Debug.Log($"[GameTableUIToolkit] RequestId: {rsp.RequestId}");
+
+            // Clear action pending flag
+            isActionPending = false;
+
+            // Hide drawn card preview
             drawnPreview.AddToClassList("hidden");
+
+            // Hide all buttons - wait for TurnStartNotify to show appropriate buttons
+            HideAllButtons();
+
+            phaseText.text = "Waiting for next turn...";
+            phaseText.style.color = new Color(0.8f, 0.8f, 0.8f); // Gray
+
+            Debug.Log($"[GameTableUIToolkit] ✅ Discard handled, waiting for TurnStartNotify");
+            Debug.Log($"[GameTableUIToolkit] ================================================");
         }
 
         private void OnRoundRevealed(RoundRevealNotify rr)
