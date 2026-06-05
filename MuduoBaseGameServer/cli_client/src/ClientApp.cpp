@@ -263,6 +263,13 @@ void ClientApp::waitingRoomLoop() {
             state_.updateFromMessage(msg);
         }
 
+        // 检查phase是否已变为PLAYING（必须在外面，即使没有新消息也要检查）
+        if (state_.phase == GameState::PLAYING) {
+            std::cout << "\n>>> Game starting! Transitioning to game loop..." << std::endl;
+            std::cout << "[DEBUG] Current phase: PLAYING, breaking from waitingRoomLoop" << std::endl;
+            break;
+        }
+
         // 检查是否是房主
         isHost = false;
         for (const auto& p : state_.players) {
@@ -375,13 +382,6 @@ void ClientApp::waitingRoomLoop() {
                 running_ = false;
                 return;
             }
-        }
-
-        // 检查phase是否已变为PLAYING
-        if (state_.phase == GameState::PLAYING) {
-            std::cout << "\n>>> Game starting! Transitioning to game loop..." << std::endl;
-            std::cout << "[DEBUG] Current phase: PLAYING, breaking from waitingRoomLoop" << std::endl;
-            break;
         }
 
         // 不需要额外休眠，因为hasMessage已经有50ms超时，足够避免CPU占用过高
