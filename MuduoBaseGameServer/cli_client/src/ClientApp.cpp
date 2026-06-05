@@ -229,32 +229,14 @@ void ClientApp::roomFlow() {
 
     if (!running_) return;
 
-    // 自动发送ReadyReq
-    std::cout << ">>> Sending ready signal..." << std::endl;
-    game::messages::ClientMessage readyMsg;
-    readyMsg.set_seq(nextSeq_);
-    auto* readyReq = readyMsg.mutable_ready_req();
-    readyReq->set_request_id(nextSeq_);
-    nextSeq_++;
-    readyReq->set_player_id(state_.myPlayerId);
-    readyReq->set_room_id(state_.roomId);
-    readyReq->set_is_ready(true);
-
-    if (!network_.send(readyMsg)) {
-        std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
-        running_ = false;
-        return;
-    }
-
-    std::cout << ">>> Ready signal sent! Waiting for others..." << std::endl;
-    // 注意：不等待ReadyRsp，因为服务端可能通过RoomStateNotify异步更新状态
-    // 直接进入waitingRoomLoop，在那里会收到状态更新
+    // 不再自动ready，进入等待室后用户手动输入ready命令
 }
 
 void ClientApp::waitingRoomLoop() {
     std::cout << "\n>>> Entering waiting room..." << std::endl;
+    std::cout << ">>> Type 'ready' and press Enter to mark yourself as ready" << std::endl;
 
-    // 先主动接收pending消息（可能包含ready后的RoomStateNotify）
+    // 先主动接收pending消息
     while (network_.hasMessage(50)) {
         game::messages::ServerMessage msg;
         if (network_.receive(msg, 100)) {
@@ -270,6 +252,42 @@ void ClientApp::waitingRoomLoop() {
     const int START_TIMEOUT_MS = 10000;  // 10秒超时
 
     while (running_) {
+        // 检查用户输入（非阻塞）
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 10000;  // 10ms timeout
+
+        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+
+        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
+            std::string input;
+            std::getline(std::cin, input);
+
+            if (input == "ready") {
+                // 发送ReadyReq
+                game::messages::ClientMessage readyMsg;
+                readyMsg.set_seq(nextSeq_);
+                auto* readyReq = readyMsg.mutable_ready_req();
+                readyReq->set_request_id(nextSeq_);
+                nextSeq_++;
+                readyReq->set_player_id(state_.myPlayerId);
+                readyReq->set_room_id(state_.roomId);
+                readyReq->set_is_ready(true);
+
+                if (!network_.send(readyMsg)) {
+                    std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
+                    running_ = false;
+                    return;
+                }
+
+                std::cout << ">>> Ready signal sent!" << std::endl;
+            }
+        }
+
         // 检查是否有新消息（使用短超时以快速响应）
         if (network_.hasMessage(50)) {
             game::messages::ServerMessage msg;
