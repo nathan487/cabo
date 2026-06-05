@@ -17,7 +17,7 @@ std::string UIRenderer::formatCard(const Card& card) {
 
 void UIRenderer::renderHeader(const GameState& state) {
     std::cout << "================================================================================" << std::endl;
-    std::cout << "                        Cabo Game - 4 Players" << std::endl;
+    std::cout << "                        Cabo Game - " << state.players.size() << " Players" << std::endl;
     if (state.phase == GameState::PLAYING) {
         std::cout << "                          Round " << state.roundNumber
                   << ", Turn " << state.turnNumber << std::endl;
