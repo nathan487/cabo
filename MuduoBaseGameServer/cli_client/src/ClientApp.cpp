@@ -393,6 +393,41 @@ void ClientApp::gameLoop() {
             #endif
         }
     }
+
+    // 处理结算阶段
+    if (state_.phase == GameState::ROUND_REVEAL) {
+        renderer_.render(state_);
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.get();
+
+        // 等待下一轮或游戏结束
+        while (running_ && state_.phase == GameState::ROUND_REVEAL) {
+            if (network_.hasMessage(100)) {
+                game::messages::ServerMessage msg;
+                if (network_.receive(msg, 1000)) {
+                    state_.updateFromMessage(msg);
+                    if (state_.phase == GameState::PLAYING) {
+                        // 进入下一轮
+                        return gameLoop();
+                    } else if (state_.phase == GameState::GAME_OVER) {
+                        break;
+                    }
+                }
+            }
+            #ifdef _WIN32
+                Sleep(100);
+            #else
+                usleep(100000);
+            #endif
+        }
+    }
+
+    // 处理游戏结束
+    if (state_.phase == GameState::GAME_OVER) {
+        renderer_.render(state_);
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cin.get();
+    }
 }
 
 void ClientApp::handleGameInput() {

@@ -425,9 +425,42 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
 
         phase = ROUND_REVEAL;
 
+        // 填充详细的结算信息
+        lastRoundResults.clear();
+        for (const auto& score : notify.scores()) {
+            RoundResult result;
+            result.playerId = score.player_id();
+            result.handTotal = score.hand_total();
+            result.penalty = score.penalty();
+            result.roundScore = score.round_score();
+            result.cumulativeScore = score.cumulative_score();
+            result.isSteadyCaller = score.is_steady_caller();
+            result.isLowest = score.is_lowest();
+            result.isKamikaze = score.is_kamikaze();
+
+            // 找到昵称
+            for (const auto& p : players) {
+                if (p.playerId == score.player_id()) {
+                    result.nickname = p.nickname;
+                    break;
+                }
+            }
+
+            // 找到手牌
+            for (const auto& hand : notify.revealed_hands()) {
+                if (hand.player_id() == score.player_id()) {
+                    for (int val : hand.card_values()) {
+                        result.cardValues.push_back(val);
+                    }
+                    break;
+                }
+            }
+
+            lastRoundResults.push_back(result);
+        }
+
         // 更新玩家分数
         for (const auto& scoreDetail : notify.scores()) {
-            // Important Fix #5: 添加玩家未找到警告
             bool found = false;
             for (auto& p : players) {
                 if (p.playerId == scoreDetail.player_id()) {
@@ -474,6 +507,18 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
         const auto& notify = msg.game_over_notify();
 
         phase = GAME_OVER;
+
+        // 填充最终排名信息
+        finalRankings.clear();
+        for (const auto& ranking : notify.rankings()) {
+            FinalRank rank;
+            rank.rank = ranking.rank();
+            rank.playerId = ranking.player_id();
+            rank.nickname = ranking.nickname();
+            rank.finalScore = ranking.final_score();
+            rank.isWinner = ranking.is_winner();
+            finalRankings.push_back(rank);
+        }
 
         std::cout << "[GameState] GameOverNotify: totalRounds=" << notify.total_rounds() << std::endl;
         for (const auto& ranking : notify.rankings()) {

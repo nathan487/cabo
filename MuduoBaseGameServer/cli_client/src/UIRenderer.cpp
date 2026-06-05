@@ -136,7 +136,93 @@ void UIRenderer::render(const GameState& state) {
             if (p.isReady) std::cout << "[Ready]";
             std::cout << std::endl;
         }
+    } else if (state.phase == GameState::ROUND_REVEAL) {
+        renderRoundReveal(state);
+    } else if (state.phase == GameState::GAME_OVER) {
+        renderGameOver(state);
     }
 }
+
+void UIRenderer::renderRoundReveal(const GameState& state) {
+    std::cout << "================================================================================" << std::endl;
+    std::cout << "                        Round " << state.roundNumber << " Reveal" << std::endl;
+    std::cout << "================================================================================" << std::endl;
+    std::cout << std::endl;
+
+    for (const auto& result : state.lastRoundResults) {
+        std::cout << result.nickname;
+        if (result.playerId == state.myPlayerId) {
+            std::cout << " (You)";
+        }
+        if (result.isSteadyCaller) {
+            std::cout << " (called CABO)";
+        }
+        std::cout << ":  ";
+
+        // 显示手牌
+        for (int val : result.cardValues) {
+            std::cout << "[" << val << "] ";
+        }
+
+        std::cout << "= " << result.handTotal;
+
+        if (result.penalty > 0) {
+            std::cout << "  (+" << result.penalty << " penalty)";
+        }
+
+        std::cout << " = " << result.roundScore;
+
+        if (result.isLowest) {
+            std::cout << "  <- Lowest!";
+        }
+
+        if (result.isKamikaze) {
+            std::cout << "  KAMIKAZE!";
+        }
+
+        std::cout << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << "Scores after Round " << state.roundNumber << ":" << std::endl;
+    for (const auto& result : state.lastRoundResults) {
+        std::cout << "  " << result.nickname << ": " << result.cumulativeScore;
+        if (result.isLowest) {
+            std::cout << "  <- Lowest";
+        }
+        std::cout << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << ">>> Press Enter to continue...";
+}
+
+void UIRenderer::renderGameOver(const GameState& state) {
+    std::cout << "================================================================================" << std::endl;
+    std::cout << "                        Game Over!" << std::endl;
+    std::cout << "================================================================================" << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Final Standings:" << std::endl;
+    for (const auto& rank : state.finalRankings) {
+        std::cout << "  " << rank.rank;
+        if (rank.rank == 1) std::cout << "st";
+        else if (rank.rank == 2) std::cout << "nd";
+        else if (rank.rank == 3) std::cout << "rd";
+        else std::cout << "th";
+
+        std::cout << " Place: " << rank.nickname << "  (Score: " << rank.finalScore << ")";
+
+        if (rank.isWinner) {
+            std::cout << "  WINNER";
+        }
+
+        std::cout << std::endl;
+    }
+
+    std::cout << std::endl;
+    std::cout << ">>> Press Enter to exit...";
+}
+
 
 } // namespace cabo
