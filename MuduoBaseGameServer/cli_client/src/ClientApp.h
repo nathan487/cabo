@@ -34,6 +34,7 @@ private:
     void handleGameInput();
     void handleDrawnCardDecision();
     void handleReplaceWithDrawn();
+    void handleTakeFromDiscard();
     void handleSkillInput(int skillType);
     void handlePeekSelfSkill();
     void handleSpySkill();

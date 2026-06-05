@@ -430,8 +430,7 @@ void ClientApp::handleGameInput() {
 
     } else if (choice == 2) {
         // 从弃牌堆拿牌
-        // TODO: Task 12实现
-        std::cout << ">>> Take from discard pile - not implemented yet" << std::endl;
+        handleTakeFromDiscard();
 
     } else if (choice == 3) {
         // 喊CABO
@@ -803,6 +802,79 @@ void ClientApp::handleSwapSkill() {
             std::cout << ">>> Swap successful!" << std::endl;
         } else {
             std::cout << ">>> Skill failed: " << rsp.use_skill_rsp().error().message() << std::endl;
+        }
+    }
+}
+
+void ClientApp::handleTakeFromDiscard() {
+    std::cout << ">>> Taking top card [" << state_.discardTopValue
+              << "] from discard pile" << std::endl;
+    std::cout << ">>> Enter slot indices to replace (space-separated, e.g., '0 1'): ";
+
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::string line;
+    std::getline(std::cin, line);
+
+    if (std::cin.eof()) {
+        running_ = false;
+        return;
+    }
+
+    std::vector<int> slots = parseSlotIndices(line);
+
+    if (slots.empty()) {
+        std::cout << ">>> No valid slots entered! Please try again." << std::endl;
+        renderer_.render(state_);
+        return handleTakeFromDiscard();  // 重试
+    }
+
+    game::messages::ClientMessage req;
+    req.set_seq(nextSeq_);
+    auto* takeReq = req.mutable_take_from_discard_req();
+    takeReq->set_player_id(state_.myPlayerId);
+    takeReq->set_room_id(state_.roomId);
+    takeReq->set_request_id(nextSeq_++);
+
+    for (int slot : slots) {
+        takeReq->add_slot_indices(slot);
+    }
+
+    if (!network_.send(req)) {
+        std::cout << ">>> Failed to send TakeFromDiscardReq!" << std::endl;
+        return;
+    }
+
+    std::cout << ">>> Attempting to replace slots [";
+    for (size_t i = 0; i < slots.size(); ++i) {
+        std::cout << slots[i];
+        if (i < slots.size() - 1) std::cout << ", ";
+    }
+    std::cout << "]..." << std::endl;
+
+    // 等待服务端响应
+    game::messages::ServerMessage rsp;
+    if (!network_.receive(rsp, 5000)) {
+        std::cout << ">>> Timeout waiting for TakeFromDiscardRsp!" << std::endl;
+        return;
+    }
+
+    if (rsp.has_take_from_discard_rsp()) {
+        const auto& takeRsp = rsp.take_from_discard_rsp();
+        if (takeRsp.error().code() == 0) {
+            if (takeRsp.has_exchange_result()) {
+                const auto& result = takeRsp.exchange_result();
+                if (result.success()) {
+                    std::cout << ">>> Replace successful!" << std::endl;
+                } else {
+                    std::cout << ">>> Replace FAILED! Cards have different values." << std::endl;
+                    std::cout << ">>> Card added to your hand." << std::endl;
+                    if (result.drew_extra_penalty_card()) {
+                        std::cout << ">>> Extra penalty card added (3+ cards attempted)." << std::endl;
+                    }
+                }
+            }
+        } else {
+            std::cout << ">>> Take from discard failed: " << takeRsp.error().message() << std::endl;
         }
     }
 }
