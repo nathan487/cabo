@@ -311,30 +311,45 @@ void ClientApp::waitingRoomLoop() {
             std::getline(std::cin, input);
 
             if (input == "ready") {
-                // 发送ReadyReq
-                game::messages::ClientMessage readyMsg;
-                readyMsg.set_seq(nextSeq_);
-                auto* readyReq = readyMsg.mutable_ready_req();
-                readyReq->set_request_id(nextSeq_);
-                nextSeq_++;
-                readyReq->set_player_id(state_.myPlayerId);
-                readyReq->set_room_id(state_.roomId);
-                readyReq->set_is_ready(true);
-
-                if (!network_.send(readyMsg)) {
-                    std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
-                    running_ = false;
-                    return;
+                // 检查是否已经ready
+                bool alreadyReady = false;
+                for (const auto& p : state_.players) {
+                    if (p.playerId == state_.myPlayerId && p.isReady) {
+                        alreadyReady = true;
+                        break;
+                    }
                 }
 
-                std::cout << ">>> Ready signal sent!" << std::endl;
+                if (alreadyReady) {
+                    std::cout << ">>> You are already ready!" << std::endl;
+                } else {
+                    // 发送ReadyReq
+                    game::messages::ClientMessage readyMsg;
+                    readyMsg.set_seq(nextSeq_);
+                    auto* readyReq = readyMsg.mutable_ready_req();
+                    readyReq->set_request_id(nextSeq_);
+                    nextSeq_++;
+                    readyReq->set_player_id(state_.myPlayerId);
+                    readyReq->set_room_id(state_.roomId);
+                    readyReq->set_is_ready(true);
+
+                    if (!network_.send(readyMsg)) {
+                        std::cout << "ERROR: Failed to send ReadyReq!" << std::endl;
+                        running_ = false;
+                        return;
+                    }
+
+                    std::cout << ">>> Ready signal sent!" << std::endl;
+                }
             } else if (input == "start") {
                 // 只有房主且所有人ready才能start
                 if (!isHost) {
                     std::cout << ">>> Only host can start the game!" << std::endl;
+                } else if (autoStartSent) {
+                    std::cout << ">>> Game start already requested, waiting for server..." << std::endl;
                 } else if (!allReady || state_.players.size() != 4) {
                     std::cout << ">>> Cannot start: not all players are ready!" << std::endl;
-                } else if (!autoStartSent) {
+                } else {
                     game::messages::ClientMessage startMsg;
                     startMsg.set_seq(nextSeq_);
                     auto* startReq = startMsg.mutable_start_game_req();
