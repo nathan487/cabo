@@ -252,8 +252,9 @@ void ClientApp::waitingRoomLoop() {
     const int START_TIMEOUT_MS = 10000;  // 10秒超时
 
     while (running_) {
-        // 先检查是否有新消息（使用短超时以快速响应）
-        if (network_.hasMessage(50)) {
+        // 非阻塞检查是否有新消息
+        bool hasNewMessage = false;
+        while (network_.hasMessage(0)) {  // 0 = 非阻塞
             game::messages::ServerMessage msg;
             if (!network_.receive(msg, 1000)) {
                 std::cerr << "ERROR: Failed to receive message, connection may be lost" << std::endl;
@@ -261,6 +262,7 @@ void ClientApp::waitingRoomLoop() {
                 return;
             }
             state_.updateFromMessage(msg);
+            hasNewMessage = true;
         }
 
         // 检查phase是否已变为PLAYING（必须在外面，即使没有新消息也要检查）
@@ -399,7 +401,14 @@ void ClientApp::waitingRoomLoop() {
             }
         }
 
-        // 不需要额外休眠，因为hasMessage已经有50ms超时，足够避免CPU占用过高
+        // 如果本次循环没有新消息，短暂休眠避免CPU空转
+        if (!hasNewMessage) {
+            #ifdef _WIN32
+                Sleep(10);
+            #else
+                usleep(10000);  // 10ms
+            #endif
+        }
     }
 }
 
