@@ -189,10 +189,7 @@ void GameService::startNewRound(GameRoom& room) {
         p->knownSlots[1] = true;
     }
 
-    // Flip first card to discard
-    auto firstDiscard = drawCard(room);
-    discardCard(room, firstDiscard);
-
+    // Discard pile starts empty — first player must draw from deck
     sendGameStart(room);
     sendTurnStart(room);
 }

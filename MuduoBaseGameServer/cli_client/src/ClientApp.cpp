@@ -450,19 +450,23 @@ bool ClientApp::isExpectingInput() const {
 
 void ClientApp::showPrompt() {
     switch (subState_) {
-        case GameSubState::AWAITING_MAIN_INPUT:
+        case GameSubState::AWAITING_MAIN_INPUT: {
+            bool firstTurn = (state_.turnNumber <= 1);
             std::cout << ">>> Your Turn! Choose action:" << std::endl;
             std::cout << "    1. Draw from draw pile" << std::endl;
-            std::cout << "    2. Take from discard pile";
-            if (state_.discardTopValue >= 0) {
-                std::cout << " (current top: " << state_.discardTopValue << ")";
+            if (!firstTurn && state_.discardPileCount > 0) {
+                std::cout << "    2. Take from discard pile";
+                if (state_.discardTopValue >= 0) {
+                    std::cout << " (current top: " << state_.discardTopValue << ")";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
             if (!state_.isFinalRound) {
-                std::cout << "    3. Call CABO" << std::endl;
+                std::cout << "    " << (firstTurn ? "2" : "3") << ". Call CABO" << std::endl;
             }
             std::cout << ">>> Enter choice: " << std::flush;
             break;
+        }
 
         case GameSubState::AWAITING_DRAWN_DECISION: {
             bool hasSkill = (state_.drawnCardSkill != SKILL_TYPE_NONE);
@@ -810,17 +814,32 @@ void ClientApp::handleInputLine(const std::string& line) {
 // ============================================================================
 
 void ClientApp::onMainMenuInput(const std::string& line) {
-    int maxChoice = state_.isFinalRound ? 2 : 3;
+    bool firstTurn = (state_.turnNumber <= 1);
+    int maxChoice;
+    if (firstTurn) {
+        maxChoice = state_.isFinalRound ? 1 : 2;  // only draw (+ cabo if not final)
+    } else if (state_.discardPileCount <= 0) {
+        maxChoice = state_.isFinalRound ? 1 : 2;  // only draw (+ cabo)
+    } else {
+        maxChoice = state_.isFinalRound ? 2 : 3;  // full options (less cabo if final)
+    }
+
     int choice;
     if (!parseInt(line, choice, 1, maxChoice)) {
         showPrompt();
         return;
     }
 
+    // Remap choice: on first turn or empty discard, option 2 is CABO (normally option 3)
+    int action = choice;
+    if (firstTurn || state_.discardPileCount <= 0) {
+        if (choice == 2 && !state_.isFinalRound) action = 3;  // remap to CABO
+    }
+
     game::messages::ClientMessage req;
     int64_t reqId = network_.nextRequestId();
 
-    if (choice == 1) {
+    if (action == 1) {
         // 抽牌
         auto* drawReq = req.mutable_draw_card_req();
         drawReq->set_player_id(state_.myPlayerId);
@@ -831,11 +850,11 @@ void ClientApp::onMainMenuInput(const std::string& line) {
             std::cout << ">>> Drawing card..." << std::endl;
             state_.waitingForDrawResponse = true;
         }
-    } else if (choice == 2) {
+    } else if (action == 2) {
         // 从弃牌堆拿牌 → 先输入槽位
         transitionTo(GameSubState::AWAITING_TAKE_SLOTS);
         showPrompt();
-    } else if (choice == 3) {
+    } else if (action == 3) {
         // 喊CABO
         if (state_.waitingForCallSteadyResponse) {
             std::cout << ">>> Already waiting for CABO response from server!" << std::endl;

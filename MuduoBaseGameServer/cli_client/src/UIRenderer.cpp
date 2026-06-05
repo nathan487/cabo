@@ -30,8 +30,10 @@ void UIRenderer::renderPiles(const GameState& state) {
     std::cout << "                    Draw Pile: " << state.drawPileCount;
 
     std::cout << "      Discard Pile: " << state.discardPileCount;
-    if (state.discardTopValue >= 0) {
+    if (state.discardPileCount > 0 && state.discardTopValue >= 0) {
         std::cout << " (Top: " << state.discardTopValue << ")";
+    } else if (state.discardPileCount == 0) {
+        std::cout << " (Top: -)";
     }
     std::cout << std::endl << std::endl;
 }
