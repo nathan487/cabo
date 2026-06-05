@@ -735,15 +735,9 @@ void ClientApp::gameLoop() {
         }
     }
 
-    // ---- 阶段转换处理（替代递归调用） ----
-    if (state_.phase == GameState::ROUND_REVEAL) {
-        handleRoundRevealPhase();
-        // 如果进入下一轮，继续gameLoop
-        if (state_.phase == GameState::PLAYING) {
-            gameLoop();
-            return;
-        }
-    }
+    // ---- 阶段转换处理 ----
+    // handleRoundRevealPhase is now called from inside the main loop (via roundJustRevealed)
+    // or when phase transitions to ROUND_REVEAL between rounds.
 
     if (state_.phase == GameState::GAME_OVER) {
         renderer_.render(state_);
@@ -753,29 +747,125 @@ void ClientApp::gameLoop() {
 }
 
 void ClientApp::handleRoundRevealPhase() {
-    // 先处理所有pending消息
     drainMessages(true);
-    renderer_.render(state_);
 
-    // 等待用户按Enter（同时继续处理消息）
-    while (running_ && state_.phase == GameState::ROUND_REVEAL) {
+    // 先展示结算面板，等待用户按Enter确认
+    std::cout << "\n>>> Press Enter to continue to waiting room..." << std::flush;
+    bool enterPressed = false;
+    while (running_ && !enterPressed) {
         drainMessages(true);
-        if (state_.phase != GameState::ROUND_REVEAL) break;
+        if (state_.phase == GameState::GAME_OVER) return;
 
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
-        struct timeval tv = {0, 100000};  // 100ms
+        struct timeval tv = {0, 100000};
         int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
         if (ret > 0) {
             std::string line;
-            std::getline(std::cin, line);  // consume the Enter
-            break;
+            std::getline(std::cin, line);
+            enterPressed = true;
         }
     }
 
-    // 再次处理可能在等待Enter期间到达的消息
     drainMessages(true);
+    if (!running_) return;
+    if (state_.phase == GameState::GAME_OVER) return;
+
+    // 进入回合间等待：结算面板保持显示，等待所有人ready + 房主start
+    std::cout << "\n>>> Type 'ready' to confirm, host type 'start' to begin next round" << std::endl;
+    state_.gameStartConfirmed = false;
+    bool autoStartSent = false;
+    auto startSentTime = std::chrono::steady_clock::time_point();
+    const int START_TIMEOUT_MS = 30000;  // 30秒超时
+
+    while (running_ && state_.phase != GameState::PLAYING) {
+        drainMessages(true);
+        if (state_.phase == GameState::PLAYING) break;
+        if (state_.phase == GameState::GAME_OVER) return;
+
+        // 检查是否是房主
+        bool isHost = false;
+        for (const auto& p : state_.players) {
+            if (p.playerId == state_.myPlayerId && p.isHost) {
+                isHost = true; break;
+            }
+        }
+
+        // 检查所有玩家ready状态
+        int readyCount = 0;
+        bool allReady = true;
+        for (const auto& p : state_.players) {
+            if (p.isReady) readyCount++;
+            else allReady = false;
+        }
+
+        // 非阻塞检查stdin
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        struct timeval tv = {0, 100000};
+        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
+
+        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
+            std::string input;
+            std::getline(std::cin, input);
+
+            if (input == "ready") {
+                bool alreadyReady = false;
+                for (const auto& p : state_.players) {
+                    if (p.playerId == state_.myPlayerId && p.isReady) {
+                        alreadyReady = true; break;
+                    }
+                }
+                if (alreadyReady) {
+                    std::cout << ">>> You are already ready! (" << readyCount << "/4 ready)" << std::endl;
+                } else {
+                    game::messages::ClientMessage readyMsg;
+                    auto* readyReq = readyMsg.mutable_ready_req();
+                    readyReq->set_request_id(network_.nextRequestId());
+                    readyReq->set_player_id(state_.myPlayerId);
+                    readyReq->set_room_id(state_.roomId);
+                    readyReq->set_is_ready(true);
+                    if (network_.send(readyMsg)) {
+                        std::cout << ">>> Ready! (" << (readyCount + 1) << "/4 ready)" << std::endl;
+                    }
+                }
+            } else if (input == "start") {
+                if (!isHost) {
+                    std::cout << ">>> Only host can start the next round!" << std::endl;
+                } else if (autoStartSent) {
+                    std::cout << ">>> Start already requested..." << std::endl;
+                } else if (!allReady) {
+                    std::cout << ">>> Cannot start: " << readyCount << "/4 ready" << std::endl;
+                } else {
+                    game::messages::ClientMessage startMsg;
+                    auto* startReq = startMsg.mutable_start_game_req();
+                    startReq->set_request_id(network_.nextRequestId());
+                    startReq->set_player_id(state_.myPlayerId);
+                    startReq->set_room_id(state_.roomId);
+                    if (network_.send(startMsg)) {
+                        autoStartSent = true;
+                        startSentTime = std::chrono::steady_clock::now();
+                        std::cout << ">>> Starting next round..." << std::endl;
+                    }
+                }
+            }
+        }
+
+        // 超时检查
+        if (autoStartSent) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startSentTime).count();
+            if (elapsed > START_TIMEOUT_MS) {
+                std::cerr << "ERROR: Start timeout, server not responding" << std::endl;
+                running_ = false;
+                return;
+            }
+        }
+
+        usleep(50000);
+    }
 }
 
 // ============================================================================

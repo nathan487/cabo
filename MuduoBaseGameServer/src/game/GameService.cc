@@ -167,6 +167,18 @@ void GameService::startGame(int64_t roomId,
     startNewRound(*room);
 }
 
+bool GameService::hasGame(int64_t roomId) const {
+    return games_.count(roomId) > 0;
+}
+
+void GameService::restartRound(int64_t roomId) {
+    auto it = games_.find(roomId);
+    if (it == games_.end()) return;
+    auto& room = *it->second;
+    room.step = GameStep::Playing;
+    startNewRound(room);
+}
+
 void GameService::startNewRound(GameRoom& room) {
     room.roundNumber++;
     room.steadyCallerSeat = -1;
@@ -491,8 +503,8 @@ void GameService::revealAndScore(GameRoom& room) {
         broadcastToRoom(room, goMsg);
         room.step = GameStep::GameOver;
     } else {
-        room.step = GameStep::Playing;
-        startNewRound(room);
+        // Wait for all players to ready up and host to start before next round
+        room.step = GameStep::WaitingToStart;
     }
 }
 

@@ -88,6 +88,10 @@ public:
                    const std::vector<std::shared_ptr<PlayerGameState>>& players,
                    int64_t hostPlayerId);
 
+    // Inter-round restart: resume existing game with startNewRound
+    bool hasGame(int64_t roomId) const;
+    void restartRound(int64_t roomId);
+
     // Player action handlers
     void handleDrawCard(const TcpConnectionPtr& conn,
                         const ::game::messages::ClientMessage& msg);

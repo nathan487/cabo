@@ -114,7 +114,13 @@ private:
         const auto& req = msg.start_game_req();
         int64_t roomId = req.room_id();
 
-        // Build player state list from room data
+        // Inter-round restart: existing game, just start new round
+        if (gameService_.hasGame(roomId)) {
+            gameService_.restartRound(roomId);
+            return;
+        }
+
+        // First game start: build player state list from room data
         auto roomPtr = roomService_.getRoom(roomId);
         if (!roomPtr) return;
 
