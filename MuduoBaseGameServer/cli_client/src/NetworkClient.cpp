@@ -206,11 +206,29 @@ bool NetworkClient::hasMessage(int timeoutMs) {
 
 // Step 6: 实现extractOneMessage方法
 bool NetworkClient::extractOneMessage(game::messages::ServerMessage& outMsg) {
+    // BUG-3 Fix: Pre-check frame length header to distinguish "need more data"
+    // from "corrupted data". Without this, a corrupted oversized length header
+    // permanently blocks the buffer since decodeFrame refuses to process it.
+    if (recvBuffer_.size() >= 4) {
+        uint32_t len = (static_cast<uint32_t>(recvBuffer_[0]) << 24)
+                     | (static_cast<uint32_t>(recvBuffer_[1]) << 16)
+                     | (static_cast<uint32_t>(recvBuffer_[2]) << 8)
+                     | static_cast<uint32_t>(recvBuffer_[3]);
+
+        if (len > 10 * 1024 * 1024) {
+            // Corrupted frame header — clear buffer to allow recovery
+            std::cerr << "NetworkClient: Corrupted frame header (len=" << len
+                      << "), clearing buffer to recover" << std::endl;
+            recvBuffer_.clear();
+            return false;
+        }
+    }
+
     size_t frameLen;
     std::vector<uint8_t> payload;
 
     if (!decodeFrame(recvBuffer_, frameLen, payload)) {
-        return false;  // 没有完整帧
+        return false;  // 没有完整帧（半包等待更多数据）
     }
 
     // 解析protobuf

@@ -201,6 +201,8 @@ message ActionResultNotify {
   .game.common.ExchangeAttemptResult exchange_result = 12; // 替换/多张替换结果（如有）
   int32 source_slot = 13;   // 操作的己方槽位（peek/swap/replace）
   int32 target_slot = 14;   // 目标槽位（spy/swap的对方槽位）
+  // BUG-4 Fix: 各玩家当前手牌数量（失败交换后可能超过4张）
+  repeated .game.common.OpponentHandState player_hands = 15;
 }
 
 // 亮牌计分通知（最终轮结束后广播）

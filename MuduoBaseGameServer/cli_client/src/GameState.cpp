@@ -495,6 +495,18 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
             }
         }
 
+        // BUG-4 Fix: Update all players' card counts from ActionResultNotify.
+        // This keeps opponent card counts in sync after failed replaces
+        // where a player's hand can grow beyond 4 cards.
+        for (const auto& hand : notify.player_hands()) {
+            for (auto& p : players) {
+                if (p.playerId == hand.player_id()) {
+                    p.cardCount = hand.card_count();
+                    break;
+                }
+            }
+        }
+
         // 更新回合状态
         if (notify.turn_ended()) {
             currentPlayerId = notify.next_player_id();

@@ -293,6 +293,14 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
     if (exchangeResult)
         *ar->mutable_exchange_result() = *exchangeResult;
 
+    // BUG-4 Fix: Include all players' current hand sizes so clients can
+    // update opponent card counts after failed replaces (hand grows beyond 4).
+    for (auto& p : room.players) {
+        auto* hand = ar->add_player_hands();
+        hand->set_player_id(p->playerId);
+        hand->set_card_count(static_cast<int32_t>(p->cards.size()));
+    }
+
     broadcastToRoom(room, msg);
 }
 
@@ -561,6 +569,20 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
 
+    // BUG-2 Fix: Verify this is actually the current player who drew the card.
+    // Without this check, any player could hijack another player's drawn card action.
+    if (!isCurrentPlayer(*room, req.player_id())) {
+        LOG_INFO("[Game] DiscardDrawn: NOT player %lld's turn (current seat=%d)",
+                 (long long)req.player_id(), room->currentPlayerSeat);
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_discard_drawn_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(3001);
+        rsp->mutable_error()->set_message("Not your turn");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
+
     int cardValue = room->pendingDrawnCard.value();
     bool hasSkill = cardValue >= 7 && cardValue <= 12;
 
@@ -602,6 +624,20 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
+
+    // BUG-2 Fix: Verify this is actually the current player who drew the card.
+    // Without this check, any player could hijack another player's drawn card action.
+    if (!isCurrentPlayer(*room, req.player_id())) {
+        LOG_INFO("[Game] ReplaceWithDrawn: NOT player %lld's turn (current seat=%d)",
+                 (long long)req.player_id(), room->currentPlayerSeat);
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_replace_with_drawn_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(3001);
+        rsp->mutable_error()->set_message("Not your turn");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
 
     auto card = room->pendingDrawnCard;
     const auto& indices = req.slot_indices();
@@ -696,17 +732,39 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
     auto player = getPlayer(*room, req.player_id());
     if (!player || !isCurrentPlayer(*room, req.player_id())) return;
 
+    // BUG-1 Fix: Validate ALL inputs BEFORE popping from discard pile.
+    // This prevents card loss when slot_indices is empty or contains invalid slots.
+    const auto& indices = req.slot_indices();
+    if (indices.size() == 0) {
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_take_from_discard_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4001);
+        rsp->mutable_error()->set_message("No slot indices provided");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
+
+    // Validate all slot indices are in range BEFORE modifying state
+    for (int i = 0; i < indices.size(); i++) {
+        int32_t slot = indices.Get(i);
+        if (slot < 0 || slot >= static_cast<int32_t>(player->cards.size())) {
+            ::game::messages::ServerMessage errMsg;
+            auto* rsp = errMsg.mutable_take_from_discard_rsp();
+            rsp->set_request_id(req.request_id());
+            rsp->mutable_error()->set_code(4002);
+            rsp->mutable_error()->set_message("Invalid slot index: " + std::to_string(slot));
+            sendToPlayer(conn, errMsg);
+            return;
+        }
+    }
+
+    // NOW it's safe to pop from discard pile
     auto card = room->discardPile.back();
     room->discardPile.pop_back();
 
-    room->pendingDrawnCard = card;
-    room->pendingDrewFromDiscard = true;
-    room->step = GameStep::WaitingDrawDecision;
-
-    // Same multi-replace logic as replace_with_drawn, but source is discard
-    // For MVP: auto-replace first slot (simplified — full multi-replace via replace flow)
-    const auto& indices = req.slot_indices();
-    if (indices.size() == 0) return;
+    // Take from discard does NOT trigger skills — no WaitingDrawDecision needed.
+    // Process the replacement inline and end the turn.
 
     ::game::common::ExchangeAttemptResult exResult;
     exResult.set_attempted_multi_card(indices.size() > 1);
@@ -716,13 +774,13 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
 
     if (indices.size() == 1) {
         int32_t slot = indices.Get(0);
-        if (slot < 0 || slot >= static_cast<int32_t>(player->cards.size())) return;
         auto oldCard = player->cards[slot];
         player->cards[slot] = card;
         player->knownSlots[slot] = true;
         discardCard(*room, oldCard);
         exResult.set_success(true);
         exResult.set_discarded_count(1);
+        exResult.set_added_card_count(0);
     } else {
         int32_t firstVal = player->cards[indices.Get(0)].value();
         bool allSame = true;
@@ -741,10 +799,12 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
             }
             exResult.set_success(true);
             exResult.set_discarded_count(indices.size());
+            exResult.set_added_card_count(0);
         } else {
             player->cards.push_back(card);
             player->knownSlots.push_back(true);
             exResult.set_success(false);
+            exResult.set_discarded_count(0);
             exResult.set_added_card_count(1);
             if (indices.size() >= 3 && !room->drawPile.empty()) {
                 auto penalty = drawCard(*room);
