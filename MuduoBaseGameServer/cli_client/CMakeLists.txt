@@ -27,6 +27,7 @@ include_directories(
 # 客户端源文件
 set(CLIENT_SOURCES
     src/main.cpp
+    src/GameState.cpp
 )
 
 # protobuf生成文件（复用服务端的）
