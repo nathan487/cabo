@@ -1,4 +1,5 @@
 #include "GameState.h"
+#include <cassert>
 
 namespace cabo {
 
@@ -19,7 +20,10 @@ std::vector<int> GameState::getOpponentIndices() const {
     int myIndex = getMyPlayerIndex();
     if (myIndex < 0) return {};
 
+    // CLI客户端固定4人游戏
     int n = static_cast<int>(players.size());
+    assert(n == PLAYER_COUNT && "CLI client only supports 4-player games");
+
     return {
         (myIndex + 2) % n,  // 对面玩家（顶部）
         (myIndex + 3) % n,  // 左侧玩家

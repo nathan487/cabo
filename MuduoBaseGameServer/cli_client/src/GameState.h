@@ -24,6 +24,8 @@ struct Player {
 
 class GameState {
 public:
+    static constexpr int PLAYER_COUNT = 4;  // CLI客户端固定4人游戏
+
     enum Phase {
         LOBBY,
         WAITING_ROOM,
