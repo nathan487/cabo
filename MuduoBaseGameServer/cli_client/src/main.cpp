@@ -1,17 +1,20 @@
 #include <iostream>
 #include "GameState.h"
+#include "NetworkClient.h"
 
 int main(int argc, char* argv[]) {
     std::cout << "Cabo CLI Client v1.0" << std::endl;
 
-    // 测试GameState
-    cabo::GameState state;
-    state.myPlayerId = 1;
-    state.phase = cabo::GameState::LOBBY;
+    // 测试NetworkClient
+    cabo::NetworkClient network;
 
-    std::cout << "GameState initialized successfully" << std::endl;
-    std::cout << "My player ID: " << state.myPlayerId << std::endl;
-    std::cout << "Phase: " << state.phase << std::endl;
+    std::cout << "Testing connection to 127.0.0.1:8888..." << std::endl;
+    if (network.connect("127.0.0.1", 8888)) {
+        std::cout << "Connection test successful!" << std::endl;
+        network.disconnect();
+    } else {
+        std::cout << "Connection test failed (server not running?)" << std::endl;
+    }
 
     return 0;
 }
