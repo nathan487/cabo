@@ -1,6 +1,7 @@
 #include "ClientApp.h"
 #include <iostream>
 #include <limits>
+#include <chrono>
 
 #ifdef _WIN32
     #include <windows.h>
@@ -253,6 +254,8 @@ void ClientApp::waitingRoomLoop() {
     bool autoStartSent = false;
     size_t lastPlayerCount = 0;
     bool lastAllReady = false;
+    auto startSentTime = std::chrono::steady_clock::time_point();
+    const int START_TIMEOUT_MS = 10000;  // 10秒超时
 
     while (running_) {
         // 检查是否有新消息（100ms超时）
@@ -324,7 +327,20 @@ void ClientApp::waitingRoomLoop() {
             }
 
             autoStartSent = true;
+            startSentTime = std::chrono::steady_clock::now();
             std::cout << ">>> StartGameReq sent!" << std::endl;
+        }
+
+        // 检查启动超时
+        if (autoStartSent) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - startSentTime
+            ).count();
+            if (elapsed > START_TIMEOUT_MS) {
+                std::cerr << "ERROR: Game start timeout, server not responding" << std::endl;
+                running_ = false;
+                return;
+            }
         }
 
         // 检查phase是否已变为PLAYING
@@ -349,10 +365,13 @@ void ClientApp::gameLoop() {
         // 检查服务端消息
         if (network_.hasMessage(100)) {
             game::messages::ServerMessage msg;
-            if (network_.receive(msg, 1000)) {
-                state_.updateFromMessage(msg);
-                renderer_.render(state_);
+            if (!network_.receive(msg, 1000)) {
+                std::cerr << "ERROR: Failed to receive message, connection lost" << std::endl;
+                running_ = false;
+                break;
             }
+            state_.updateFromMessage(msg);
+            renderer_.render(state_);
         }
 
         // 如果是我的回合且没有抽牌状态
@@ -374,6 +393,13 @@ void ClientApp::gameLoop() {
 void ClientApp::handleGameInput() {
     int choice;
     std::cin >> choice;
+
+    // 检查EOF
+    if (std::cin.eof()) {
+        std::cout << "\n>>> EOF detected, exiting..." << std::endl;
+        running_ = false;
+        return;
+    }
 
     if (std::cin.fail() || choice < 1 || choice > 3) {
         std::cin.clear();
