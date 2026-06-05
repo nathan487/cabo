@@ -254,6 +254,14 @@ void ClientApp::roomFlow() {
 void ClientApp::waitingRoomLoop() {
     std::cout << "\n>>> Entering waiting room..." << std::endl;
 
+    // 先主动接收pending消息（可能包含ready后的RoomStateNotify）
+    while (network_.hasMessage(50)) {
+        game::messages::ServerMessage msg;
+        if (network_.receive(msg, 100)) {
+            state_.updateFromMessage(msg);
+        }
+    }
+
     bool isHost = false;
     bool autoStartSent = false;
     size_t lastPlayerCount = 0;
