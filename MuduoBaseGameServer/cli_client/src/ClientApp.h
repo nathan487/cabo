@@ -19,6 +19,10 @@ private:
     bool running_ = true;
     int64_t nextSeq_ = 1;
 
+    // Constants
+    static constexpr int MAX_SLOT_INDEX = 10;  // 最大槽位数（失败替换可能超过4）
+    static constexpr int SKILL_TYPE_NONE = 1;
+
     // 流程方法
     void connectToServer();
     void loginFlow();
@@ -30,6 +34,10 @@ private:
     void handleGameInput();
     void handleDrawnCardDecision();
     void handleReplaceWithDrawn();
+    void handleSkillInput(int skillType);
+    void handlePeekSelfSkill();
+    void handleSpySkill();
+    void handleSwapSkill();
 
     // 工具方法
     std::vector<int> parseSlotIndices(const std::string& input);
