@@ -347,8 +347,33 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                 int32_t addedCardCount = result.selected_slot_indices_size();
 
                 if (result.success()) {
-                    // 替换成功，更新对应槽位
-                    for (int32_t slotIdx : result.selected_slot_indices()) {
+                    if (addedCardCount > 1) {
+                        // Multi-card success: discard selected, keep unselected, add drawn at end
+                        // Card count decreases: old N → (N - addedCardCount + 1)
+                        std::vector<Card> newMyCards;
+                        for (size_t i = 0; i < myCards.size(); i++) {
+                            bool isSelected = false;
+                            for (int j = 0; j < result.selected_slot_indices_size(); j++) {
+                                if (static_cast<int32_t>(i) == result.selected_slot_indices(j)) {
+                                    isSelected = true; break;
+                                }
+                            }
+                            if (!isSelected) {
+                                Card c = myCards[i];
+                                c.slotIndex = static_cast<int32_t>(newMyCards.size());
+                                newMyCards.push_back(c);
+                            }
+                        }
+                        // Add drawn card at end
+                        Card newCard;
+                        newCard.slotIndex = static_cast<int32_t>(newMyCards.size());
+                        newCard.value = incomingValue;
+                        newCard.isKnown = true;
+                        newMyCards.push_back(newCard);
+                        myCards = std::move(newMyCards);
+                    } else {
+                        // Single card: update in place
+                        int32_t slotIdx = result.selected_slot_indices(0);
                         if (slotIdx >= 0 && slotIdx < static_cast<int32_t>(myCards.size())) {
                             myCards[slotIdx].value = incomingValue;
                             myCards[slotIdx].isKnown = true;
@@ -390,8 +415,30 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
                 int32_t addedCardCount = result.selected_slot_indices_size();
 
                 if (result.success()) {
-                    // 替换成功
-                    for (int32_t slotIdx : result.selected_slot_indices()) {
+                    if (addedCardCount > 1) {
+                        // Multi-card success: discard selected, keep unselected, add at end
+                        std::vector<Card> newMyCards;
+                        for (size_t i = 0; i < myCards.size(); i++) {
+                            bool isSelected = false;
+                            for (int j = 0; j < result.selected_slot_indices_size(); j++) {
+                                if (static_cast<int32_t>(i) == result.selected_slot_indices(j)) {
+                                    isSelected = true; break;
+                                }
+                            }
+                            if (!isSelected) {
+                                Card c = myCards[i];
+                                c.slotIndex = static_cast<int32_t>(newMyCards.size());
+                                newMyCards.push_back(c);
+                            }
+                        }
+                        Card newCard;
+                        newCard.slotIndex = static_cast<int32_t>(newMyCards.size());
+                        newCard.value = incomingValue;
+                        newCard.isKnown = true;
+                        newMyCards.push_back(newCard);
+                        myCards = std::move(newMyCards);
+                    } else {
+                        int32_t slotIdx = result.selected_slot_indices(0);
                         if (slotIdx >= 0 && slotIdx < static_cast<int32_t>(myCards.size())) {
                             myCards[slotIdx].value = incomingValue;
                             myCards[slotIdx].isKnown = true;

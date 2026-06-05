@@ -644,6 +644,32 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
 
     if (indices.size() == 0) return;
 
+    // Validate all slot indices are in range AND unique before modifying state
+    for (int i = 0; i < indices.size(); i++) {
+        int32_t slot = indices.Get(i);
+        if (slot < 0 || slot >= static_cast<int32_t>(player->cards.size())) {
+            ::game::messages::ServerMessage errMsg;
+            auto* rsp = errMsg.mutable_replace_with_drawn_rsp();
+            rsp->set_request_id(req.request_id());
+            rsp->mutable_error()->set_code(4002);
+            rsp->mutable_error()->set_message("Invalid slot index: " + std::to_string(slot));
+            sendToPlayer(conn, errMsg);
+            return;
+        }
+        // Check for duplicate slots (would cause card loss in multi-replace)
+        for (int j = i + 1; j < indices.size(); j++) {
+            if (indices.Get(j) == slot) {
+                ::game::messages::ServerMessage errMsg;
+                auto* rsp = errMsg.mutable_replace_with_drawn_rsp();
+                rsp->set_request_id(req.request_id());
+                rsp->mutable_error()->set_code(4003);
+                rsp->mutable_error()->set_message("Duplicate slot index: " + std::to_string(slot));
+                sendToPlayer(conn, errMsg);
+                return;
+            }
+        }
+    }
+
     ::game::common::ExchangeAttemptResult exResult;
     exResult.set_attempted_multi_card(indices.size() > 1);
     for (int i = 0; i < indices.size(); i++)
@@ -674,16 +700,40 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
         }
 
         if (allSame) {
-            for (int i = 0; i < indices.size(); i++) {
-                int32_t slot = indices.Get(i);
-                auto oldCard = player->cards[slot];
-                player->cards[slot] = card;
-                player->knownSlots[slot] = true;
-                discardCard(*room, oldCard);
-            }
+            // Multi-card success: discard ALL selected cards (N out).
+            // Unselected cards shift forward, drawn card added at end (1 in).
+            // Card count decreases by (N - 1). Example: [0][2][?][2] select 1,3
+            // → discard [2][2], keep [0][?], add [1] → [0][?][1]
             exResult.set_success(true);
             exResult.set_discarded_count(indices.size());
             exResult.set_added_card_count(0);
+
+            // Step 1: Discard all selected cards (using original indices)
+            for (int i = 0; i < indices.size(); i++) {
+                discardCard(*room, player->cards[indices.Get(i)]);
+            }
+
+            // Step 2: Rebuild cards — keep unselected, add drawn card at end
+            std::vector<::game::common::CardInfo> newCards;
+            std::vector<bool> newKnown;
+            for (size_t i = 0; i < player->cards.size(); i++) {
+                bool isSelected = false;
+                for (int j = 0; j < indices.size(); j++) {
+                    if (static_cast<int32_t>(i) == indices.Get(j)) {
+                        isSelected = true; break;
+                    }
+                }
+                if (!isSelected) {
+                    newCards.push_back(player->cards[i]);
+                    newKnown.push_back(player->knownSlots[i]);
+                }
+            }
+            // Add drawn/discard card at end (known to player)
+            newCards.push_back(card);
+            newKnown.push_back(true);
+
+            player->cards = std::move(newCards);
+            player->knownSlots = std::move(newKnown);
         } else {
             // Failure: drawn card added to player area
             player->cards.push_back(card);
@@ -745,7 +795,7 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
         return;
     }
 
-    // Validate all slot indices are in range BEFORE modifying state
+    // Validate all slot indices are in range AND unique BEFORE modifying state
     for (int i = 0; i < indices.size(); i++) {
         int32_t slot = indices.Get(i);
         if (slot < 0 || slot >= static_cast<int32_t>(player->cards.size())) {
@@ -756,6 +806,18 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
             rsp->mutable_error()->set_message("Invalid slot index: " + std::to_string(slot));
             sendToPlayer(conn, errMsg);
             return;
+        }
+        // Check for duplicate slots (would cause card loss in multi-replace)
+        for (int j = i + 1; j < indices.size(); j++) {
+            if (indices.Get(j) == slot) {
+                ::game::messages::ServerMessage errMsg;
+                auto* rsp = errMsg.mutable_take_from_discard_rsp();
+                rsp->set_request_id(req.request_id());
+                rsp->mutable_error()->set_code(4003);
+                rsp->mutable_error()->set_message("Duplicate slot index: " + std::to_string(slot));
+                sendToPlayer(conn, errMsg);
+                return;
+            }
         }
     }
 
@@ -790,16 +852,40 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
             }
         }
         if (allSame) {
-            for (int i = 0; i < indices.size(); i++) {
-                int32_t slot = indices.Get(i);
-                auto oldCard = player->cards[slot];
-                player->cards[slot] = card;
-                player->knownSlots[slot] = true;
-                discardCard(*room, oldCard);
-            }
+            // Multi-card success: discard ALL selected cards (N out).
+            // Unselected cards shift forward, drawn card added at end (1 in).
+            // Card count decreases by (N - 1). Example: [0][2][?][2] select 1,3
+            // → discard [2][2], keep [0][?], add [1] → [0][?][1]
             exResult.set_success(true);
             exResult.set_discarded_count(indices.size());
             exResult.set_added_card_count(0);
+
+            // Step 1: Discard all selected cards (using original indices)
+            for (int i = 0; i < indices.size(); i++) {
+                discardCard(*room, player->cards[indices.Get(i)]);
+            }
+
+            // Step 2: Rebuild cards — keep unselected, add drawn card at end
+            std::vector<::game::common::CardInfo> newCards;
+            std::vector<bool> newKnown;
+            for (size_t i = 0; i < player->cards.size(); i++) {
+                bool isSelected = false;
+                for (int j = 0; j < indices.size(); j++) {
+                    if (static_cast<int32_t>(i) == indices.Get(j)) {
+                        isSelected = true; break;
+                    }
+                }
+                if (!isSelected) {
+                    newCards.push_back(player->cards[i]);
+                    newKnown.push_back(player->knownSlots[i]);
+                }
+            }
+            // Add drawn/discard card at end (known to player)
+            newCards.push_back(card);
+            newKnown.push_back(true);
+
+            player->cards = std::move(newCards);
+            player->knownSlots = std::move(newKnown);
         } else {
             player->cards.push_back(card);
             player->knownSlots.push_back(true);
