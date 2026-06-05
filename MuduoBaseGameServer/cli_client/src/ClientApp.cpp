@@ -632,6 +632,11 @@ void ClientApp::gameLoop() {
         // UseSkillRsp已到达
         if (subState_ == GameSubState::WAITING_SKILL_RSP && !state_.waitingForSkillResponse) {
             // 根据技能类型更新手牌状态
+            // 保存当前回合状态，技能结果展示期间暂不切换回合
+            int64_t savedCurrentPlayerId = state_.currentPlayerId;
+            int32_t savedTurnNumber = state_.turnNumber;
+            state_.currentPlayerId = state_.myPlayerId;  // 保持箭头在自己身上
+
             if (skillTypeJustCompleted_ == 2) {
                 // PEEK_SELF: 偷看自己的牌 → 标记为已知
                 int slot = skillPending_.mySlot;
@@ -640,26 +645,42 @@ void ClientApp::gameLoop() {
                     if (state_.lastPeekedValue >= 0) {
                         state_.myCards[slot].value = state_.lastPeekedValue;
                     }
-                    std::cout << ">>> You peeked your slot " << slot
-                              << ": [" << state_.lastPeekedValue << "]" << std::endl;
                 }
+                renderer_.render(state_);
+                std::cout << "\n  ╔══════════════════════════════════╗" << std::endl;
+                std::cout <<   "  ║  PEEK SELF: Your slot " << skillPending_.mySlot
+                          << " = [" << state_.lastPeekedValue << "]" << std::endl;
+                std::cout <<   "  ╚══════════════════════════════════╝" << std::endl;
+                std::cout << "  (Continuing in 2 seconds...)" << std::flush;
+                usleep(2000000);
             } else if (skillTypeJustCompleted_ == 3) {
                 // SPY: 偷看对手的牌 → 仅显示数值，不影响自己手牌
-                if (state_.lastPeekedValue >= 0) {
-                    std::cout << ">>> You spied opponent's card: [" << state_.lastPeekedValue << "]" << std::endl;
-                }
+                renderer_.render(state_);
+                std::cout << "\n  ╔══════════════════════════════════╗" << std::endl;
+                std::cout <<   "  ║  SPY: Opponent's card = ["
+                          << state_.lastPeekedValue << "]" << std::endl;
+                std::cout <<   "  ╚══════════════════════════════════╝" << std::endl;
+                std::cout << "  (Continuing in 2 seconds...)" << std::flush;
+                usleep(2000000);
             } else if (skillTypeJustCompleted_ == 4) {
                 // SWAP: 交换 → 自己的槽位变为未知（盲换）
                 int slot = skillPending_.mySlot;
                 if (slot >= 0 && slot < static_cast<int>(state_.myCards.size())) {
                     state_.myCards[slot].isKnown = false;
-                    std::cout << ">>> Swap completed! Your slot " << slot
-                              << " is now unknown (blind swap)." << std::endl;
                 }
+                renderer_.render(state_);
+                std::cout << "\n  >>> Swap completed! Your slot " << skillPending_.mySlot
+                          << " is now unknown (blind swap)." << std::endl;
+                std::cout << "  (Continuing in 2 seconds...)" << std::flush;
+                usleep(2000000);
             }
+
+            // 恢复真实的回合状态（切换到下一玩家）
+            state_.currentPlayerId = savedCurrentPlayerId;
+            state_.turnNumber = savedTurnNumber;
             skillTypeJustCompleted_ = 0;
             transitionTo(GameSubState::IDLE);
-            renderer_.render(state_);  // 立即渲染以反映手牌变化
+            renderer_.render(state_);  // 刷新显示，切换到下一玩家回合
         }
 
         // ---- Step 3: 自己回合且空闲 → 进入主输入状态 ----
