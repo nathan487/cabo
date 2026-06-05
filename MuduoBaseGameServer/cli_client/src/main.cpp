@@ -1,20 +1,26 @@
 #include <iostream>
 #include "GameState.h"
-#include "NetworkClient.h"
+#include "UIRenderer.h"
 
 int main(int argc, char* argv[]) {
-    std::cout << "Cabo CLI Client v1.0" << std::endl;
+    cabo::GameState state;
+    state.myPlayerId = 1;
+    state.phase = cabo::GameState::WAITING_ROOM;
 
-    // 测试NetworkClient
-    cabo::NetworkClient network;
+    cabo::Player p1;
+    p1.playerId = 1;
+    p1.nickname = "Alice";
+    p1.seatId = 0;
+    p1.isHost = true;
+    p1.isReady = true;
 
-    std::cout << "Testing connection to 127.0.0.1:8888..." << std::endl;
-    if (network.connect("127.0.0.1", 8888)) {
-        std::cout << "Connection test successful!" << std::endl;
-        network.disconnect();
-    } else {
-        std::cout << "Connection test failed (server not running?)" << std::endl;
-    }
+    state.players.push_back(p1);
+
+    cabo::UIRenderer renderer;
+    renderer.render(state);
+
+    std::cout << std::endl << "Press Enter to exit..." << std::endl;
+    std::cin.get();
 
     return 0;
 }

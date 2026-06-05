@@ -29,6 +29,7 @@ set(CLIENT_SOURCES
     src/main.cpp
     src/GameState.cpp
     src/NetworkClient.cpp
+    src/UIRenderer.cpp
 )
 
 # protobuf生成文件（复用服务端的）
