@@ -17,6 +17,7 @@ private:
     GameState state_;
     UIRenderer renderer_;
     bool running_ = true;
+    int64_t nextSeq_ = 1;
 
     // 流程方法
     void connectToServer();
