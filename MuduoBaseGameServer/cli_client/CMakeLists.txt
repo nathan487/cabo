@@ -13,7 +13,7 @@ if(NOT Protobuf_FOUND)
     message(STATUS "Using anaconda protobuf: ${PROTOBUF_INCLUDE_DIR}")
 else()
     set(PROTOBUF_LIB_DIR "${Protobuf_LIBRARY_DIRS}")
-    set(PROTOBUF_LIBRARY "${PROTOBUF_LIBRARY}")
+    set(PROTOBUF_LIBRARY ${Protobuf_LIBRARIES})
     message(STATUS "Using system protobuf: ${PROTOBUF_INCLUDE_DIR}")
 endif()
 

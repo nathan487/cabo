@@ -17,7 +17,7 @@ make
 ./cabo_cli_client
 ```
 
-## Features
+## Features (Planned)
 
 - 4-player game support
 - TCP + protobuf communication
