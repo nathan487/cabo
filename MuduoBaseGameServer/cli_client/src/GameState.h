@@ -78,6 +78,10 @@ public:
     // 技能结果暂存（UseSkillRsp后更新myCards用）
     int32_t lastPeekedValue = -1;
     bool lastSwapOccurred = false;
+
+    // 操作广播消息缓冲（先渲染再打印，避免被clearScreen擦除）
+    std::string lastActionMessage;
+
     bool isFinalRound = false;
     int32_t finalRoundRemaining = 0;
 

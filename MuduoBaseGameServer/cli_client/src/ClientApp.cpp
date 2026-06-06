@@ -415,6 +415,11 @@ void ClientApp::drainMessages(bool render) {
     }
     if (stateChanged && render) {
         renderer_.render(state_);
+        // 渲染后再打印操作广播消息，避免被clearScreen擦除
+        if (!state_.lastActionMessage.empty()) {
+            std::cout << state_.lastActionMessage << std::flush;
+            state_.lastActionMessage.clear();
+        }
     }
 }
 

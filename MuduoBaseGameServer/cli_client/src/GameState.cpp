@@ -554,23 +554,77 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
             }
         }
 
-        // 公开广播技能操作信息（桌游中所有人能看到谁翻了哪张牌，只是不知道值）
-        if (notify.action_type() == ::game::common::ACTION_TYPE_USE_SKILL &&
-            notify.source_player_id() != myPlayerId) {
+        // 公开广播所有操作信息（先缓存，渲染后再打印，避免被clearScreen擦除）
+        {
             std::string name = "Player";
             for (const auto& p : players) {
                 if (p.playerId == notify.source_player_id()) { name = p.nickname; break; }
             }
-            if (notify.skill_used() == ::game::common::SKILL_TYPE_PEEK_SELF) {
-                std::cout << "\n>>> " << name << " peeked at their own slot "
-                          << notify.source_slot() << std::endl;
-            } else if (notify.skill_used() == ::game::common::SKILL_TYPE_SPY) {
-                std::string tgtName = "Player";
-                for (const auto& p : players) {
-                    if (p.playerId == notify.target_player_id()) { tgtName = p.nickname; break; }
+            std::string you = (notify.source_player_id() == myPlayerId) ? " (You)" : "";
+            std::string& msg = lastActionMessage;
+            msg.clear();
+
+            switch (notify.action_type()) {
+            case ::game::common::ACTION_TYPE_DRAW:
+                msg = "\n>>> " + name + you + " drew a card from the deck\n";
+                break;
+            case ::game::common::ACTION_TYPE_DISCARD_DRAWN:
+                msg = "\n>>> " + name + you + " discarded the drawn card";
+                if (notify.skill_used() == ::game::common::SKILL_TYPE_PEEK_SELF)
+                    msg += " (Peek Self skill available)";
+                else if (notify.skill_used() == ::game::common::SKILL_TYPE_SPY)
+                    msg += " (Spy skill available)";
+                else if (notify.skill_used() == ::game::common::SKILL_TYPE_SWAP)
+                    msg += " (Swap skill available)";
+                msg += "\n";
+                break;
+            case ::game::common::ACTION_TYPE_REPLACE_WITH_DRAWN:
+                if (notify.has_exchange_result()) {
+                    const auto& ex = notify.exchange_result();
+                    if (ex.success())
+                        msg = "\n>>> " + name + you + " replaced " + std::to_string(ex.discarded_count()) + " card(s) with the drawn card\n";
+                    else {
+                        msg = "\n>>> " + name + you + " failed to replace — card added to hand";
+                        if (ex.drew_extra_penalty_card()) msg += " (+1 penalty card)";
+                        msg += "\n";
+                    }
                 }
-                std::cout << "\n>>> " << name << " spied on " << tgtName
-                          << "'s slot " << notify.target_slot() << std::endl;
+                break;
+            case ::game::common::ACTION_TYPE_TAKE_FROM_DISCARD:
+                if (notify.has_exchange_result()) {
+                    const auto& ex = notify.exchange_result();
+                    if (ex.success())
+                        msg = "\n>>> " + name + you + " took from discard and replaced " + std::to_string(ex.discarded_count()) + " card(s)\n";
+                    else {
+                        msg = "\n>>> " + name + you + " took from discard but failed to replace";
+                        if (ex.drew_extra_penalty_card()) msg += " (+1 penalty card)";
+                        msg += "\n";
+                    }
+                }
+                break;
+            case ::game::common::ACTION_TYPE_USE_SKILL:
+                if (notify.skill_used() == ::game::common::SKILL_TYPE_PEEK_SELF) {
+                    msg = "\n>>> " + name + you + " peeked at their own slot " + std::to_string(notify.source_slot()) + "\n";
+                } else if (notify.skill_used() == ::game::common::SKILL_TYPE_SPY) {
+                    std::string tgtName = "Player";
+                    for (const auto& p : players) {
+                        if (p.playerId == notify.target_player_id()) { tgtName = p.nickname; break; }
+                    }
+                    msg = "\n>>> " + name + you + " spied on " + tgtName + "'s slot " + std::to_string(notify.target_slot()) + "\n";
+                } else if (notify.skill_used() == ::game::common::SKILL_TYPE_SWAP) {
+                    std::string tgtName = "Player";
+                    for (const auto& p : players) {
+                        if (p.playerId == notify.target_player_id()) { tgtName = p.nickname; break; }
+                    }
+                    msg = "\n>>> " + name + you + " swapped their slot " + std::to_string(notify.source_slot())
+                        + " with " + tgtName + "'s slot " + std::to_string(notify.target_slot()) + "\n";
+                }
+                break;
+            case ::game::common::ACTION_TYPE_CALL_STEADY:
+                msg = "\n>>> " + name + you + " called CABO!\n";
+                break;
+            default:
+                break;
             }
         }
 
