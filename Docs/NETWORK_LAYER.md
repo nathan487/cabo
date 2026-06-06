@@ -31,6 +31,8 @@ All messages use protobuf. Categories:
 | `PlayerReadyNotify` | broadcast | playerId, isReady |
 | `ReadyRsp` | private | error |
 | `StartGameRsp` | private | error |
+| `RoomStartNotify` | broadcast | roomId (game about to start) |
+| `PlayerLeaveNotify` | broadcast | playerId (player disconnected/left) |
 
 ### Game Phase
 
