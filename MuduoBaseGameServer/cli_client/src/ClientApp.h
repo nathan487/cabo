@@ -54,6 +54,9 @@ private:
     };
     SkillPendingData skillPending_;
 
+    // 等待室ready状态追踪（用于检测个别玩家ready变化）
+    std::vector<bool> lastReadyStates_;
+
     // ========== 流程方法 ==========
     void connectToServer();
     void loginFlow();

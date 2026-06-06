@@ -193,7 +193,19 @@ void UIRenderer::renderRoundReveal(const GameState& state) {
     }
 
     std::cout << std::endl;
-    std::cout << ">>> Press Enter to continue...";
+
+    // 回合间等待：显示每个玩家的ready状态
+    std::cout << "--- Ready for Next Round ---" << std::endl;
+    int readyCount = 0;
+    for (const auto& p : state.players) {
+        std::cout << "  " << p.nickname;
+        if (p.playerId == state.myPlayerId) std::cout << " (You)";
+        std::cout << ": " << (p.isReady ? "[Ready]" : "[...]") << std::endl;
+        if (p.isReady) readyCount++;
+    }
+    std::cout << "  (" << readyCount << "/" << state.players.size() << " ready)" << std::endl;
+    std::cout << std::endl;
+    std::cout << ">>> Type 'ready' to confirm, host type 'start' to begin next round";
 }
 
 void UIRenderer::renderGameOver(const GameState& state) {

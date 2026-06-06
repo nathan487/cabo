@@ -444,15 +444,22 @@ void RoomService::handleStartGame(const TcpConnectionPtr& conn,
     rsp->mutable_error()->set_code(0);
     sendTo(conn, rspMsg);
 
+    // Reset ready flags so players must re-ready for inter-round restart
+    for (auto& p : room->players) {
+        p->isReady = false;
+    }
+
     // RoomStartNotify to all
     ::game::messages::ServerMessage startNotify;
     auto* sn = startNotify.mutable_room_start_notify();
     sn->set_room_id(room->roomId);
     broadcastToRoom(room->roomId, startNotify);
 
-    // Reset ready flags so players must re-ready for inter-round restart
+    // Broadcast updated room state so all clients see isReady=false
     for (auto& p : room->players) {
-        p->isReady = false;
+        if (p->conn && p->isConnected) {
+            sendRoomState(room->roomId, p->conn);
+        }
     }
 }
 

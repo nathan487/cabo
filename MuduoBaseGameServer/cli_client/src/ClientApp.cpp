@@ -355,11 +355,19 @@ void ClientApp::waitingRoomLoop() {
             }
         }
 
-        // 只在状态变化时渲染
-        if (state_.players.size() != lastPlayerCount || allReady != lastAllReady) {
+        // 状态变化时渲染（包括个别玩家ready状态变化）
+        bool anyReadyChanged = false;
+        for (size_t i = 0; i < state_.players.size() && i < lastReadyStates_.size(); i++) {
+            if (state_.players[i].isReady != lastReadyStates_[i]) {
+                anyReadyChanged = true; break;
+            }
+        }
+        if (state_.players.size() != lastPlayerCount || allReady != lastAllReady || anyReadyChanged) {
             renderer_.render(state_);
             lastPlayerCount = state_.players.size();
             lastAllReady = allReady;
+            lastReadyStates_.clear();
+            for (const auto& p : state_.players) lastReadyStates_.push_back(p.isReady);
 
             if (allReady && state_.players.size() == 4) {
                 if (isHost) {
@@ -749,38 +757,14 @@ void ClientApp::gameLoop() {
 void ClientApp::handleRoundRevealPhase() {
     drainMessages(true);
 
-    // 先展示结算面板，等待用户按Enter确认
-    std::cout << "\n>>> Press Enter to continue to waiting room..." << std::flush;
-    bool enterPressed = false;
-    while (running_ && !enterPressed) {
-        drainMessages(true);
-        if (state_.phase == GameState::GAME_OVER) return;
-
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(STDIN_FILENO, &readfds);
-        struct timeval tv = {0, 100000};
-        int ret = select(STDIN_FILENO + 1, &readfds, nullptr, nullptr, &tv);
-        if (ret > 0) {
-            std::string line;
-            std::getline(std::cin, line);
-            enterPressed = true;
-        }
-    }
-
-    drainMessages(true);
-    if (!running_) return;
-    if (state_.phase == GameState::GAME_OVER) return;
-
-    // 进入回合间等待：结算面板保持显示，等待所有人ready + 房主start
-    std::cout << "\n>>> Type 'ready' to confirm, host type 'start' to begin next round" << std::endl;
+    // 直接进入回合间等待：结算面板已含ready提示，等待所有人ready + 房主start
     state_.gameStartConfirmed = false;
     bool autoStartSent = false;
     auto startSentTime = std::chrono::steady_clock::time_point();
     const int START_TIMEOUT_MS = 30000;  // 30秒超时
 
     while (running_ && state_.phase != GameState::PLAYING) {
-        drainMessages(true);
+        drainMessages(true);  // 刷新以显示ready状态变化
         if (state_.phase == GameState::PLAYING) break;
         if (state_.phase == GameState::GAME_OVER) return;
 
