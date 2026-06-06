@@ -276,7 +276,7 @@ namespace Cabo.Client
                 WaitingForDrawResponse = false; WaitingForTakeResponse = false;
                 WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
             }
-            if (notify.Phase == GamePhaseType.GamePhaseFinalRound)
+            if (notify.Phase == Game.Common.GamePhase.FinalRound)
             { IsFinalRound = true; FinalRoundRemaining = notify.FinalRoundRemaining; }
 
             DrawPileCount = notify.DrawPile?.Count ?? 0;
@@ -290,7 +290,7 @@ namespace Cabo.Client
             if (rsp.Error?.Code == 0)
             {
                 HasDrawnCard = true; DrawnCardValue = rsp.Value;
-                DrawnCardSkill = (int)(rsp.Skill ?? SkillType.SkillTypeNone);
+                DrawnCardSkill = (int)(rsp.Skill);
             }
         }
 
@@ -301,7 +301,7 @@ namespace Cabo.Client
 
         void HandleReplaceWithDrawn(ReplaceWithDrawnRsp rsp)
         {
-            if (rsp.Error?.Code != 0 || !rsp.HasExchangeResult) return;
+            if (rsp.Error?.Code != 0 || rsp.ExchangeResult == null) return;
             var ex = rsp.ExchangeResult;
             if (ex.Success)
             {
@@ -336,7 +336,7 @@ namespace Cabo.Client
         void HandleTakeFromDiscard(TakeFromDiscardRsp rsp)
         {
             WaitingForTakeResponse = false;
-            if (rsp.Error?.Code != 0 || !rsp.HasExchangeResult) return;
+            if (rsp.Error?.Code != 0 || rsp.ExchangeResult == null) return;
             var ex = rsp.ExchangeResult;
             if (ex.Success)
             {
@@ -386,12 +386,8 @@ namespace Cabo.Client
             DiscardPileCount = ar.DiscardPile?.Count ?? 0;
             DiscardTopValue = ar.DiscardPile?.TopCard?.Value ?? -1;
 
-            // Update opponent card counts
-            foreach (var h in ar.PlayerHands)
-            {
-                var p = Players.Find(x => x.PlayerId == h.PlayerId);
-                if (p != null) p.CardCount = h.CardCount;
-            }
+            // Note: PlayerHands not yet in generated C# proto — opponent counts
+            // updated via GameStartNotify per round
 
             // Swap: update own card state
             if (ar.SwapOccurred)
@@ -468,39 +464,39 @@ namespace Cabo.Client
 
             switch (ar.ActionType)
             {
-                case ActionType.ActionTypeDraw: return $">>> {name}{you} drew a card";
-                case ActionType.ActionTypeDiscardDrawn:
+                case ActionType.Draw: return $">>> {name}{you} drew a card";
+                case ActionType.DiscardDrawn:
                     string skill = ar.SkillUsed switch
                     {
-                        SkillType.SkillTypePeekSelf => " (Peek Self)",
-                        SkillType.SkillTypeSpy => " (Spy)",
-                        SkillType.SkillTypeSwap => " (Swap)",
+                        SkillType.PeekSelf => " (Peek Self)",
+                        SkillType.Spy => " (Spy)",
+                        SkillType.Swap => " (Swap)",
                         _ => ""
                     };
                     return $">>> {name}{you} discarded the card{skill}";
-                case ActionType.ActionTypeReplaceWithDrawn:
+                case ActionType.ReplaceWithDrawn:
                     if (ar.ExchangeResult != null)
                         return ar.ExchangeResult.Success
                             ? $">>> {name}{you} replaced {ar.ExchangeResult.DiscardedCount} card(s)"
                             : $">>> {name}{you} replace FAILED — card added to hand";
                     break;
-                case ActionType.ActionTypeTakeFromDiscard:
+                case ActionType.TakeFromDiscard:
                     if (ar.ExchangeResult != null)
                         return ar.ExchangeResult.Success
                             ? $">>> {name}{you} took from discard, replaced {ar.ExchangeResult.DiscardedCount} card(s)"
                             : $">>> {name}{you} take from discard FAILED";
                     break;
-                case ActionType.ActionTypeUseSkill:
-                    if (ar.SkillUsed == SkillType.SkillTypePeekSelf)
+                case ActionType.UseSkill:
+                    if (ar.SkillUsed == SkillType.PeekSelf)
                         return $">>> {name}{you} peeked at own slot {ar.SourceSlot}";
-                    if (ar.SkillUsed == SkillType.SkillTypeSpy)
+                    if (ar.SkillUsed == SkillType.Spy)
                     {
                         string tgt = "Player";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
                         if (tp != null) tgt = tp.Nickname;
                         return $">>> {name}{you} spied on {tgt}'s slot {ar.TargetSlot}";
                     }
-                    if (ar.SkillUsed == SkillType.SkillTypeSwap)
+                    if (ar.SkillUsed == SkillType.Swap)
                     {
                         string tgt = "Player";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
@@ -508,7 +504,7 @@ namespace Cabo.Client
                         return $">>> {name}{you} swapped slot {ar.SourceSlot} with {tgt}'s slot {ar.TargetSlot}";
                     }
                     break;
-                case ActionType.ActionTypeCallSteady:
+                case ActionType.CallSteady:
                     return $">>> {name}{you} called CABO!";
             }
             return "";

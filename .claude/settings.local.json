@@ -52,7 +52,15 @@
       "Bash(make clean *)",
       "Bash(make -j4)",
       "Bash(cmake --build build)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(unity-mcp --help)",
+      "Bash(unity-mcp editor *)",
+      "Bash(unity-mcp scene *)",
+      "Bash(sed -i 's|Game\\\\.Game\\\\.PeekSelfParams|Game.Common.PeekSelfParams|g' NetworkGateway.cs)",
+      "Bash(sed -i 's|Game\\\\.Game\\\\.SpyParams|Game.Common.SpyParams|g' NetworkGateway.cs)",
+      "Bash(sed -i 's|Game\\\\.Game\\\\.SwapParams|Game.Common.SwapParams|g' NetworkGateway.cs)",
+      "Bash(sed -i 's|GamePhaseType\\\\.FinalRound|Game.Common.GamePhase.FinalRound|g' GameState.cs)",
+      "Bash(sed -i 's|\\\\.Skill ?? SkillType\\\\.None|.Skill|g' GameState.cs)"
     ]
   }
 }

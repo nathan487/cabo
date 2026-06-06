@@ -3,6 +3,9 @@ using System.Threading;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Game.Messages;
+using Game.Room;
+using Game.Game;
+using Game.Common;
 using Cabo.Client.Network;
 using UnityEngine;
 
@@ -151,7 +154,7 @@ namespace Cabo.Client
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
                     RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
-                    PeekSelf = new Game.Game.PeekSelfParams { SlotIndex = slot }
+                    PeekSelf = new Game.Common.PeekSelfParams { SlotIndex = slot }
                 }
             });
         }
@@ -163,7 +166,7 @@ namespace Cabo.Client
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
                     RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
-                    Spy = new Game.Game.SpyParams { TargetPlayerId = targetId, TargetSlotIndex = slot }
+                    Spy = new Game.Common.SpyParams { TargetPlayerId = targetId, TargetSlotIndex = slot }
                 }
             });
         }
@@ -175,7 +178,7 @@ namespace Cabo.Client
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
                     RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
-                    Swap = new Game.Game.SwapParams { OwnSlotIndex = mySlot, TargetPlayerId = targetId, TargetSlotIndex = targetSlot }
+                    Swap = new Game.Common.SwapParams { OwnSlotIndex = mySlot, TargetPlayerId = targetId, TargetSlotIndex = targetSlot }
                 }
             });
         }

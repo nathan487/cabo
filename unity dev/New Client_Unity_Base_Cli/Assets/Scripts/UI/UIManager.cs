@@ -8,7 +8,7 @@ namespace Cabo.Client.UI
     /// </summary>
     public class UIManager : MonoBehaviour
     {
-        [SerializeField] private UIDocument uiDocument;
+        [SerializeField] public UIDocument uiDocument;
 
         public VisualElement Root { get; private set; }
         public RoomPanel RoomPanel { get; private set; }
@@ -18,13 +18,23 @@ namespace Cabo.Client.UI
 
         void Awake()
         {
+            // uiDocument is set by GameBootstrap after AddComponent
+            // Don't access rootVisualElement here — defer to Initialize()
+        }
+
+        void EnsureRoot()
+        {
+            if (Root != null) return;
             if (uiDocument == null) uiDocument = GetComponent<UIDocument>();
-            Root = uiDocument.rootVisualElement;
+            if (uiDocument == null) uiDocument = GetComponentInChildren<UIDocument>();
+            if (uiDocument != null) Root = uiDocument.rootVisualElement;
+            if (Root == null) Debug.LogError("[UIManager] Cannot find UIDocument!");
         }
 
         public void Initialize(GameFlow flow)
         {
             _flow = flow;
+            EnsureRoot();
 
             // Build panels
             RoomPanel = new RoomPanel(Root, flow);
