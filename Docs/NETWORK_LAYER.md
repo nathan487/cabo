@@ -78,6 +78,39 @@ When `action_type == USE_SKILL`:
 - `skill_used == SPY`: Actor peeks target's `target_slot`
 - `skill_used == SWAP`: Two players swap `source_slot` ↔ `target_slot`
 
+## Sync & Display Challenges (Critical for Unity)
+
+These are the issues discovered during CLI client development. Unity must handle them correctly:
+
+### 1. Message Batching
+TCP delivers multiple messages in one `recv()`. The CLI pattern: `drainMessages()` reads ALL available messages before any render/decision. **Without this, messages are processed one-at-a-time and UI decisions are made on stale state.**
+
+### 2. Action + Turn Transition Timing
+`ActionResultNotify` and `TurnStartNotify` arrive in the same TCP frame. Server now has 1.5s delay between them, but Unity must still: process Action → update display → wait for TurnStart → switch current player.
+
+### 3. Multi-Card Replace Layout Change
+When multi-replace succeeds, card count decreases (N out, 1 in). Unity must rebuild card layout: remove selected slots, shift remaining cards, add new card at end.
+
+### 4. Card State After Skills
+- `PeekSelf`: `myCards[slot].isKnown = true` from UseSkillRsp
+- `Swap`: `myCards[slot].isKnown = false` + `ActionResultNotify` handles target player too
+- Skill results display for 2 seconds before turn switches
+
+### 5. Round Reveal Panel
+`RoundRevealNotify` and `GameStartNotify` (next round) arrive in rapid succession. The `roundJustRevealed` flag ensures the reveal panel is shown before the new round's UI appears. Unity should: show panel → wait for user tap → transition.
+
+### 6. Inter-Round Ready Sync
+After `isReady` is reset by `RoomService::handleStartGame`, a `RoomStateNotify` is broadcast. Unity must update the ready checklist on each `RoomStateNotify` and show who is ready / not ready.
+
+### 7. Opponent Card Counts
+Updated via `ActionResultNotify.player_hands[]` (not `TurnStartNotify`). Unity must track card counts for each opponent and update on every action broadcast.
+
+### 8. First Turn Special Case
+Discard pile starts empty. Unity must hide/disable "Take from discard" button when `turnNumber == 1` or `discardPileCount == 0`.
+
+### 9. isFinalRound Reset
+This flag is set by `TurnStartNotify` but only reset by `GameStartNotify` (new round). Unity must reset the CABO button visibility on each new round, not just on turn changes.
+
 ## State Sync
 
 `GameState.h` / `GameState.cpp` is the reference implementation. Unity should mirror these fields:
