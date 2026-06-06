@@ -3,6 +3,8 @@
 #include <mymuduo/logger.h>
 #include <algorithm>
 #include <sstream>
+#include <thread>
+#include <chrono>
 
 namespace cabogame {
 
@@ -316,6 +318,9 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
 // ── Turn Management ──
 
 void GameService::endTurn(GameRoom& room) {
+    // 延迟 1.5 秒再切换回合，给客户端渲染操作动画的时间窗口
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+
     if (room.steadyCallerSeat >= 0) {
         room.finalRoundRemaining--;
         if (room.finalRoundRemaining <= 0) {

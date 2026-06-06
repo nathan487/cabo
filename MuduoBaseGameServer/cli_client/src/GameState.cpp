@@ -554,6 +554,26 @@ void GameState::updateFromMessage(const game::messages::ServerMessage& msg) {
             }
         }
 
+        // 公开广播技能操作信息（桌游中所有人能看到谁翻了哪张牌，只是不知道值）
+        if (notify.action_type() == ::game::common::ACTION_TYPE_USE_SKILL &&
+            notify.source_player_id() != myPlayerId) {
+            std::string name = "Player";
+            for (const auto& p : players) {
+                if (p.playerId == notify.source_player_id()) { name = p.nickname; break; }
+            }
+            if (notify.skill_used() == ::game::common::SKILL_TYPE_PEEK_SELF) {
+                std::cout << "\n>>> " << name << " peeked at their own slot "
+                          << notify.source_slot() << std::endl;
+            } else if (notify.skill_used() == ::game::common::SKILL_TYPE_SPY) {
+                std::string tgtName = "Player";
+                for (const auto& p : players) {
+                    if (p.playerId == notify.target_player_id()) { tgtName = p.nickname; break; }
+                }
+                std::cout << "\n>>> " << name << " spied on " << tgtName
+                          << "'s slot " << notify.target_slot() << std::endl;
+            }
+        }
+
         // 更新回合状态
         if (notify.turn_ended()) {
             currentPlayerId = notify.next_player_id();
