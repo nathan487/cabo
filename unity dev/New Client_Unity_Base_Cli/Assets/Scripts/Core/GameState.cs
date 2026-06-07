@@ -224,7 +224,12 @@ namespace Cabo.Client
             if (p != null) p.IsReady = notify.IsReady;
         }
 
-        void HandleReady(ReadyRsp rsp) { }
+        void HandleReady(ReadyRsp rsp)
+        {
+            if (rsp.Error?.Code != 0) return;
+            var me = Players.Find(x => x.PlayerId == MyPlayerId);
+            if (me != null) me.IsReady = rsp.IsReady;
+        }
 
         void HandleStartGame(StartGameRsp rsp)
         {

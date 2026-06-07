@@ -3,6 +3,7 @@ Label {
 }
 
 Button {
+    color: rgb(235, 235, 245);
     background-color: rgb(50, 50, 80);
     border-radius: 6px;
     border-width: 1px;
@@ -11,6 +12,20 @@ Button {
     padding-bottom: 8px;
     padding-left: 16px;
     padding-right: 16px;
+    min-width: 110px;
+}
+
+TextField {
+    color: rgb(25, 25, 35);
+}
+
+TextField .unity-text-field__input {
+    color: rgb(25, 25, 35);
+    background-color: rgb(245, 245, 250);
+}
+
+TextField Label {
+    color: rgb(220, 220, 220);
 }
 
 Button:hover {

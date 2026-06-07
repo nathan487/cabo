@@ -145,6 +145,7 @@ yarn-error.log
 local.properties
 local.env
 .env.local
+**/.claude/
 
 # 生成的文件
 *.pb.cc

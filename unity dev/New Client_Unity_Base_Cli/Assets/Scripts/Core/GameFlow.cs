@@ -39,15 +39,17 @@ namespace Cabo.Client
 
         public event Action StateChanged;  // Fire when UI should refresh
 
-        string _host, _nickname;
+        string _host, _nickname = "Player";
         int _port;
         bool _running = true;
 
         public GameFlow(NetworkGateway gw) { Gateway = gw; }
 
-        public async void Connect(string host, int port, string nickname)
+        public async void Connect(string host, int port, string nickname = null)
         {
-            _host = host; _port = port; _nickname = nickname;
+            _host = host; _port = port;
+            if (!string.IsNullOrWhiteSpace(nickname))
+                _nickname = NormalizeNickname(nickname);
             Flow = FlowState.Connecting; StateChanged?.Invoke();
             await Gateway.ConnectAsync(host, port);
             if (!Gateway.IsConnected) return;
@@ -56,16 +58,24 @@ namespace Cabo.Client
 
         // ── Room Actions ──
 
-        public void CreateRoom()
+        public void CreateRoom(string nickname)
         {
+            _nickname = NormalizeNickname(nickname);
             Gateway.SendCreateRoom(_nickname);
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
         }
 
-        public void JoinRoom(string roomCode)
+        public void JoinRoom(string roomCode, string nickname)
         {
+            _nickname = NormalizeNickname(nickname);
             Gateway.SendJoinRoom(roomCode, _nickname);
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
+        }
+
+        static string NormalizeNickname(string nickname)
+        {
+            var trimmed = nickname?.Trim();
+            return string.IsNullOrEmpty(trimmed) ? "Player" : trimmed;
         }
 
         public void SendReady()
@@ -78,6 +88,40 @@ namespace Cabo.Client
         {
             if (State.MyPlayerId > 0 && State.RoomId > 0)
                 Gateway.SendStartGame(State.MyPlayerId, State.RoomId);
+        }
+
+        public void ProcessServerMessage(ServerMessage msg)
+        {
+            var previousFlow = Flow;
+            var previousPhase = State.Phase;
+
+            State.UpdateFromMessage(msg);
+
+            switch (State.Phase)
+            {
+                case GamePhase.WaitingRoom:
+                    if (Flow != FlowState.Playing && Flow != FlowState.RoundReveal && Flow != FlowState.GameOver)
+                        Flow = FlowState.WaitingRoom;
+                    break;
+                case GamePhase.Playing:
+                    if (Flow != FlowState.Playing)
+                    {
+                        Flow = FlowState.Playing;
+                        SubState = GameSubState.Idle;
+                    }
+                    break;
+                case GamePhase.RoundReveal:
+                    Flow = FlowState.RoundReveal;
+                    SubState = GameSubState.Idle;
+                    break;
+                case GamePhase.GameOver:
+                    Flow = FlowState.GameOver;
+                    SubState = GameSubState.Idle;
+                    break;
+            }
+
+            if (Flow != previousFlow || State.Phase != previousPhase || msg.PayloadCase != ServerMessage.PayloadOneofCase.None)
+                StateChanged?.Invoke();
         }
 
         // ── Game Actions ──
@@ -184,6 +228,10 @@ namespace Cabo.Client
         public void Tick()
         {
             if (!_running) return;
+
+            // Drain all pending TCP messages before the state machine decides what UI/actions are valid.
+            Gateway.DrainMessages(ProcessServerMessage);
+
             if (Flow != FlowState.Playing) return;
 
             // Step 1: Check transitions

@@ -154,7 +154,8 @@ namespace Cabo.Client.Network
             }
             else
             {
-                Debug.LogWarning($"[MessageDispatcher] No handler registered for {typeof(T).Name}");
+                // The current client flow drains raw ServerMessage batches through MessageReceived.
+                // Typed handlers are optional extension points, so missing registrations are not warnings.
             }
         }
 

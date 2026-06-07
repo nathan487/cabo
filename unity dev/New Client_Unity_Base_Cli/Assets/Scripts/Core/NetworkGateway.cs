@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ namespace Cabo.Client
         private TcpClient tcpClient;
         private NetworkStream stream;
         private CancellationTokenSource receiveCts;
+        private readonly Queue<ServerMessage> pendingMessages = new();
 
         // MessageCodec: [4-byte big-endian length][protobuf payload]
         private readonly MessageCodec codec = new();
@@ -36,6 +38,35 @@ namespace Cabo.Client
 
         /// <summary>Register a typed handler. Example: Register&lt;DrawCardRsp&gt;(OnDrawCard);</summary>
         public void Register<T>(Action<T> handler) where T : class => dispatcher.Register(handler);
+
+        /// <summary>
+        /// Drain every message received by the background socket task.
+        /// Call from Unity's main thread before rendering or making UI decisions.
+        /// </summary>
+        public int DrainMessages(Action<ServerMessage> beforeDispatch = null)
+        {
+            List<ServerMessage> drained = null;
+            lock (pendingMessages)
+            {
+                if (pendingMessages.Count > 0)
+                {
+                    drained = new List<ServerMessage>(pendingMessages.Count);
+                    while (pendingMessages.Count > 0)
+                        drained.Add(pendingMessages.Dequeue());
+                }
+            }
+
+            if (drained == null) return 0;
+
+            foreach (var msg in drained)
+            {
+                beforeDispatch?.Invoke(msg);
+                dispatcher.Dispatch(msg);
+                MessageReceived?.Invoke(msg);
+            }
+
+            return drained.Count;
+        }
 
         public async Task ConnectAsync(string host, int port)
         {
@@ -216,8 +247,14 @@ namespace Cabo.Client
                     if (n == 0) break;
                     var data = new byte[n];
                     Array.Copy(buffer, data, n);
-                    // Feed to codec on main thread via queue (simplified: inline since Unity main thread drives Tick)
-                    lock (codec) { codec.FeedBytes(data, msg => { dispatcher.Dispatch(msg); MessageReceived?.Invoke(msg); }); }
+                    lock (codec)
+                    {
+                        codec.FeedBytes(data, msg =>
+                        {
+                            lock (pendingMessages)
+                                pendingMessages.Enqueue(msg);
+                        });
+                    }
                 }
             }
             catch (OperationCanceledException) { }
