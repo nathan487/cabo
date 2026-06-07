@@ -9,7 +9,7 @@ Build a functional Unity (C#) client based on the fully working C++ CLI client a
 Current immediate goal: implement the actual multiplayer card game scene in Unity. The CLI client remains the logic and state-machine reference, but the Unity game scene must be a real visual card table, not a terminal-style clone.
 
 See `Docs/UNITY_GAME_SCENE_TASK.md` for the next-session task brief.
-See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation and upgrade notes.
+See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation, including the slower skill-inspection animations and CABO caller marker.
 
 ## What We Have
 

@@ -16,6 +16,10 @@ namespace Cabo.Client.UI
         const int SelfCardHeight = 96;
         const int OppCardWidth = 46;
         const int OppCardHeight = 64;
+        const float QuickMoveDuration = 0.72f;
+        const float SkillMoveDuration = 0.96f;
+        const float SkillHoldDuration = 1.18f;
+        const float FlipRevealDuration = 1.95f;
 
         readonly VisualElement _root;
         readonly VisualElement _container;
@@ -285,7 +289,8 @@ namespace Cabo.Client.UI
             }
 
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
-            _selfSeat.RenderHeader(myInfo?.Nickname ?? "You", myInfo?.TotalScore ?? 0, state.IsMyTurn, "You");
+            bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
+            _selfSeat.RenderHeader(myInfo?.Nickname ?? "You", myInfo?.TotalScore ?? 0, state.IsMyTurn, selfCabo ? "CABO" : "You", selfCabo);
             _selfSeat.CardRow.Clear();
             for (int i = 0; i < state.MyCards.Count; i++)
             {
@@ -314,7 +319,8 @@ namespace Cabo.Client.UI
                 var player = state.Players[opponentIndices[i]];
                 bool current = player.PlayerId == state.CurrentPlayerId;
                 bool selected = _selectedOpponentPlayerId == player.PlayerId;
-                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, selected ? "Target" : "Opponent");
+                bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
+                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "Target" : "Opponent", cabo);
                 _opponentSeats[i].CardRow.Clear();
 
                 int cardCount = Mathf.Max(0, player.CardCount);
@@ -469,9 +475,10 @@ namespace Cabo.Client.UI
                 TargetSlot = state.LastActionTargetSlot,
                 SwapOccurred = state.LastActionSwapOccurred,
                 IncomingCardValue = state.LastActionIncomingCardValue,
-                DiscardTopValue = state.DiscardTopValue
+                DiscardTopValue = state.DiscardTopValue,
+                PeekedValue = state.LastPeekedValue
             };
-            _root.schedule.Execute(() => PlayActionAnimation(snapshot)).ExecuteLater(1);
+            PlayActionAnimation(snapshot);
         }
 
         void PlayDrawAnimation(int value)
@@ -500,7 +507,7 @@ namespace Cabo.Client.UI
             _animationLayer.Add(card);
 
             float startedAt = Time.realtimeSinceStartup;
-            const float duration = 0.42f;
+            const float duration = 0.78f;
             _drawAnimation = _root.schedule.Execute(() =>
             {
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
@@ -523,25 +530,25 @@ namespace Cabo.Client.UI
             switch (action.ActionType)
             {
                 case ActionType.Draw:
-                    PlayFlyCard(CenterOf(_drawPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), false, 0, new Color(0.30f, 0.55f, 1f), 0.34f);
+                    PlayFlyCard(CenterOf(_drawPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), false, 0, new Color(0.30f, 0.55f, 1f), QuickMoveDuration);
                     break;
                 case ActionType.DiscardDrawn:
-                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), true, action.DiscardTopValue, GetSkillColor(action.Skill), 0.38f);
-                    PulsePlayer(action.SourcePlayerId, GetSkillColor(action.Skill));
+                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), true, action.DiscardTopValue, GetSkillColor(action.Skill), QuickMoveDuration);
+                    PulsePlayer(action.SourcePlayerId, GetSkillColor(action.Skill), 0.95f);
                     break;
                 case ActionType.ReplaceWithDrawn:
-                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), false, 0, new Color(1f, 0.72f, 0.30f), 0.38f);
-                    PulsePlayer(action.SourcePlayerId, action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : new Color(1f, 0.72f, 0.30f));
+                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), false, 0, new Color(1f, 0.72f, 0.30f), QuickMoveDuration);
+                    PulsePlayer(action.SourcePlayerId, action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : new Color(1f, 0.72f, 0.30f), 0.95f);
                     break;
                 case ActionType.TakeFromDiscard:
-                    PlayFlyCard(CenterOf(_discardPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), true, action.DiscardTopValue, new Color(1f, 0.85f, 0.42f), 0.38f);
-                    PulsePlayer(action.SourcePlayerId, new Color(1f, 0.85f, 0.42f));
+                    PlayFlyCard(CenterOf(_discardPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), true, action.DiscardTopValue, new Color(1f, 0.85f, 0.42f), QuickMoveDuration);
+                    PulsePlayer(action.SourcePlayerId, new Color(1f, 0.85f, 0.42f), 0.95f);
                     break;
                 case ActionType.UseSkill:
                     PlaySkillAnimation(action);
                     break;
                 case ActionType.CallSteady:
-                    PulsePlayer(action.SourcePlayerId, new Color(1f, 0.82f, 0.22f), 0.9f);
+                    PlayCaboCallAnimation(action.SourcePlayerId);
                     break;
             }
         }
@@ -553,23 +560,24 @@ namespace Cabo.Client.UI
             {
                 var source = CenterOf(GetCardBounds(action.SourcePlayerId, action.SourceSlot));
                 var target = CenterOf(GetCardBounds(action.TargetPlayerId, action.TargetSlot));
-                PlayFlyCard(source, target, false, 0, color, 0.44f);
-                PlayFlyCard(target, source, false, 0, color, 0.44f);
-                PulseCard(action.SourcePlayerId, action.SourceSlot, color);
-                PulseCard(action.TargetPlayerId, action.TargetSlot, color);
+                PlayFlyCard(source, target, false, 0, color, SkillMoveDuration);
+                PlayFlyCard(target, source, false, 0, color, SkillMoveDuration);
+                PulseCard(action.SourcePlayerId, action.SourceSlot, color, 1.35f);
+                PulseCard(action.TargetPlayerId, action.TargetSlot, color, 1.35f);
                 return;
             }
 
             if (action.Skill == SkillType.Spy)
             {
-                PulseCard(action.TargetPlayerId, action.TargetSlot, color);
-                PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(GetCardBounds(action.TargetPlayerId, action.TargetSlot)), false, 0, color, 0.34f);
+                int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? action.PeekedValue : -1;
+                PlaySpyCardInspection(action.SourcePlayerId, action.TargetPlayerId, action.TargetSlot, privateValue, color);
                 return;
             }
 
             if (action.Skill == SkillType.PeekSelf)
             {
-                PulseCard(action.SourcePlayerId, action.SourceSlot, color);
+                int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? GetKnownOwnCardValue(action.SourceSlot, action.PeekedValue) : -1;
+                PlayPeekSelfFlip(action.SourcePlayerId, action.SourceSlot, privateValue, color);
                 return;
             }
 
@@ -579,7 +587,7 @@ namespace Cabo.Client.UI
         void PlayFlyCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration)
         {
             var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
-            if (start == Vector2.zero || end == Vector2.zero)
+            if (start == Vector2.zero || end == Vector2.zero || !IsFinite(start) || !IsFinite(end) || !IsFinite(rootOrigin))
                 return;
 
             const int width = 44;
@@ -591,6 +599,7 @@ namespace Cabo.Client.UI
             card.style.marginTop = 0;
             card.style.marginBottom = 0;
             SetBorderColor(card, color);
+            _animationLayer.BringToFront();
             _animationLayer.Add(card);
 
             float startedAt = Time.realtimeSinceStartup;
@@ -612,16 +621,259 @@ namespace Cabo.Client.UI
             }).Every(16);
         }
 
+        void PlayPeekSelfFlip(long playerId, int slot, int privateValue, Color color)
+        {
+            var bounds = GetCardBounds(playerId, slot);
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero)
+            {
+                PulsePlayer(playerId, color, FlipRevealDuration);
+                return;
+            }
+
+            PulseCard(playerId, slot, color, FlipRevealDuration);
+            bool revealValue = privateValue >= 0;
+            PlayFlipCardAt(center, revealValue, privateValue, color, "PEEK", FlipRevealDuration);
+            ShowHeldInspectionCard(center, revealValue, privateValue, color, "PEEK", FlipRevealDuration);
+        }
+
+        void PlaySpyCardInspection(long sourcePlayerId, long targetPlayerId, int targetSlot, int privateValue, Color color)
+        {
+            var start = CenterOf(GetCardBounds(targetPlayerId, targetSlot));
+            var end = CenterOf(GetPlayerBounds(sourcePlayerId));
+            if (start == Vector2.zero || end == Vector2.zero)
+            {
+                PulseCard(targetPlayerId, targetSlot, color, FlipRevealDuration);
+                PulsePlayer(sourcePlayerId, color, FlipRevealDuration);
+                return;
+            }
+
+            PulseCard(targetPlayerId, targetSlot, color, SkillMoveDuration + SkillHoldDuration);
+            PulsePlayer(sourcePlayerId, color, SkillMoveDuration + SkillHoldDuration);
+            PlayFlyCard(start, end, privateValue >= 0, privateValue, color, SkillMoveDuration);
+            ShowHeldInspectionCard(end, privateValue >= 0, privateValue, color, "SPY", SkillMoveDuration + SkillHoldDuration);
+            ScheduleAfter(SkillMoveDuration + SkillHoldDuration, () => PlayFlyCard(end, start, false, 0, color, SkillMoveDuration));
+        }
+
+        void PlayCaboCallAnimation(long sourcePlayerId)
+        {
+            var color = new Color(1f, 0.82f, 0.22f);
+            PulsePlayer(sourcePlayerId, color, 1.65f);
+
+            var bounds = GetPlayerBounds(sourcePlayerId);
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero) return;
+
+            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
+            var banner = new Label("CABO");
+            banner.style.position = Position.Absolute;
+            banner.style.width = 104;
+            banner.style.height = 34;
+            banner.style.unityTextAlign = TextAnchor.MiddleCenter;
+            banner.style.unityFontStyleAndWeight = FontStyle.Bold;
+            banner.style.fontSize = 22;
+            banner.style.color = new Color(0.12f, 0.08f, 0.02f);
+            banner.style.backgroundColor = color;
+            banner.style.borderTopLeftRadius = 6;
+            banner.style.borderTopRightRadius = 6;
+            banner.style.borderBottomLeftRadius = 6;
+            banner.style.borderBottomRightRadius = 6;
+            _animationLayer.Add(banner);
+
+            float startedAt = Time.realtimeSinceStartup;
+            const float duration = 1.55f;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
+                float lift = Mathf.Sin(t * Mathf.PI) * 18f;
+                var p = center - rootOrigin + new Vector2(0f, -bounds.height * 0.42f - lift);
+                banner.style.left = p.x - 52f;
+                banner.style.top = p.y - 17f;
+                banner.style.opacity = Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.82f) / 0.18f));
+
+                if (t >= 1f)
+                {
+                    item?.Pause();
+                    banner.RemoveFromHierarchy();
+                }
+            }).Every(16);
+        }
+
+        void PlayFlipCardAt(Vector2 center, bool revealValue, int value, Color color, string caption, float duration)
+        {
+            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
+            const int width = 52;
+            const int height = 72;
+            var card = CreateFloatingCard(false, 0, width, height, color, caption);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(card);
+
+            int phase = 0;
+            float startedAt = Time.realtimeSinceStartup;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
+                if (phase == 0 && t >= 0.18f)
+                {
+                    phase = 1;
+                    ReplaceFloatingCardContent(card, revealValue, value, width, height, color, caption);
+                }
+                else if (phase == 1 && t >= 0.78f)
+                {
+                    phase = 2;
+                    ReplaceFloatingCardContent(card, false, 0, width, height, color, caption);
+                }
+
+                float fold;
+                if (t < 0.18f) fold = Mathf.Lerp(1f, 0.12f, t / 0.18f);
+                else if (t < 0.32f) fold = Mathf.Lerp(0.12f, 1f, (t - 0.18f) / 0.14f);
+                else if (t < 0.78f) fold = 1f;
+                else if (t < 0.88f) fold = Mathf.Lerp(1f, 0.12f, (t - 0.78f) / 0.10f);
+                else fold = Mathf.Lerp(0.12f, 1f, (t - 0.88f) / 0.12f);
+
+                PositionFloating(card, center, width * fold, height, rootOrigin);
+                card.style.opacity = Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.92f) / 0.08f));
+
+                if (t >= 1f)
+                {
+                    item?.Pause();
+                    card.RemoveFromHierarchy();
+                }
+            }).Every(16);
+        }
+
+        void PlayInspectCardRoundTrip(Vector2 start, Vector2 inspectAt, bool revealValue, int value, Color color, string caption)
+        {
+            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
+            const int width = 56;
+            const int height = 78;
+            var card = CreateFloatingCard(revealValue, value, width, height, color, caption);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(card);
+
+            float startedAt = Time.realtimeSinceStartup;
+            float total = SkillMoveDuration + SkillHoldDuration + SkillMoveDuration;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                float elapsed = Time.realtimeSinceStartup - startedAt;
+                Vector2 p;
+                if (elapsed < SkillMoveDuration)
+                {
+                    float t = Mathf.Clamp01(elapsed / SkillMoveDuration);
+                    p = Vector2.Lerp(start, inspectAt, 1f - Mathf.Pow(1f - t, 3f));
+                }
+                else if (elapsed < SkillMoveDuration + SkillHoldDuration)
+                {
+                    p = inspectAt;
+                }
+                else
+                {
+                    float t = Mathf.Clamp01((elapsed - SkillMoveDuration - SkillHoldDuration) / SkillMoveDuration);
+                    p = Vector2.Lerp(inspectAt, start, t * t * (3f - 2f * t));
+                }
+
+                float scale = elapsed < SkillMoveDuration + SkillHoldDuration ? 1.14f : Mathf.Lerp(1.14f, 1f, Mathf.Clamp01((elapsed - SkillMoveDuration - SkillHoldDuration) / SkillMoveDuration));
+                PositionFloating(card, p, width * scale, height * scale, rootOrigin);
+                card.style.opacity = Mathf.Lerp(1f, 0f, Mathf.Max(0f, (elapsed - total + 0.22f) / 0.22f));
+
+                if (elapsed >= total)
+                {
+                    item?.Pause();
+                    card.RemoveFromHierarchy();
+                }
+            }).Every(16);
+        }
+
+        void ShowHeldInspectionCard(Vector2 center, bool faceUp, int value, Color color, string caption, float duration)
+        {
+            if (center == Vector2.zero) return;
+            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
+            const int width = 58;
+            const int height = 80;
+            var card = CreateFloatingCard(faceUp, value, width, height, color, caption);
+            PositionFloating(card, center, width, height, rootOrigin);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(card);
+
+            ScheduleAfter(duration, () => card.RemoveFromHierarchy());
+        }
+
+        void ScheduleAfter(float delaySeconds, Action action)
+        {
+            int remainingTicks = Mathf.Max(1, Mathf.CeilToInt(delaySeconds / 0.05f));
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                remainingTicks--;
+                if (remainingTicks > 0)
+                    return;
+
+                item?.Pause();
+                action?.Invoke();
+            }).Every(50);
+        }
+
+        VisualElement CreateFloatingCard(bool faceUp, int value, int width, int height, Color color, string caption)
+        {
+            var wrap = new VisualElement();
+            wrap.style.position = Position.Absolute;
+            wrap.style.flexDirection = FlexDirection.Column;
+            wrap.style.alignItems = Align.Center;
+            wrap.style.justifyContent = Justify.FlexStart;
+            wrap.style.overflow = Overflow.Hidden;
+            wrap.style.marginLeft = 0;
+            wrap.style.marginRight = 0;
+            wrap.style.marginTop = 0;
+            wrap.style.marginBottom = 0;
+            ReplaceFloatingCardContent(wrap, faceUp, value, width, height, color, caption);
+            return wrap;
+        }
+
+        void ReplaceFloatingCardContent(VisualElement wrap, bool faceUp, int value, int width, int height, Color color, string caption)
+        {
+            wrap.Clear();
+            var card = CreateCard(faceUp, value >= 0 ? value : 0, width, height, false, false, null);
+            card.style.marginLeft = 0;
+            card.style.marginRight = 0;
+            card.style.marginTop = 0;
+            card.style.marginBottom = 0;
+            SetBorderColor(card, color);
+            wrap.Add(card);
+
+            var label = new Label(caption);
+            label.style.fontSize = 11;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.color = color;
+            label.style.marginTop = 3;
+            wrap.Add(label);
+        }
+
+        static void PositionFloating(VisualElement element, Vector2 center, float width, float height, Vector2 rootOrigin)
+        {
+            if (!IsFinite(center) || !IsFinite(rootOrigin) || float.IsNaN(width) || float.IsNaN(height) || width <= 0f || height <= 0f)
+                return;
+
+            var p = center - rootOrigin;
+            element.style.width = width;
+            element.style.height = height + 18f;
+            element.style.left = p.x - width * 0.5f;
+            element.style.top = p.y - height * 0.5f;
+        }
+
         void PulsePlayer(long playerId, Color color, float duration = 0.48f)
         {
             PulseElement(GetSeatRoot(playerId), color, duration);
         }
 
-        void PulseCard(long playerId, int slot, Color color)
+        void PulseCard(long playerId, int slot, Color color, float duration = 0.9f)
         {
             var element = GetCardElement(playerId, slot);
             if (element != null)
-                PulseElement(element, color, 0.56f);
+                PulseElement(element, color, duration);
         }
 
         void PulseElement(VisualElement element, Color color, float duration)
@@ -703,6 +955,13 @@ namespace Cabo.Client.UI
             return row[slot];
         }
 
+        int GetKnownOwnCardValue(int slot, int fallbackValue)
+        {
+            if (slot >= 0 && slot < _flow.State.MyCards.Count && _flow.State.MyCards[slot].IsKnown)
+                return _flow.State.MyCards[slot].Value;
+            return fallbackValue;
+        }
+
         static Color GetSkillColor(SkillType skill)
         {
             return skill switch
@@ -734,7 +993,13 @@ namespace Cabo.Client.UI
         {
             if (rect.width <= 1 || rect.height <= 1)
                 return Vector2.zero;
-            return new Vector2(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
+            var center = new Vector2(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f);
+            return IsFinite(center) ? center : Vector2.zero;
+        }
+
+        static bool IsFinite(Vector2 value)
+        {
+            return !(float.IsNaN(value.x) || float.IsNaN(value.y) || float.IsInfinity(value.x) || float.IsInfinity(value.y));
         }
 
         VisualElement CreateCard(bool faceUp, int value, int width, int height, bool selected, bool clickable, Action onClick)
@@ -1122,6 +1387,13 @@ namespace Cabo.Client.UI
         {
             var current = state.Players.Find(p => p.PlayerId == state.CurrentPlayerId);
             string name = current?.Nickname ?? "Waiting";
+            if (state.SteadyCallerId != 0)
+            {
+                var caller = state.Players.Find(p => p.PlayerId == state.SteadyCallerId);
+                string callerName = caller?.Nickname ?? "A player";
+                if (state.IsFinalRound)
+                    return $"Final round after {callerName} called CABO. {state.FinalRoundRemaining} turns left. Current turn: {name}";
+            }
             if (state.IsFinalRound)
                 return $"Final round: {state.FinalRoundRemaining} turns left. Current turn: {name}";
             return state.IsMyTurn ? "Your turn" : $"Current turn: {name}";
@@ -1288,19 +1560,22 @@ namespace Cabo.Client.UI
                 CardRow.Clear();
             }
 
-            public void RenderHeader(string name, int score, bool isCurrentTurn, string tag)
+            public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false)
             {
                 _name.text = name;
                 _score.text = $"Score {score}";
-                _tag.text = isCurrentTurn ? "TURN" : tag;
-                Root.style.borderTopColor = isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : new Color(0.10f, 0.28f, 0.23f);
+                _tag.text = isCurrentTurn && isCaboCaller ? "CABO TURN" : isCurrentTurn ? "TURN" : tag;
+                _tag.style.color = isCaboCaller ? new Color(1f, 0.82f, 0.22f) : new Color(0.82f, 0.76f, 0.52f);
+                var borderColor = isCaboCaller ? new Color(1f, 0.82f, 0.22f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : new Color(0.10f, 0.28f, 0.23f);
+                Root.style.borderTopColor = borderColor;
                 Root.style.borderRightColor = Root.style.borderTopColor.value;
                 Root.style.borderBottomColor = Root.style.borderTopColor.value;
                 Root.style.borderLeftColor = Root.style.borderTopColor.value;
-                Root.style.borderTopWidth = isCurrentTurn ? 3 : 1;
-                Root.style.borderRightWidth = isCurrentTurn ? 3 : 1;
-                Root.style.borderBottomWidth = isCurrentTurn ? 3 : 1;
-                Root.style.borderLeftWidth = isCurrentTurn ? 3 : 1;
+                float borderWidth = isCaboCaller || isCurrentTurn ? 3 : 1;
+                Root.style.borderTopWidth = borderWidth;
+                Root.style.borderRightWidth = borderWidth;
+                Root.style.borderBottomWidth = borderWidth;
+                Root.style.borderLeftWidth = borderWidth;
             }
         }
 
@@ -1315,6 +1590,7 @@ namespace Cabo.Client.UI
             public bool SwapOccurred;
             public int IncomingCardValue;
             public int DiscardTopValue;
+            public int PeekedValue;
         }
     }
 }

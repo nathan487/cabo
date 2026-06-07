@@ -87,6 +87,7 @@ namespace Cabo.Client
         // Final round
         public bool IsFinalRound;
         public int FinalRoundRemaining;
+        public long SteadyCallerId;
 
         // Inter-round
         public bool GameStartConfirmed;
@@ -265,7 +266,7 @@ namespace Cabo.Client
             GameStartConfirmed = false;
             RoundNumber = notify.RoundNumber;
             CurrentPlayerId = notify.FirstPlayerId;
-            IsFinalRound = false; FinalRoundRemaining = 0;
+            IsFinalRound = false; FinalRoundRemaining = 0; SteadyCallerId = 0;
             HasDrawnCard = false; DrawnCardValue = 0; DrawnCardSkill = 0;
             WaitingForDrawResponse = false; WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
@@ -449,6 +450,8 @@ namespace Cabo.Client
             LastActionExchangeSucceeded = ar.ExchangeResult?.Success ?? false;
             LastActionIncomingCardValue = ar.ExchangeResult?.IncomingCardValue ?? -1;
             LastActionDiscardedCount = ar.ExchangeResult?.DiscardedCount ?? 0;
+            if (ar.ActionType == ActionType.CallSteady)
+                SteadyCallerId = ar.SourcePlayerId;
 
             DrawPileCount = ar.DrawPile?.Count ?? 0;
             DiscardPileCount = ar.DiscardPile?.Count ?? 0;
@@ -481,6 +484,7 @@ namespace Cabo.Client
         {
             Phase = GamePhase.RoundReveal; RoundJustRevealed = true;
             GameStartConfirmed = false;
+            SteadyCallerId = rrn.SteadyCallerId;
             LastRoundResults.Clear();
             foreach (var sc in rrn.Scores)
             {

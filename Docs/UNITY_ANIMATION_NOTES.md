@@ -76,6 +76,13 @@ Important: `ActionResultNotify` is broadcast by the server, so these animations 
 
 ## Current Animation Coverage
 
+Timing note:
+
+- Public action movement now uses slower timings than the first pass so players can read the table action.
+- Basic draw/discard/replace/take movement is about 0.72-0.78s.
+- Skill inspection movement is about 0.96s out, about 1.18s held, then about 0.96s back.
+- Peek flip hold is about 1.95s total.
+
 ### Draw
 
 Trigger:
@@ -149,12 +156,15 @@ Trigger:
 
 Current visual:
 
-- Pulses source player's source slot.
+- Pulses the source player's selected slot.
+- Plays an overlay flip animation at that exact slot and holds it long enough to read.
+- On the acting player's own Unity client, the overlay can show the private value when `UseSkillRsp.peeked_value` has arrived or the card has already become locally known.
+- On other clients, the same slot visibly flips/highlights but remains a card back because the protocol does not broadcast the hidden value.
 
 Limitations:
 
-- Does not flip the card face for observers, because peek result is private.
-- For the acting player, the private peek value is still handled through state update, not a dedicated flip animation.
+- Non-acting clients cannot show the actual value without a server/protocol change.
+- If `ActionResultNotify` arrives before the private `UseSkillRsp`, the actor may see the slot flip without the value for that one animation; the state still updates when the private response is processed.
 
 ### Spy
 
@@ -164,13 +174,15 @@ Trigger:
 
 Current visual:
 
-- Temporary indicator/card flies from source player seat to target card.
-- Target card pulses.
+- The target slot pulses.
+- A temporary card back moves from the target slot to the skill source player's seat, pauses in front of that player, then returns to the target slot.
+- This movement is public and visible on all Unity clients, making the selected target slot clear without text.
+- On the acting player's own Unity client, the temporary inspected card can show the private peek value when available.
 
 Limitations:
 
-- Does not reveal target value publicly.
-- Acting player's private spy value is not yet shown via a dedicated reveal overlay.
+- Does not reveal target value publicly; that is intentionally private in the current protocol.
+- If product design later wants every client to see the inspected value, `ActionResultNotify` would need a new public field and the server would need to send it.
 
 ### Swap
 
@@ -182,6 +194,7 @@ Current visual:
 
 - Two temporary card backs fly between source slot and target slot.
 - Both affected slots pulse.
+- Movement is slower than the first pass so observers can read both endpoints.
 
 Limitations:
 
@@ -198,10 +211,12 @@ Trigger:
 Current visual:
 
 - Acting player seat pulses gold.
+- A short CABO banner appears over the caller.
+- The caller remains marked on their seat until the round reveal / next round transition clears the final-round state.
 
 Limitations:
 
-- No dedicated CABO banner or final-round transition animation yet.
+- The persistent marker is a UI state marker, not a separate animation track.
 
 ## Text Notifications
 

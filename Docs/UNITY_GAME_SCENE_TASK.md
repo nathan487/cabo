@@ -256,6 +256,8 @@ Current implementation note:
 
 - A first-pass UI Toolkit animation layer now exists in `GameTablePanel.cs`.
 - It plays local draw-decision animation and public `ActionResultNotify` animations for Draw, DiscardDrawn, ReplaceWithDrawn, TakeFromDiscard, PeekSelf, Spy, Swap, and Call CABO.
+- PeekSelf and Spy were upgraded to slower, slot-specific inspection animations: observers see which slot was inspected, while only the acting client can show the private peek value under the current protocol.
+- Call CABO now creates a visible banner and leaves a persistent caller marker until the round reveal / next round transition.
 - Details, limitations, and the replacement/upgrade path are recorded in `Docs/UNITY_ANIMATION_NOTES.md`.
 
 ## End-to-End Verification
