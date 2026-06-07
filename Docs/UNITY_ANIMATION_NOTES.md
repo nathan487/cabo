@@ -79,9 +79,9 @@ Important: `ActionResultNotify` is broadcast by the server, so these animations 
 Timing note:
 
 - Public action movement now uses slower timings than the first pass so players can read the table action.
-- Basic draw/discard/replace/take movement is about 0.72-0.78s.
-- Skill inspection movement is about 0.96s out, about 1.18s held, then about 0.96s back.
-- Peek flip hold is about 1.95s total.
+- Basic draw/discard/replace/take movement is about 0.95-1.10s.
+- Spy inspection is about 1.05s into the center inspection zone, about 1.75s held, then about 1.05s returned.
+- Peek flip hold is about 2.35s total.
 
 ### Draw
 
@@ -174,10 +174,12 @@ Trigger:
 
 Current visual:
 
-- The target slot pulses.
-- A temporary card back moves from the target slot to the skill source player's seat, pauses in front of that player, then returns to the target slot.
-- This movement is public and visible on all Unity clients, making the selected target slot clear without text.
-- On the acting player's own Unity client, the temporary inspected card can show the private peek value when available.
+- The target card slot is temporarily hidden, leaving an empty slot at the target player's hand.
+- The inspected card moves into the center table inspection zone and remains there long enough to read.
+- After the hold, the center inspection zone clears, a return card animation plays, and the original target slot is restored.
+- This slot-emptying behavior is public and visible on all Unity clients, making the selected target slot clear without text.
+- On the acting player's own Unity client, the center inspected card can show the private peek value when available.
+- Inspection recovery is driven from `GameBootstrap.Update()` via `GameTablePanel.Tick()` instead of delayed UI Toolkit callbacks, so the center zone cannot remain stuck after the hold period.
 
 Limitations:
 
@@ -213,6 +215,7 @@ Current visual:
 - Acting player seat pulses gold.
 - A short CABO banner appears over the caller.
 - The caller remains marked on their seat until the round reveal / next round transition clears the final-round state.
+- The persistent caller marker now uses a red seat tint and red tag so it is visually distinct from the current-turn gold highlight.
 
 Limitations:
 
@@ -248,7 +251,7 @@ Recommended next iterations:
 ## Known Technical Constraints
 
 - UI Toolkit scheduled animations are frame-driven but lightweight; they are suitable for this 2D table pass.
-- Screenshots may miss short animations because current durations are around 0.34 to 0.56 seconds.
+- Screenshots can still miss movement segments, but the current skill inspection hold is long enough to capture in normal Game View verification.
 - The server does not expose every visual detail needed for perfect animation. For example, discarded card value and exact multi-card exchange visuals may require either protocol additions or carefully maintained client pending-action state.
 - `ActionResultNotify + TurnStartNotify` can arrive in the same TCP burst. The client must keep the existing drain-then-decide behavior and avoid blocking state updates on animations.
 

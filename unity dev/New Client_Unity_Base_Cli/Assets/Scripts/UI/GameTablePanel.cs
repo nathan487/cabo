@@ -16,10 +16,10 @@ namespace Cabo.Client.UI
         const int SelfCardHeight = 96;
         const int OppCardWidth = 46;
         const int OppCardHeight = 64;
-        const float QuickMoveDuration = 0.72f;
-        const float SkillMoveDuration = 0.96f;
-        const float SkillHoldDuration = 1.18f;
-        const float FlipRevealDuration = 1.95f;
+        const float QuickMoveDuration = 0.95f;
+        const float SkillMoveDuration = 1.05f;
+        const float SkillHoldDuration = 1.75f;
+        const float FlipRevealDuration = 2.35f;
 
         readonly VisualElement _root;
         readonly VisualElement _container;
@@ -37,6 +37,7 @@ namespace Cabo.Client.UI
         readonly VisualElement _pileRow;
         readonly VisualElement _drawPile;
         readonly VisualElement _discardPile;
+        readonly VisualElement _inspectionZone;
         readonly VisualElement _actionPanel;
         readonly Label _actionTitle;
         readonly Label _actionBody;
@@ -51,6 +52,12 @@ namespace Cabo.Client.UI
         GameSubState _lastRenderedSubState = GameSubState.Idle;
         long _lastAnimatedActionSequence;
         IVisualElementScheduledItem _drawAnimation;
+        VisualElement _temporaryHiddenCard;
+        bool _inspectionActive;
+        float _inspectionEndsAt;
+        Vector2 _inspectionReturnStart;
+        Vector2 _inspectionReturnEnd;
+        Color _inspectionReturnColor;
 
         public GameTablePanel(VisualElement root, GameFlow flow)
         {
@@ -140,6 +147,26 @@ namespace Cabo.Client.UI
             _pileRow.Add(_drawPile);
             _pileRow.Add(_discardPile);
 
+            _inspectionZone = new VisualElement { name = "InspectionZone" };
+            _inspectionZone.style.width = Length.Percent(92);
+            _inspectionZone.style.maxWidth = 640;
+            _inspectionZone.style.minHeight = 118;
+            _inspectionZone.style.marginBottom = 8;
+            _inspectionZone.style.alignItems = Align.Center;
+            _inspectionZone.style.justifyContent = Justify.Center;
+            _inspectionZone.style.backgroundColor = new Color(0.035f, 0.18f, 0.15f);
+            _inspectionZone.style.borderTopLeftRadius = 8;
+            _inspectionZone.style.borderTopRightRadius = 8;
+            _inspectionZone.style.borderBottomLeftRadius = 8;
+            _inspectionZone.style.borderBottomRightRadius = 8;
+            _inspectionZone.style.borderTopWidth = 1;
+            _inspectionZone.style.borderRightWidth = 1;
+            _inspectionZone.style.borderBottomWidth = 1;
+            _inspectionZone.style.borderLeftWidth = 1;
+            SetBorderColor(_inspectionZone, new Color(0.14f, 0.40f, 0.34f));
+            _inspectionZone.style.display = DisplayStyle.None;
+            _centerTable.Add(_inspectionZone);
+
             _drawnCardSlot = new VisualElement();
             _drawnCardSlot.style.alignItems = Align.Center;
             _drawnCardSlot.style.flexShrink = 0;
@@ -199,6 +226,20 @@ namespace Cabo.Client.UI
             _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
+        public void Tick()
+        {
+            if (!_inspectionActive || Time.realtimeSinceStartup < _inspectionEndsAt)
+                return;
+
+            _inspectionActive = false;
+            HideInspectionZone();
+            if (_temporaryHiddenCard != null && _temporaryHiddenCard.panel != null)
+                _temporaryHiddenCard.style.visibility = Visibility.Visible;
+            PlayFlyCard(_inspectionReturnStart, _inspectionReturnEnd, false, 0, _inspectionReturnColor, SkillMoveDuration);
+
+            _temporaryHiddenCard = null;
+        }
+
         public void RenderGame()
         {
             var state = _flow.State;
@@ -207,6 +248,8 @@ namespace Cabo.Client.UI
                 && state.HasDrawnCard;
 
             ResetSelectionWhenSubStateChanges(_flow.SubState);
+            if (!_inspectionActive)
+                HideInspectionZone();
 
             _roundLabel.text = $"Round {state.RoundNumber}  Turn {state.TurnNumber}";
             _turnLabel.text = BuildTurnText(state);
@@ -507,7 +550,7 @@ namespace Cabo.Client.UI
             _animationLayer.Add(card);
 
             float startedAt = Time.realtimeSinceStartup;
-            const float duration = 0.78f;
+            const float duration = 1.10f;
             _drawAnimation = _root.schedule.Execute(() =>
             {
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
@@ -640,7 +683,11 @@ namespace Cabo.Client.UI
         void PlaySpyCardInspection(long sourcePlayerId, long targetPlayerId, int targetSlot, int privateValue, Color color)
         {
             var start = CenterOf(GetCardBounds(targetPlayerId, targetSlot));
-            var end = CenterOf(GetPlayerBounds(sourcePlayerId));
+            if (start == Vector2.zero)
+                start = CenterOf(GetPlayerBounds(targetPlayerId));
+            var end = CenterOf(_centerTable.worldBound);
+            if (end == Vector2.zero)
+                end = CenterOf(_actionPanel.worldBound);
             if (start == Vector2.zero || end == Vector2.zero)
             {
                 PulseCard(targetPlayerId, targetSlot, color, FlipRevealDuration);
@@ -648,11 +695,20 @@ namespace Cabo.Client.UI
                 return;
             }
 
-            PulseCard(targetPlayerId, targetSlot, color, SkillMoveDuration + SkillHoldDuration);
+            end = ShowInspectionZone(privateValue >= 0, privateValue, color, "SPY");
+            if (end == Vector2.zero)
+                end = CenterOf(_centerTable.worldBound);
+
+            var targetCard = GetCardElement(targetPlayerId, targetSlot);
+            SetTemporaryCardVisibility(targetCard, false);
+            _temporaryHiddenCard = targetCard;
+            _inspectionActive = true;
+            _inspectionEndsAt = Time.realtimeSinceStartup + SkillMoveDuration + SkillHoldDuration;
+            _inspectionReturnStart = end;
+            _inspectionReturnEnd = start;
+            _inspectionReturnColor = color;
             PulsePlayer(sourcePlayerId, color, SkillMoveDuration + SkillHoldDuration);
             PlayFlyCard(start, end, privateValue >= 0, privateValue, color, SkillMoveDuration);
-            ShowHeldInspectionCard(end, privateValue >= 0, privateValue, color, "SPY", SkillMoveDuration + SkillHoldDuration);
-            ScheduleAfter(SkillMoveDuration + SkillHoldDuration, () => PlayFlyCard(end, start, false, 0, color, SkillMoveDuration));
         }
 
         void PlayCaboCallAnimation(long sourcePlayerId)
@@ -799,6 +855,50 @@ namespace Cabo.Client.UI
             _animationLayer.Add(card);
 
             ScheduleAfter(duration, () => card.RemoveFromHierarchy());
+        }
+
+        Vector2 ShowInspectionZone(bool faceUp, int value, Color color, string caption)
+        {
+            _inspectionZone.Clear();
+            _inspectionZone.style.display = DisplayStyle.Flex;
+            SetBorderColor(_inspectionZone, color);
+
+            var wrap = new VisualElement();
+            wrap.style.flexDirection = FlexDirection.Column;
+            wrap.style.alignItems = Align.Center;
+            wrap.style.justifyContent = Justify.Center;
+
+            var card = CreateCard(faceUp, value >= 0 ? value : 0, 74, 104, false, false, null);
+            SetBorderColor(card, color);
+            wrap.Add(card);
+
+            var label = new Label(caption == "SPY" ? "Inspecting card" : caption);
+            label.style.fontSize = 13;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.color = color;
+            label.style.marginTop = 4;
+            wrap.Add(label);
+
+            _inspectionZone.Add(wrap);
+
+            var center = CenterOf(_inspectionZone.worldBound);
+            if (center == Vector2.zero)
+                center = CenterOf(_centerTable.worldBound);
+            return center;
+        }
+
+        void HideInspectionZone()
+        {
+            _inspectionZone.Clear();
+            _inspectionZone.style.display = DisplayStyle.None;
+            SetBorderColor(_inspectionZone, new Color(0.14f, 0.40f, 0.34f));
+        }
+
+        void SetTemporaryCardVisibility(VisualElement card, bool visible)
+        {
+            if (card == null) return;
+            card.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
         }
 
         void ScheduleAfter(float delaySeconds, Action action)
@@ -1531,6 +1631,14 @@ namespace Cabo.Client.UI
                 _tag.style.fontSize = 10;
                 _tag.style.color = new Color(0.82f, 0.76f, 0.52f);
                 _tag.style.marginRight = 8;
+                _tag.style.paddingLeft = 5;
+                _tag.style.paddingRight = 5;
+                _tag.style.paddingTop = 2;
+                _tag.style.paddingBottom = 2;
+                _tag.style.borderTopLeftRadius = 4;
+                _tag.style.borderTopRightRadius = 4;
+                _tag.style.borderBottomLeftRadius = 4;
+                _tag.style.borderBottomRightRadius = 4;
                 header.Add(_tag);
 
                 _name = new Label();
@@ -1565,8 +1673,10 @@ namespace Cabo.Client.UI
                 _name.text = name;
                 _score.text = $"Score {score}";
                 _tag.text = isCurrentTurn && isCaboCaller ? "CABO TURN" : isCurrentTurn ? "TURN" : tag;
-                _tag.style.color = isCaboCaller ? new Color(1f, 0.82f, 0.22f) : new Color(0.82f, 0.76f, 0.52f);
-                var borderColor = isCaboCaller ? new Color(1f, 0.82f, 0.22f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : new Color(0.10f, 0.28f, 0.23f);
+                _tag.style.color = isCaboCaller ? Color.white : isCurrentTurn ? new Color(0.12f, 0.09f, 0.02f) : new Color(0.82f, 0.76f, 0.52f);
+                _tag.style.backgroundColor = isCaboCaller ? new Color(0.74f, 0.10f, 0.18f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : Color.clear;
+                Root.style.backgroundColor = isCaboCaller ? new Color(0.20f, 0.055f, 0.075f) : new Color(0.025f, 0.13f, 0.11f);
+                var borderColor = isCaboCaller ? new Color(1f, 0.18f, 0.28f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : new Color(0.10f, 0.28f, 0.23f);
                 Root.style.borderTopColor = borderColor;
                 Root.style.borderRightColor = Root.style.borderTopColor.value;
                 Root.style.borderBottomColor = Root.style.borderTopColor.value;

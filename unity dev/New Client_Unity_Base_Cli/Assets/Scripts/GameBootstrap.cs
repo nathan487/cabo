@@ -114,6 +114,7 @@ namespace Cabo.Client
         void Update()
         {
             _flow?.Tick();
+            _ui?.GameTablePanel?.Tick();
             HandleSceneTransition();
         }
 
