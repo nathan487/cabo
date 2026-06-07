@@ -1,16 +1,22 @@
 # Current Task: Unity Client Migration
 
-> 2026-06-06
+> Updated: 2026-06-07
 
 ## Goal
 
 Build a functional Unity (C#) client based on the fully working C++ CLI client and server implementation.
+
+Current immediate goal: implement the actual multiplayer card game scene in Unity. The CLI client remains the logic and state-machine reference, but the Unity game scene must be a real visual card table, not a terminal-style clone.
+
+See `Docs/UNITY_GAME_SCENE_TASK.md` for the next-session task brief.
+See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation and upgrade notes.
 
 ## What We Have
 
 - **Server**: Complete — all game logic, room management, scoring, skills
 - **Protocol**: Stable — all message types defined and tested
 - **CLI Client**: Complete — full reference implementation for state management, message handling, game flow
+- **Unity Lobby / Start Flow**: Verified end-to-end — Unity host can create room, bots can join/ready, host can start, and Unity transitions to `CaboGameScene`
 
 ## Unity Development Priorities (Ordered)
 
@@ -22,11 +28,20 @@ The most critical challenge from CLI development — messages arrive in batches 
 3. **State management** — Port `GameState.cpp updateFromMessage()` to C#
 4. **Drain-then-decide** — Process ALL pending messages before evaluating UI state (critical for sync)
 
-### Phase 2: Core UI Rendering
+### Phase 2: Core UI Rendering (Current Focus)
 5. **Card layout** — Show own cards (known `[value]` / unknown `[?]`), opponent card counts
 6. **Turn indicator** — Highlight current player based on `TurnStartNotify.current_player_id`
 7. **Action buttons** — Draw / Take from discard / Call CABO menu
 8. **Pile display** — Draw pile count, discard pile top card
+
+Important update: the original Phase 2 text describes functional data, not final rendering style. The next implementation should render these as a real card game table:
+
+- card-shaped UI elements instead of `[?]` text
+- self at bottom, opponents top/left/right
+- visible deck/discard piles
+- clickable card slots for selections
+- state-specific action panels
+- reveal/game-over panels as visual UI, not text logs
 
 ### Phase 3: Action Animation
 9. **Draw animation** — Card from deck to hand area
@@ -54,6 +69,9 @@ The most critical challenge from CLI development — messages arrive in batches 
 
 ## Key Reference Files
 
+- `Docs/UNITY_GAME_SCENE_TASK.md` — Next task brief for the real Unity game scene
+- `Docs/UNITY_ANIMATION_NOTES.md` — Current UI Toolkit animation coverage, trigger sources, limitations, and upgrade path
+- `Docs/UNITY_CLIENT_HANDOFF.md` — MCP quick start and current verified baseline
 - `Docs/NETWORK_LAYER.md` — Protocol reference + animation mapping
 - `Docs/ARCHITECTURE.md` — Server + CLI architecture
 - `Docs/GAME_SESSION.md` — Captured 4-player game session (reference data)

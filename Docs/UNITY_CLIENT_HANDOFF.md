@@ -7,7 +7,7 @@
 把下面这段直接发给新的 Codex 会话：
 
 ```text
-请先阅读 Docs/UNITY_CLIENT_HANDOFF.md、Docs/CURRENT_TASK.md，然后继续开发 unity dev/New Client_Unity_Base_Cli。需要用 Unity MCP。请按 handoff 文档快速启动/连接 MCP，不要重新摸索。当前目标是继续 Unity 客户端开发，已验证房主创建房间、3 个 bot 加入 ready、房主 start 后能从 SampleScene 跳到 CaboGameScene。
+请先阅读 Docs/UNITY_CLIENT_HANDOFF.md、Docs/CURRENT_TASK.md、Docs/UNITY_GAME_SCENE_TASK.md，然后继续开发 unity dev/New Client_Unity_Base_Cli。需要用 Unity MCP。请按 handoff 文档快速启动/连接 MCP，不要重新摸索。当前已验证房主创建房间、3 个 bot 加入 ready、房主 start 后能从 SampleScene 跳到 CaboGameScene。下一个目标是实现真正的多人在线 Cabo 卡牌游戏场景：逻辑/状态流参考 CLI，但 UI 不能照搬 CLI 文本，要做成可交互的卡牌桌界面。
 ```
 
 ## 当前项目路径
@@ -375,7 +375,15 @@ return "refresh_requested";
 - Play Mode 截图会生成 `Assets/Screenshots`，验证后清理。
 - `MuduoBaseGameServer/.claude/` 是未跟踪目录，不属于本轮 Unity 客户端改动，通常忽略。
 
-## 下一步开发建议
+## 下一步开发目标
+
+下一阶段主文档：`Docs/UNITY_GAME_SCENE_TASK.md`。
+
+核心方向：
+
+- CLI 继续作为逻辑参考。
+- Unity 游戏场景不能继续做终端式文本 UI。
+- `CaboGameScene` 要成为真正的多人在线卡牌桌界面。
 
 继续开发时优先检查：
 

@@ -68,15 +68,15 @@ namespace Cabo.Client.UI
             Debug.Log($"[UIManager] OnStateChanged: phase={state.Phase}, flow={_flow.Flow}, players={state.Players.Count}, room={state.RoomCode}");
 
             // Show/hide panels based on flow state
-            bool inRoom = _flow.Flow == FlowState.RoomFlow || _flow.Flow == FlowState.WaitingRoom || state.Phase == GamePhase.WaitingRoom;
-            bool showGame = _flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing;
-            bool showReveal = state.Phase == GamePhase.RoundReveal;
             bool showOver = state.Phase == GamePhase.GameOver;
+            bool showReveal = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
+            bool showGame = !showReveal && !showOver && (_flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing);
+            bool inRoom = _flow.Flow == FlowState.RoomFlow || _flow.Flow == FlowState.WaitingRoom || state.Phase == GamePhase.WaitingRoom;
 
-            RoomPanel.SetVisible(inRoom && !showGame);
+            RoomPanel.SetVisible(inRoom && !showGame && !showReveal && !showOver);
             GameTablePanel.SetVisible(showGame || showReveal || showOver);
 
-            if (inRoom) RoomPanel.Render();
+            if (inRoom && !showReveal && !showOver) RoomPanel.Render();
             if (showGame) GameTablePanel.RenderGame();
             if (showReveal) GameTablePanel.RenderReveal();
             if (showOver) GameTablePanel.RenderGameOver();

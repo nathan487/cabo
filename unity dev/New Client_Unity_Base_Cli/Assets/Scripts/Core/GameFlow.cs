@@ -131,6 +131,7 @@ namespace Cabo.Client
             Gateway.SendDrawCard(State.MyPlayerId, State.RoomId);
             State.WaitingForDrawResponse = true;
             SubState = GameSubState.WaitingDrawRsp;
+            StateChanged?.Invoke();
         }
 
         public void DoTakeFromDiscard()
@@ -144,6 +145,7 @@ namespace Cabo.Client
             Gateway.SendCallSteady(State.MyPlayerId, State.RoomId);
             State.WaitingForCallSteadyResponse = true;
             SubState = GameSubState.WaitingCallSteadyRsp;
+            StateChanged?.Invoke();
         }
 
         public void DoDiscardDrawn(bool useSkill)
@@ -151,12 +153,21 @@ namespace Cabo.Client
             Gateway.SendDiscardDrawn(State.MyPlayerId, State.RoomId);
             SkillTypePending = useSkill ? State.DrawnCardSkill : (State.DrawnCardSkill > 0 ? -1 : 0);
             SubState = GameSubState.WaitingDiscardRsp;
+            StateChanged?.Invoke();
+        }
+
+        public void BeginReplaceWithDrawn()
+        {
+            if (!State.HasDrawnCard) return;
+            SubState = GameSubState.AwaitingReplaceSlots;
+            StateChanged?.Invoke();
         }
 
         public void DoReplaceWithDrawn(int[] slots)
         {
             Gateway.SendReplaceWithDrawn(State.MyPlayerId, State.RoomId, slots);
             SubState = GameSubState.WaitingReplaceRsp;
+            StateChanged?.Invoke();
         }
 
         public void DoTakeFromDiscardSlots(int[] slots)
@@ -164,6 +175,7 @@ namespace Cabo.Client
             Gateway.SendTakeFromDiscard(State.MyPlayerId, State.RoomId, slots);
             State.WaitingForTakeResponse = true;
             SubState = GameSubState.WaitingTakeRsp;
+            StateChanged?.Invoke();
         }
 
         public void DoSkillPeek(int slot)
@@ -214,6 +226,7 @@ namespace Cabo.Client
             SkillTypePending = 0;
             State.WaitingForSkillResponse = true;
             SubState = GameSubState.WaitingSkillRsp;
+            StateChanged?.Invoke();
         }
 
         public void DoSkipSkill()
@@ -221,6 +234,7 @@ namespace Cabo.Client
             Gateway.SendSkipSkill(State.MyPlayerId, State.RoomId);
             State.WaitingForSkillResponse = true;
             SubState = GameSubState.WaitingSkillRsp;
+            StateChanged?.Invoke();
         }
 
         // ── Tick ── Called once per frame. Processes state transitions. ──
@@ -240,6 +254,8 @@ namespace Cabo.Client
 
         void CheckTransitions()
         {
+            var previousSubState = SubState;
+
             // Not my turn → Idle
             if (!State.IsMyTurn && SubState != GameSubState.Idle
                 && SubState != GameSubState.WaitingDrawRsp
@@ -256,7 +272,6 @@ namespace Cabo.Client
             if (SubState == GameSubState.WaitingDrawRsp && !State.WaitingForDrawResponse)
             {
                 SubState = State.HasDrawnCard ? GameSubState.AwaitingDrawnDecision : GameSubState.Idle;
-                if (SubState == GameSubState.AwaitingDrawnDecision) StateChanged?.Invoke();
             }
 
             // TakeFromDiscardRsp arrived
@@ -311,7 +326,6 @@ namespace Cabo.Client
                 }
                 SkillTypeJustCompleted = 0;
                 SubState = GameSubState.Idle;
-                StateChanged?.Invoke();
             }
 
             // My turn + Idle → show main menu
@@ -324,6 +338,9 @@ namespace Cabo.Client
                 SubState = GameSubState.AwaitingMainInput;
                 StateChanged?.Invoke();
             }
+
+            if (SubState != previousSubState)
+                StateChanged?.Invoke();
         }
 
         public void Dispose()

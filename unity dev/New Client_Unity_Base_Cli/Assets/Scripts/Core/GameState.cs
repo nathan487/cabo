@@ -102,6 +102,18 @@ namespace Cabo.Client
 
         // Action broadcast message (printed after render)
         public string LastActionMessage;
+        public long LastActionSequence;
+        public ActionType LastActionType = ActionType.Unknown;
+        public SkillType LastActionSkill = SkillType.Unknown;
+        public long LastActionSourcePlayerId;
+        public long LastActionTargetPlayerId;
+        public int LastActionSourceSlot;
+        public int LastActionTargetSlot;
+        public bool LastActionSwapOccurred;
+        public bool LastActionTurnEnded;
+        public bool LastActionExchangeSucceeded;
+        public int LastActionIncomingCardValue;
+        public int LastActionDiscardedCount;
 
         // Helpers
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
@@ -197,6 +209,14 @@ namespace Cabo.Client
             var room = notify.Room;
             if (room == null) return;
             RoomId = room.RoomId; RoomCode = room.RoomCode;
+
+            if (Phase == GamePhase.Playing)
+            {
+                foreach (var p in room.Players)
+                    UpsertPlayer(p.PlayerId, p.Nickname, p.SeatId, p.IsReady, p.IsHost, p.TotalScore);
+                return;
+            }
+
             Players.Clear();
             foreach (var p in room.Players)
                 Players.Add(new PlayerInfo
@@ -241,9 +261,16 @@ namespace Cabo.Client
         void HandleGameStart(GameStartNotify notify)
         {
             Phase = GamePhase.Playing;
+            RoundJustRevealed = false;
+            GameStartConfirmed = false;
             RoundNumber = notify.RoundNumber;
             CurrentPlayerId = notify.FirstPlayerId;
             IsFinalRound = false; FinalRoundRemaining = 0;
+            HasDrawnCard = false; DrawnCardValue = 0; DrawnCardSkill = 0;
+            WaitingForDrawResponse = false; WaitingForTakeResponse = false;
+            WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
+            foreach (var player in Players)
+                player.IsReady = false;
 
             if (notify.YourView != null)
             {
@@ -254,6 +281,19 @@ namespace Cabo.Client
                         SlotIndex = oc.SlotIndex, IsKnown = oc.IsKnown,
                         Value = oc.IsKnown ? oc.Value : 0
                     });
+                var me = Players.Find(x => x.PlayerId == MyPlayerId);
+                if (me != null)
+                    me.CardCount = MyCards.Count;
+                else
+                    Players.Add(new PlayerInfo
+                    {
+                        PlayerId = MyPlayerId,
+                        Nickname = "You",
+                        SeatId = 0,
+                        CardCount = MyCards.Count,
+                        IsHost = true
+                    });
+
                 DrawPileCount = notify.YourView.DrawPile?.Count ?? 0;
                 DiscardPileCount = notify.YourView.DiscardPile?.Count ?? 0;
                 if (notify.YourView.DiscardPile?.TopCard != null)
@@ -264,6 +304,16 @@ namespace Cabo.Client
                 {
                     var p = Players.Find(x => x.PlayerId == oh.PlayerId);
                     if (p != null) p.CardCount = oh.CardCount;
+                    else
+                    {
+                        Players.Add(new PlayerInfo
+                        {
+                            PlayerId = oh.PlayerId,
+                            Nickname = $"Player {Players.Count + 1}",
+                            SeatId = Players.Count,
+                            CardCount = oh.CardCount
+                        });
+                    }
                 }
             }
             Debug.Log($"[GameState] GameStart: round={RoundNumber} firstPlayer={CurrentPlayerId} cards={MyCards.Count}");
@@ -387,6 +437,19 @@ namespace Cabo.Client
 
         void HandleActionResult(ActionResultNotify ar)
         {
+            LastActionSequence = ar.ServerSeq != 0 ? ar.ServerSeq : LastActionSequence + 1;
+            LastActionType = ar.ActionType;
+            LastActionSkill = ar.SkillUsed;
+            LastActionSourcePlayerId = ar.SourcePlayerId;
+            LastActionTargetPlayerId = ar.TargetPlayerId;
+            LastActionSourceSlot = ar.SourceSlot;
+            LastActionTargetSlot = ar.TargetSlot;
+            LastActionSwapOccurred = ar.SwapOccurred;
+            LastActionTurnEnded = ar.TurnEnded;
+            LastActionExchangeSucceeded = ar.ExchangeResult?.Success ?? false;
+            LastActionIncomingCardValue = ar.ExchangeResult?.IncomingCardValue ?? -1;
+            LastActionDiscardedCount = ar.ExchangeResult?.DiscardedCount ?? 0;
+
             DrawPileCount = ar.DrawPile?.Count ?? 0;
             DiscardPileCount = ar.DiscardPile?.Count ?? 0;
             DiscardTopValue = ar.DiscardPile?.TopCard?.Value ?? -1;
@@ -417,6 +480,7 @@ namespace Cabo.Client
         void HandleRoundReveal(RoundRevealNotify rrn)
         {
             Phase = GamePhase.RoundReveal; RoundJustRevealed = true;
+            GameStartConfirmed = false;
             LastRoundResults.Clear();
             foreach (var sc in rrn.Scores)
             {
@@ -458,6 +522,30 @@ namespace Cabo.Client
                     Rank = r.Rank, PlayerId = r.PlayerId, Nickname = r.Nickname,
                     FinalScore = r.FinalScore, IsWinner = r.IsWinner
                 });
+        }
+
+        void UpsertPlayer(long playerId, string nickname, int seatId, bool isReady, bool isHost, int totalScore)
+        {
+            var existing = Players.Find(x => x.PlayerId == playerId);
+            if (existing != null)
+            {
+                existing.Nickname = nickname;
+                existing.SeatId = seatId;
+                existing.IsReady = isReady;
+                existing.IsHost = isHost;
+                existing.TotalScore = totalScore;
+                return;
+            }
+
+            Players.Add(new PlayerInfo
+            {
+                PlayerId = playerId,
+                Nickname = nickname,
+                SeatId = seatId,
+                IsReady = isReady,
+                IsHost = isHost,
+                TotalScore = totalScore
+            });
         }
 
         string BuildActionMessage(ActionResultNotify ar)
