@@ -60,9 +60,7 @@ namespace Cabo.Client
             _ui.uiDocument = _uiDoc;
             _ui.Initialize(_flow);
 
-            _flow.Connect(serverHost, serverPort);
-
-            Debug.Log($"[GameBootstrap] Started - {serverHost}:{serverPort}");
+            Debug.Log($"[GameBootstrap] Started - connect from the home screen ({serverHost}:{serverPort} default)");
         }
 
         PanelSettings LoadPanelSettings()

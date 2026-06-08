@@ -4,15 +4,18 @@ using UnityEngine.UIElements;
 namespace Cabo.Client.UI
 {
     /// <summary>
-    /// Room waiting UI. Shows player list, ready button, room code.
+    /// Home and waiting-room UI. The home page now owns server connection input.
     /// </summary>
     public class RoomPanel
     {
         VisualElement _root, _container;
-        Label _roomCode, _playerList, _status;
-        TextField _nicknameInput, _joinCodeInput;
-        Button _btnCreate, _btnJoin, _btnReady, _btnStart, _btnCopyRoomCode;
+        VisualElement _serverRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
+        Label _title, _roomCode, _playerList, _status;
+        TextField _serverAddressInput, _nicknameInput, _joinCodeInput;
+        Button _btnConnect, _btnCreate, _btnShowJoin, _btnConfirmJoin, _btnExitGame;
+        Button _btnReady, _btnStart, _btnLeaveRoom, _btnCopyRoomCode;
         GameFlow _flow;
+        bool _joinFormVisible;
 
         public RoomPanel(VisualElement root, GameFlow flow)
         {
@@ -27,11 +30,11 @@ namespace Cabo.Client.UI
             _container.style.paddingRight = 40;
             root.Add(_container);
 
-            var title = new Label("CABO - 等待房间");
-            title.style.fontSize = 28;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _container.Add(title);
+            _title = new Label("CABO");
+            _title.style.fontSize = 28;
+            _title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _container.Add(_title);
 
             _roomCode = new Label();
             _roomCode.style.fontSize = 18;
@@ -51,6 +54,30 @@ namespace Cabo.Client.UI
             _btnCopyRoomCode.style.marginTop = 8;
             _btnCopyRoomCode.style.fontSize = 14;
             _container.Add(_btnCopyRoomCode);
+
+            _serverRow = new VisualElement();
+            _serverRow.style.flexDirection = FlexDirection.Row;
+            _serverRow.style.justifyContent = Justify.Center;
+            _serverRow.style.alignItems = Align.FlexEnd;
+            _serverRow.style.marginTop = 18;
+            _container.Add(_serverRow);
+
+            _serverAddressInput = new TextField("服务器地址");
+            _serverAddressInput.value = _flow.GetCachedServerAddress();
+            _serverAddressInput.style.width = 320;
+            _serverAddressInput.style.maxWidth = 320;
+            _serverAddressInput.style.marginRight = 10;
+            _serverAddressInput.maxLength = 128;
+            _serverRow.Add(_serverAddressInput);
+
+            _btnConnect = new Button(() =>
+            {
+                _status.text = "正在连接服务器...";
+                _flow.ConnectToServerAddress(_serverAddressInput.value);
+            });
+            _btnConnect.text = "连接";
+            _btnConnect.style.fontSize = 16;
+            _serverRow.Add(_btnConnect);
 
             _playerList = new Label();
             _playerList.style.fontSize = 16;
@@ -73,34 +100,62 @@ namespace Cabo.Client.UI
             _nicknameInput.maxLength = 20;
             _container.Add(_nicknameInput);
 
-            _joinCodeInput = new TextField("房间码");
-            _joinCodeInput.style.marginTop = 16;
-            _joinCodeInput.style.width = 260;
-            _joinCodeInput.style.maxWidth = 260;
-            _joinCodeInput.style.alignSelf = Align.Center;
-            _joinCodeInput.maxLength = 16;
-            _container.Add(_joinCodeInput);
+            _homeButtonRow = new VisualElement();
+            _homeButtonRow.style.flexDirection = FlexDirection.Row;
+            _homeButtonRow.style.justifyContent = Justify.Center;
+            _homeButtonRow.style.marginTop = 20;
+            _container.Add(_homeButtonRow);
 
-            var btnRow = new VisualElement();
-            btnRow.style.flexDirection = FlexDirection.Row;
-            btnRow.style.justifyContent = Justify.Center;
-            btnRow.style.marginTop = 20;
-            _container.Add(btnRow);
-
-            // Create/Join buttons (room flow)
-            var btnCreate = new Button(() =>
+            _btnCreate = new Button(() =>
             {
                 var nickname = GetNicknameOrShowError();
                 if (nickname == null) return;
                 _flow.CreateRoom(nickname);
             });
-            btnCreate.text = "创建房间";
-            btnCreate.style.marginRight = 10;
-            btnCreate.style.fontSize = 18;
-            btnRow.Add(btnCreate);
-            _btnCreate = btnCreate;
+            _btnCreate.text = "创建房间";
+            _btnCreate.style.marginRight = 10;
+            _btnCreate.style.fontSize = 18;
+            _homeButtonRow.Add(_btnCreate);
 
-            var btnJoin = new Button(() =>
+            _btnShowJoin = new Button(() =>
+            {
+                _joinFormVisible = true;
+                Render();
+            });
+            _btnShowJoin.text = "加入房间";
+            _btnShowJoin.style.marginRight = 10;
+            _btnShowJoin.style.fontSize = 18;
+            _homeButtonRow.Add(_btnShowJoin);
+
+            _btnExitGame = new Button(() => _flow.ExitGame());
+            _btnExitGame.text = "退出游戏";
+            _btnExitGame.style.fontSize = 18;
+            _homeButtonRow.Add(_btnExitGame);
+
+            _joinFormRow = new VisualElement();
+            _joinFormRow.style.flexDirection = FlexDirection.Row;
+            _joinFormRow.style.justifyContent = Justify.Center;
+            _joinFormRow.style.alignItems = Align.FlexEnd;
+            _joinFormRow.style.marginTop = 16;
+            _container.Add(_joinFormRow);
+
+            var joinCodeLabel = new Label("房间码");
+            joinCodeLabel.style.fontSize = 14;
+            joinCodeLabel.style.unityTextAlign = TextAnchor.MiddleRight;
+            joinCodeLabel.style.marginRight = 8;
+            joinCodeLabel.style.marginBottom = 7;
+            _joinFormRow.Add(joinCodeLabel);
+
+            _joinCodeInput = new TextField();
+            _joinCodeInput.style.width = 260;
+            _joinCodeInput.style.maxWidth = 260;
+            _joinCodeInput.style.minWidth = 260;
+            _joinCodeInput.style.fontSize = 16;
+            _joinCodeInput.style.marginRight = 10;
+            _joinCodeInput.maxLength = 16;
+            _joinFormRow.Add(_joinCodeInput);
+
+            _btnConfirmJoin = new Button(() =>
             {
                 var nickname = GetNicknameOrShowError();
                 if (nickname == null) return;
@@ -111,24 +166,39 @@ namespace Cabo.Client.UI
                     _status.text = "请先输入房间码。";
                     return;
                 }
+
                 _flow.JoinRoom(code, nickname);
             });
-            btnJoin.text = "加入房间";
-            btnJoin.style.fontSize = 18;
-            btnRow.Add(btnJoin);
-            _btnJoin = btnJoin;
+            _btnConfirmJoin.text = "确认加入";
+            _btnConfirmJoin.style.fontSize = 16;
+            _joinFormRow.Add(_btnConfirmJoin);
 
-            // Ready/Start buttons (waiting room, hidden initially)
+            _roomButtonRow = new VisualElement();
+            _roomButtonRow.style.flexDirection = FlexDirection.Row;
+            _roomButtonRow.style.justifyContent = Justify.Center;
+            _roomButtonRow.style.marginTop = 20;
+            _container.Add(_roomButtonRow);
+
             _btnReady = new Button(() => { _flow.SendReady(); _status.text = "已发送准备。"; });
             _btnReady.text = "准备";
             _btnReady.style.marginRight = 10;
             _btnReady.style.fontSize = 18;
-            btnRow.Add(_btnReady);
+            _roomButtonRow.Add(_btnReady);
 
             _btnStart = new Button(() => { _flow.SendStartGame(); _status.text = "正在开始游戏..."; });
             _btnStart.text = "开始游戏";
+            _btnStart.style.marginRight = 10;
             _btnStart.style.fontSize = 18;
-            btnRow.Add(_btnStart);
+            _roomButtonRow.Add(_btnStart);
+
+            _btnLeaveRoom = new Button(() =>
+            {
+                _joinFormVisible = false;
+                _flow.LeaveRoomToHome();
+            });
+            _btnLeaveRoom.text = "退出房间";
+            _btnLeaveRoom.style.fontSize = 18;
+            _roomButtonRow.Add(_btnLeaveRoom);
         }
 
         public void SetVisible(bool visible)
@@ -155,22 +225,43 @@ namespace Cabo.Client.UI
         public void Render()
         {
             var s = _flow.State;
+            bool connected = _flow.IsConnected;
+            bool connecting = _flow.Flow == FlowState.Connecting;
             bool inRoom = s.RoomId > 0 || s.Players.Count > 0;
             bool hasRoomCode = !string.IsNullOrEmpty(s.RoomCode);
+
+            _title.text = inRoom ? "CABO - 等待房间" : "CABO";
             _roomCode.text = hasRoomCode ? $"房间码：{s.RoomCode}" : (inRoom ? "正在加入..." : "");
-            if (_btnCopyRoomCode != null) _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
+            _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // Show create/join only when NOT in room
-            if (_btnCreate != null) _btnCreate.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_btnJoin != null) _btnJoin.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_nicknameInput != null) _nicknameInput.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_joinCodeInput != null) _joinCodeInput.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _serverRow.style.display = inRoom ? DisplayStyle.None : DisplayStyle.Flex;
+            _nicknameInput.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
+            _homeButtonRow.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _joinFormRow.style.display = (!inRoom && connected && _joinFormVisible) ? DisplayStyle.Flex : DisplayStyle.None;
+            _roomButtonRow.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // Show ready/start only when in room
-            if (_btnReady != null) _btnReady.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_btnStart != null) _btnStart.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _btnConnect.SetEnabled(!connecting);
+            _btnConnect.text = connecting ? "连接中..." : (connected ? "重新连接" : "连接");
+            _btnCreate.SetEnabled(connected);
+            _btnShowJoin.SetEnabled(connected);
+            _btnConfirmJoin.SetEnabled(connected);
 
-            // Build player list with ready status
+            if (!inRoom)
+            {
+                _playerList.text = "";
+                if (connecting)
+                    _status.text = "正在连接服务器...";
+                else if (connected)
+                    _status.text = string.IsNullOrEmpty(_flow.ConnectedAddress)
+                        ? "服务器已连接。"
+                        : $"服务器已连接：{_flow.ConnectedAddress}";
+                else if (!string.IsNullOrEmpty(_flow.LastConnectError))
+                    _status.text = $"未连接服务器：{_flow.LastConnectError}";
+                else
+                    _status.text = "未连接服务器。请先输入服务器地址并连接。";
+                return;
+            }
+
             string list = "";
             int readyCount = 0;
             foreach (var p in s.Players)
@@ -179,7 +270,7 @@ namespace Cabo.Client.UI
                 if (p.PlayerId == s.MyPlayerId) tag += "（你）";
                 if (p.IsHost) tag += " [房主]";
                 string ready = p.IsReady ? " 已准备" : " 未准备";
-                list += $"{p.Nickname}{tag}:{ready}\n";
+                list += $"{p.Nickname}{tag}: {ready}\n";
                 if (p.IsReady) readyCount++;
             }
             _playerList.text = list;
@@ -187,7 +278,13 @@ namespace Cabo.Client.UI
             bool isHost = false;
             bool allReady = readyCount == s.Players.Count && s.Players.Count >= 2;
             foreach (var p in s.Players)
-                if (p.PlayerId == s.MyPlayerId && p.IsHost) { isHost = true; break; }
+            {
+                if (p.PlayerId == s.MyPlayerId && p.IsHost)
+                {
+                    isHost = true;
+                    break;
+                }
+            }
 
             _btnStart.SetEnabled(isHost && allReady);
             _status.text = $"{readyCount}/{s.Players.Count} 已准备" + (allReady && isHost ? " - 可以开始" : "");

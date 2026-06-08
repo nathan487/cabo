@@ -90,11 +90,21 @@ namespace Cabo.Client
 
         public void Disconnect()
         {
-            receiveCts?.Cancel();
+            bool wasConnected = IsConnected;
+            IsConnected = false;
+
+            var cts = receiveCts;
+            receiveCts = null;
+            try { cts?.Cancel(); } catch (ObjectDisposedException) { }
+            try { cts?.Dispose(); } catch (ObjectDisposedException) { }
+
             try { stream?.Close(); } catch { }
             try { tcpClient?.Close(); } catch { }
-            IsConnected = false;
-            Disconnected?.Invoke();
+            stream = null;
+            tcpClient = null;
+
+            if (wasConnected)
+                Disconnected?.Invoke();
         }
 
         /// <summary>Send a ClientMessage. Sets seq automatically.</summary>
@@ -123,6 +133,14 @@ namespace Cabo.Client
             Send(new ClientMessage
             {
                 JoinRoomReq = new Game.Room.JoinRoomReq { RequestId = reqId, RoomCode = roomCode, Nickname = nickname }
+            });
+        }
+
+        public void SendLeaveRoom(long playerId, long roomId)
+        {
+            Send(new ClientMessage
+            {
+                LeaveRoomReq = new Game.Room.LeaveRoomReq { RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId }
             });
         }
 
@@ -233,7 +251,6 @@ namespace Cabo.Client
         public void Dispose()
         {
             Disconnect();
-            receiveCts?.Dispose();
         }
 
         private async Task ReceiveLoop(CancellationToken ct)

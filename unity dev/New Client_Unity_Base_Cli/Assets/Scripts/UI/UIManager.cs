@@ -71,12 +71,16 @@ namespace Cabo.Client.UI
             bool showOver = state.Phase == GamePhase.GameOver;
             bool showReveal = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
             bool showGame = !showReveal && !showOver && (_flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing);
-            bool inRoom = _flow.Flow == FlowState.RoomFlow || _flow.Flow == FlowState.WaitingRoom || state.Phase == GamePhase.WaitingRoom;
+            bool showRoomPanel = _flow.Flow == FlowState.Home
+                || _flow.Flow == FlowState.Connecting
+                || _flow.Flow == FlowState.RoomFlow
+                || _flow.Flow == FlowState.WaitingRoom
+                || state.Phase == GamePhase.WaitingRoom;
 
-            RoomPanel.SetVisible(inRoom && !showGame && !showReveal && !showOver);
+            RoomPanel.SetVisible(showRoomPanel && !showGame && !showReveal && !showOver);
             GameTablePanel.SetVisible(showGame || showReveal || showOver);
 
-            if (inRoom && !showReveal && !showOver) RoomPanel.Render();
+            if (showRoomPanel && !showReveal && !showOver) RoomPanel.Render();
             if (showGame) GameTablePanel.RenderGame();
             if (showReveal) GameTablePanel.RenderReveal();
             if (showOver) GameTablePanel.RenderGameOver();

@@ -328,6 +328,8 @@ namespace Cabo.Client.UI
             _actionPanel.Add(controls);
             controls.Add(CreatePanelButton("返回房间", () => _flow.ReturnToRoomAfterGameOver(),
                 _flow.State.MyPlayerId > 0 && _flow.State.RoomId > 0));
+            controls.Add(CreatePanelButton("返回首页", () => _flow.ReturnHomeAfterGameOver(),
+                _flow.State.MyPlayerId > 0 && _flow.State.RoomId > 0));
             controls.Add(CreatePanelButton("退出游戏", () => _flow.ExitGame(), true));
 
             _statusLine.text = "返回房间后可重新准备并开始新对局。";

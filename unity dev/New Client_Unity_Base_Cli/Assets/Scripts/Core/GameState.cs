@@ -154,10 +154,14 @@ namespace Cabo.Client
                     HandleCreateRoom(msg.CreateRoomRsp); break;
                 case ServerMessage.PayloadOneofCase.JoinRoomRsp:
                     HandleJoinRoom(msg.JoinRoomRsp); break;
+                case ServerMessage.PayloadOneofCase.LeaveRoomRsp:
+                    HandleLeaveRoom(msg.LeaveRoomRsp); break;
                 case ServerMessage.PayloadOneofCase.RoomStateNotify:
                     HandleRoomState(msg.RoomStateNotify); break;
                 case ServerMessage.PayloadOneofCase.PlayerJoinNotify:
                     HandlePlayerJoin(msg.PlayerJoinNotify); break;
+                case ServerMessage.PayloadOneofCase.PlayerLeaveNotify:
+                    HandlePlayerLeave(msg.PlayerLeaveNotify); break;
                 case ServerMessage.PayloadOneofCase.PlayerReadyNotify:
                     HandlePlayerReady(msg.PlayerReadyNotify); break;
                 case ServerMessage.PayloadOneofCase.ReadyRsp:
@@ -209,6 +213,12 @@ namespace Cabo.Client
             Debug.Log($"[GameState] JoinRoom: {RoomId} player={MyPlayerId}");
         }
 
+        void HandleLeaveRoom(LeaveRoomRsp rsp)
+        {
+            if (rsp.Error?.Code != 0) return;
+            ReturnHome();
+        }
+
         void HandleRoomState(RoomStateNotify notify)
         {
             var room = notify.Room;
@@ -241,6 +251,22 @@ namespace Cabo.Client
                     PlayerId = pj.PlayerId, Nickname = pj.Nickname,
                     SeatId = pj.SeatId, IsReady = pj.IsReady, IsHost = pj.IsHost
                 });
+        }
+
+        void HandlePlayerLeave(PlayerLeaveNotify notify)
+        {
+            if (notify.PlayerId == MyPlayerId)
+            {
+                ReturnHome();
+                return;
+            }
+
+            Players.RemoveAll(p => p.PlayerId == notify.PlayerId);
+            if (notify.NewHostPlayerId > 0)
+            {
+                foreach (var player in Players)
+                    player.IsHost = player.PlayerId == notify.NewHostPlayerId;
+            }
         }
 
         void HandlePlayerReady(PlayerReadyNotify notify)
@@ -656,6 +682,55 @@ namespace Cabo.Client
                 player.IsReady = false;
                 player.CardCount = 0;
             }
+        }
+
+        public void ReturnHome()
+        {
+            Phase = GamePhase.Lobby;
+            MyPlayerId = 0;
+            RoomId = 0;
+            RoomCode = "";
+            Players.Clear();
+            MyCards.Clear();
+            DrawPileCount = 0;
+            DiscardPileCount = 0;
+            DiscardTopValue = -1;
+            CurrentPlayerId = 0;
+            RoundNumber = 0;
+            TurnNumber = 0;
+            HasDrawnCard = false;
+            DrawnCardValue = 0;
+            DrawnCardSkill = 0;
+            WaitingForDrawResponse = false;
+            WaitingForTakeResponse = false;
+            WaitingForCallSteadyResponse = false;
+            WaitingForSkillResponse = false;
+            IsFinalRound = false;
+            FinalRoundRemaining = 0;
+            SteadyCallerId = 0;
+            GameStartConfirmed = false;
+            RoundJustRevealed = false;
+            LastRoundResults.Clear();
+            FinalRankings.Clear();
+            LastPeekedValue = -1;
+            LastSwapOccurred = false;
+            LastActionMessage = "";
+            LastActionSequence = 0;
+            LastActionType = ActionType.Unknown;
+            LastActionSkill = SkillType.Unknown;
+            LastActionSourcePlayerId = 0;
+            LastActionTargetPlayerId = 0;
+            LastActionSourceSlot = -1;
+            LastActionTargetSlot = -1;
+            LastActionSwapOccurred = false;
+            LastActionTurnEnded = false;
+            LastActionExchangeSucceeded = false;
+            LastActionIncomingCardValue = -1;
+            LastActionDiscardedCount = 0;
+            LastActionAttemptedMultiCard = false;
+            LastActionAddedCardCount = 0;
+            LastActionDrewExtraPenaltyCard = false;
+            LastActionSelectedSlots.Clear();
         }
 
         void UpsertPlayer(long playerId, string nickname, int seatId, bool isReady, bool isHost, int totalScore)

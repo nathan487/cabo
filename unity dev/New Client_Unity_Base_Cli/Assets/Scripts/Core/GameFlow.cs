@@ -11,7 +11,7 @@ namespace Cabo.Client
     /// </summary>
     public enum FlowState
     {
-        Connecting, RoomFlow, WaitingRoom, Playing, RoundReveal, GameOver
+        Home, Connecting, RoomFlow, WaitingRoom, Playing, RoundReveal, GameOver
     }
 
     public enum GameSubState
@@ -29,7 +29,10 @@ namespace Cabo.Client
     {
         public GameState State { get; } = new();
         public NetworkGateway Gateway { get; }
-        public FlowState Flow { get; private set; } = FlowState.Connecting;
+        public FlowState Flow { get; private set; } = FlowState.Home;
+        public bool IsConnected => Gateway?.IsConnected ?? false;
+        public string ConnectedAddress { get; private set; } = "";
+        public string LastConnectError { get; private set; } = "";
 
         public GameSubState SubState { get; private set; } = GameSubState.Idle;
         public int SkillTypePending;     // 2=PeekSelf, 3=Spy, 4=Swap
@@ -39,20 +42,62 @@ namespace Cabo.Client
 
         public event Action StateChanged;  // Fire when UI should refresh
 
+        public const string ServerAddressPrefsKey = "Cabo.LastServerAddress";
+        public const string DefaultServerAddress = "127.0.0.1:8888";
+
         string _host, _nickname = "玩家";
         int _port;
         bool _running = true;
+        bool _wasConnected;
 
         public GameFlow(NetworkGateway gw) { Gateway = gw; }
 
+        public string GetCachedServerAddress()
+        {
+            return PlayerPrefs.GetString(ServerAddressPrefsKey, DefaultServerAddress);
+        }
+
+        public void ConnectToServerAddress(string address, string nickname = null)
+        {
+            var trimmed = string.IsNullOrWhiteSpace(address) ? DefaultServerAddress : address.Trim();
+            PlayerPrefs.SetString(ServerAddressPrefsKey, trimmed);
+            PlayerPrefs.Save();
+
+            if (!TryParseServerAddress(trimmed, out var host, out var port))
+            {
+                LastConnectError = "服务器地址格式应为 host:port。";
+                Flow = FlowState.Home;
+                StateChanged?.Invoke();
+                return;
+            }
+
+            Connect(host, port, nickname);
+        }
+
         public async void Connect(string host, int port, string nickname = null)
         {
+            if (Gateway.IsConnected)
+            {
+                _wasConnected = false;
+                Gateway.Disconnect();
+            }
+
             _host = host; _port = port;
+            LastConnectError = "";
+            ConnectedAddress = $"{host}:{port}";
             if (!string.IsNullOrWhiteSpace(nickname))
                 _nickname = NormalizeNickname(nickname);
             Flow = FlowState.Connecting; StateChanged?.Invoke();
             await Gateway.ConnectAsync(host, port);
-            if (!Gateway.IsConnected) return;
+            _wasConnected = Gateway.IsConnected;
+            if (!Gateway.IsConnected)
+            {
+                ConnectedAddress = "";
+                LastConnectError = "连接失败，请检查服务器地址和服务端状态。";
+                Flow = FlowState.Home;
+                StateChanged?.Invoke();
+                return;
+            }
             Flow = FlowState.RoomFlow; StateChanged?.Invoke();
         }
 
@@ -78,6 +123,36 @@ namespace Cabo.Client
             return string.IsNullOrEmpty(trimmed) ? "玩家" : trimmed;
         }
 
+        static bool TryParseServerAddress(string address, out string host, out int port)
+        {
+            host = "";
+            port = 8888;
+
+            if (string.IsNullOrWhiteSpace(address))
+                return false;
+
+            var trimmed = address.Trim();
+            if (trimmed.Contains("://") && Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+            {
+                host = uri.Host;
+                port = uri.Port > 0 ? uri.Port : 8888;
+                return !string.IsNullOrWhiteSpace(host);
+            }
+
+            int colon = trimmed.LastIndexOf(':');
+            if (colon > 0 && colon < trimmed.Length - 1)
+            {
+                host = trimmed.Substring(0, colon).Trim();
+                return int.TryParse(trimmed.Substring(colon + 1), out port)
+                    && port > 0
+                    && port <= 65535
+                    && !string.IsNullOrWhiteSpace(host);
+            }
+
+            host = trimmed;
+            return !string.IsNullOrWhiteSpace(host);
+        }
+
         public void SendReady()
         {
             if (State.MyPlayerId > 0 && State.RoomId > 0)
@@ -88,6 +163,22 @@ namespace Cabo.Client
         {
             if (State.MyPlayerId > 0 && State.RoomId > 0)
                 Gateway.SendStartGame(State.MyPlayerId, State.RoomId);
+        }
+
+        public void LeaveRoomToHome()
+        {
+            if (State.MyPlayerId > 0 && State.RoomId > 0 && Gateway.IsConnected)
+                Gateway.SendLeaveRoom(State.MyPlayerId, State.RoomId);
+
+            State.ReturnHome();
+            Flow = Gateway.IsConnected ? FlowState.RoomFlow : FlowState.Home;
+            SubState = GameSubState.Idle;
+            SkillTypePending = 0;
+            SkillTypeJustCompleted = 0;
+            SkillMySlot = -1;
+            SkillTargetSlot = -1;
+            SkillTargetPlayerId = 0;
+            StateChanged?.Invoke();
         }
 
         public void ReturnToRoomAfterGameOver()
@@ -104,6 +195,14 @@ namespace Cabo.Client
             SkillTargetSlot = -1;
             SkillTargetPlayerId = 0;
             StateChanged?.Invoke();
+        }
+
+        public void ReturnHomeAfterGameOver()
+        {
+            if (State.Phase != GamePhase.GameOver)
+                return;
+
+            LeaveRoomToHome();
         }
 
         public void ExitGame()
@@ -269,6 +368,21 @@ namespace Cabo.Client
         public void Tick()
         {
             if (!_running) return;
+
+            if (_wasConnected && !Gateway.IsConnected)
+            {
+                _wasConnected = false;
+                ConnectedAddress = "";
+                LastConnectError = "已断开服务器连接。";
+                State.ReturnHome();
+                Flow = FlowState.Home;
+                SubState = GameSubState.Idle;
+                StateChanged?.Invoke();
+            }
+            else if (!_wasConnected && Gateway.IsConnected)
+            {
+                _wasConnected = true;
+            }
 
             // Drain all pending TCP messages before the state machine decides what UI/actions are valid.
             Gateway.DrainMessages(ProcessServerMessage);
