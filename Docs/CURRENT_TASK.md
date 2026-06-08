@@ -1,5 +1,34 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-08 Latest Handoff Update
+
+Latest committed client work:
+
+- `879aa90 Add home server connection flow`
+  - Home page now has server address input, cached last server address, connect status, connect button, hidden join-room input until Join is clicked, and Exit Game.
+  - Room page now has Leave Room returning to the home page.
+  - Final GameOver page has Return to Room, Return Home, and Exit Game.
+- `78958c9 Improve card action animation clarity`
+  - PeekSelf and Spy now use slot-specific inspection animations.
+  - Previous action turn display is held until the animation queue finishes, avoiding a premature new-turn render.
+  - Replace / take-from-discard animations keep the drawn/incoming card visible through the staged discard and slot-empty period.
+  - Multi-card replacement uses an old-hand overlay to reduce reflow artifacts and make selected slots readable.
+
+Next development task:
+
+1. Add an in-game framed panel that can switch between Game Log and Room Chat.
+2. Room Chat should support player text messages and sticker/emote sending.
+3. Add avatar selection on the home page; selected avatar should remain visible in the waiting room and during the game.
+
+Suggested asset paths for the next task:
+
+- Stickers: `unity dev/New Client_Unity_Base_Cli/Assets/Art/Stickers/<pack-name>/*.png`
+- Avatars: `unity dev/New Client_Unity_Base_Cli/Assets/Art/Avatars/*.png`
+
+Preferred asset format: transparent PNG, square 256x256 or 512x512. Use ASCII filenames where possible so Unity import paths remain easy to reference.
+
+Server note: the user will build and start the server. Do not run server build/start unless explicitly asked.
+
 > Updated: 2026-06-08
 
 ## Goal

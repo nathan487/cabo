@@ -1,5 +1,32 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-08 Fast Resume Update
+
+Latest accepted client state:
+
+- Home/start UI includes server address input, cached last address, connection status, connect button, hidden join-room input, and Exit Game.
+- Waiting room includes Leave Room.
+- Final GameOver includes Return to Room, Return Home, and Exit Game.
+- Latest animation fix is committed as `78958c9 Improve card action animation clarity`.
+- Current card action animations hold the previous acting player until animations finish, preserve drawn/incoming cards through replacement, and use slot-specific PeekSelf/Spy motion.
+
+Next task for a new session:
+
+1. Add a framed in-game panel for `游戏日志` and `房间交流`, switchable by buttons/tabs.
+2. `房间交流` should support player text chat and sticker/emote sending.
+3. Add avatar selection on the home page; show the selected avatar in the waiting room and throughout the game.
+
+Suggested asset paths:
+
+- Stickers: `unity dev/New Client_Unity_Base_Cli/Assets/Art/Stickers/<pack-name>/*.png`
+- Avatars: `unity dev/New Client_Unity_Base_Cli/Assets/Art/Avatars/*.png`
+
+Use transparent PNG assets, preferably square 256x256 or 512x512. The user will place the actual files.
+
+Important: the user builds and starts the server. Do not build/start the server unless explicitly requested.
+
+Recommended next-session prompt is also stored in `Docs/NEXT_SESSION_PROMPT.md`.
+
 本文档用于在新的 Codex 会话中快速继续 `unity dev/New Client_Unity_Base_Cli` 的 Unity 客户端开发，避免重新摸索 Unity MCP、当前进度和端到端验证流程。
 
 ## 新会话第一句话建议

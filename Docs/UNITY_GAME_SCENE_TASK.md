@@ -1,5 +1,51 @@
 # Unity Game Scene Task
 
+## 2026-06-08 Next Task: Log / Chat Panel and Avatars
+
+The card-table core is now usable, and the latest animation clarity pass has been accepted by user testing. The next feature should add social/table context without covering the actual cards.
+
+Required features:
+
+- Add a framed panel in the game scene that can switch between:
+  - `游戏日志`: concise game action log.
+  - `房间交流`: player chat plus stickers/emotes.
+- Add Home-page avatar selection.
+- Show the selected avatar consistently in:
+  - Home or pre-room identity preview.
+  - Waiting room player list.
+  - In-game player seats.
+  - Log/chat messages where useful.
+
+Suggested UI placement:
+
+- Start with a compact docked panel on the right side of the table layout if there is enough width.
+- If the current middle row becomes too cramped, place the panel under the center action/status area with a fixed max height.
+- Do not cover player seats, hand cards, draw/discard piles, or the current action buttons.
+- Use two tab-like buttons at the top of the panel: `游戏日志` and `房间交流`.
+
+Suggested asset paths:
+
+- Stickers: `Assets/Art/Stickers/<pack-name>/*.png`
+- Avatars: `Assets/Art/Avatars/*.png`
+
+Recommended file format: transparent PNG, square 256x256 or 512x512. The user will place suitable sticker/avatar files after the path is prepared.
+
+Implementation hints:
+
+- UI files to inspect first:
+  - `Assets/Scripts/UI/RoomPanel.cs`
+  - `Assets/Scripts/UI/GameTablePanel.cs`
+  - `Assets/Scripts/UI/UIManager.cs`
+  - `Assets/UI/GameScreen.uss`
+- Flow/state files to inspect before adding message plumbing:
+  - `Assets/Scripts/Core/GameFlow.cs`
+  - `Assets/Scripts/Core/GameState.cs`
+  - `Assets/Scripts/Core/NetworkGateway.cs`
+- First pass can implement UI structure, local avatar selection/cache, and local placeholder chat/log rendering.
+- If real networked chat/avatar sync is required, plan the protocol/server change separately before modifying protobuf and server routing.
+
+Server note: the user will build and start the server. The next session should not start or rebuild the server unless the user explicitly requests it.
+
 > Created: 2026-06-07
 > Target project: `unity dev/New Client_Unity_Base_Cli`
 

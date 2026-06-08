@@ -1,5 +1,33 @@
 # Unity Animation Notes
 
+## 2026-06-08 Latest Animation Fix
+
+Committed in `78958c9 Improve card action animation clarity`.
+
+Latest behavior:
+
+- PeekSelf:
+  - When an opponent uses the self-peek skill, the selected slot is blanked.
+  - A card moves from that slot to the acting player's name/seat area, pauses, then returns.
+  - Other clients see card backs only; private values are not leaked.
+- Spy:
+  - The viewed target slot is blanked.
+  - The inspected card moves from the target player to the acting player's name/seat area, pauses, then returns.
+  - The animation no longer moves generically to the center.
+- Turn display:
+  - After an action broadcast, the visual current-turn label is held on the acting player until the queued action animation finishes.
+  - New-turn buttons are deferred while the previous action is still being shown.
+- Replace / take-from-discard:
+  - The temporary drawn/incoming card stays visible until it actually flies into the target slot.
+  - Selected old cards fly to the discard pile in a staggered sequence.
+  - Selected slots remain blank during the hold period so observers can see which slots were operated on.
+- Multi-card replace:
+  - The previous hand layout is captured before server-driven reflow.
+  - A temporary old-hand overlay shows non-selected old cards while selected slots are blank.
+  - This reduces residual-card artifacts and makes the selected slots easier to infer.
+
+Known design target: action animations should communicate what happened without requiring text notifications. Future changes should preserve the source slot, target slot, empty-slot hold, and final landing position as the primary visual information.
+
 > Updated: 2026-06-08
 > Target project: `unity dev/New Client_Unity_Base_Cli`
 
