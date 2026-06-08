@@ -90,6 +90,33 @@ namespace Cabo.Client
                 Gateway.SendStartGame(State.MyPlayerId, State.RoomId);
         }
 
+        public void ReturnToRoomAfterGameOver()
+        {
+            if (State.Phase != GamePhase.GameOver)
+                return;
+
+            State.ReturnToRoomAfterGameOver();
+            Flow = FlowState.WaitingRoom;
+            SubState = GameSubState.Idle;
+            SkillTypePending = 0;
+            SkillTypeJustCompleted = 0;
+            SkillMySlot = -1;
+            SkillTargetSlot = -1;
+            SkillTargetPlayerId = 0;
+            StateChanged?.Invoke();
+        }
+
+        public void ExitGame()
+        {
+            _running = false;
+            Gateway?.Dispose();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+
         public void ProcessServerMessage(ServerMessage msg)
         {
             var previousFlow = Flow;

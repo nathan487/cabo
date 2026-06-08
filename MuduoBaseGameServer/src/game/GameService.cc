@@ -173,10 +173,16 @@ bool GameService::hasGame(int64_t roomId) const {
     return games_.count(roomId) > 0;
 }
 
+bool GameService::isGameOver(int64_t roomId) const {
+    auto it = games_.find(roomId);
+    return it != games_.end() && it->second->step == GameStep::GameOver;
+}
+
 void GameService::restartRound(int64_t roomId) {
     auto it = games_.find(roomId);
     if (it == games_.end()) return;
     auto& room = *it->second;
+    if (room.step == GameStep::GameOver) return;
     room.step = GameStep::Playing;
     startNewRound(room);
 }
@@ -507,6 +513,8 @@ void GameService::revealAndScore(GameRoom& room) {
         }
         broadcastToRoom(room, goMsg);
         room.step = GameStep::GameOver;
+        if (gameFinishedFunc_)
+            gameFinishedFunc_(room.roomId);
     } else {
         // Wait for all players to ready up and host to start before next round
         room.step = GameStep::WaitingToStart;

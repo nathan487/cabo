@@ -8,6 +8,8 @@ Build a functional Unity (C#) client based on the fully working C++ CLI client a
 
 Current immediate goal: implement the actual multiplayer card game scene in Unity. The CLI client remains the logic and state-machine reference, but the Unity game scene must be a real visual card table, not a terminal-style clone.
 
+Latest completed task: final `GameOver` now has a `Return to Room` button. It returns the Unity client to the existing waiting-room panel without leaving the room. The server marks the room as waiting after final `GameOver`, clears ready flags, preserves online players, preserves or migrates host ownership, and treats the next Start as a fresh full game with reset cumulative scores.
+
 See `Docs/UNITY_GAME_SCENE_TASK.md` for the next-session task brief.
 See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation, including slot-level exchange animations, slower skill-inspection animations, and the CABO caller marker.
 
@@ -54,7 +56,7 @@ Current Phase 3 status: first pass implemented for deck-to-player draw markers, 
 ### Phase 4: Game Flow
 13. **Round reveal panel** — All cards visible + scores. Must handle `roundJustRevealed` to prevent GameStartNotify from hiding it
 14. **Inter-round ready** — Show ready status, ready button, host start button
-15. **Game over screen** — Rankings display
+15. **Game over screen** — Rankings display plus Return to Room for a fresh next game
 
 ## Key Sync/Display Challenges (From CLI Experience)
 

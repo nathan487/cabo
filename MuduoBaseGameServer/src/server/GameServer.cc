@@ -98,6 +98,11 @@ public:
             [](const cabogame::TcpConnectionPtr& conn, const std::string& framedData) {
                 conn->send(framedData);
             });
+
+        gameService_.setGameFinishedFunc(
+            [this](int64_t roomId) {
+                roomService_.markGameFinished(roomId);
+            });
     }
 
     void start() { server_.start(); }
@@ -108,19 +113,22 @@ private:
     void onStartGame(const cabogame::TcpConnectionPtr& conn,
                      const ::game::messages::ClientMessage& msg) {
         // RoomService validates host/ready/etc and sends RoomStartNotify
-        roomService_.handleStartGame(conn, msg);
+        if (!roomService_.handleStartGame(conn, msg))
+            return;
 
         // Kick off game logic
         const auto& req = msg.start_game_req();
         int64_t roomId = req.room_id();
 
-        // Inter-round restart: existing game, just start new round
-        if (gameService_.hasGame(roomId)) {
+        bool startNewGame = !gameService_.hasGame(roomId) || gameService_.isGameOver(roomId);
+
+        // Inter-round restart: existing active game, just start new round
+        if (!startNewGame) {
             gameService_.restartRound(roomId);
             return;
         }
 
-        // First game start: build player state list from room data
+        // First game start, or a new full game after GameOver.
         auto roomPtr = roomService_.getRoom(roomId);
         if (!roomPtr) return;
 

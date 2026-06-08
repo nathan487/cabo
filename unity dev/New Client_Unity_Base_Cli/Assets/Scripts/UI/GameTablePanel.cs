@@ -321,7 +321,17 @@ namespace Cabo.Client.UI
                 _actionPanel.Add(row);
             }
 
-            _statusLine.text = "";
+            var controls = new VisualElement();
+            controls.style.flexDirection = FlexDirection.Row;
+            controls.style.justifyContent = Justify.Center;
+            controls.style.marginTop = 14;
+            _actionPanel.Add(controls);
+            controls.Add(CreatePanelButton("Return to Room", () => _flow.ReturnToRoomAfterGameOver(),
+                _flow.State.MyPlayerId > 0 && _flow.State.RoomId > 0));
+            controls.Add(CreatePanelButton("Exit Game", () => _flow.ExitGame(), true));
+
+            _statusLine.text = "Return to the room to ready up for a new game.";
+            _statusLine.style.display = DisplayStyle.Flex;
         }
 
         void RenderSeats(GameState state)

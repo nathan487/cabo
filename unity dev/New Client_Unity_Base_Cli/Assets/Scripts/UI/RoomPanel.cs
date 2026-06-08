@@ -185,7 +185,7 @@ namespace Cabo.Client.UI
             _playerList.text = list;
 
             bool isHost = false;
-            bool allReady = readyCount == s.Players.Count && s.Players.Count == 4;
+            bool allReady = readyCount == s.Players.Count && s.Players.Count >= 2;
             foreach (var p in s.Players)
                 if (p.PlayerId == s.MyPlayerId && p.IsHost) { isHost = true; break; }
 

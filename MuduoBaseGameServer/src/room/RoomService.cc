@@ -393,7 +393,7 @@ void RoomService::handleReady(const TcpConnectionPtr& conn,
 
 // ── Handle StartGame ──
 
-void RoomService::handleStartGame(const TcpConnectionPtr& conn,
+bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
                                    const ::game::messages::ClientMessage& msg) {
     const auto& req = msg.start_game_req();
     int64_t playerId = req.player_id();
@@ -409,7 +409,7 @@ void RoomService::handleStartGame(const TcpConnectionPtr& conn,
             rsp->mutable_error()->set_code(2001);
             rsp->mutable_error()->set_message("Not in room");
             sendTo(conn, rspMsg);
-            return;
+            return false;
         }
         room = it->second;
     }
@@ -423,7 +423,7 @@ void RoomService::handleStartGame(const TcpConnectionPtr& conn,
         rsp->mutable_error()->set_code(2001);
         rsp->mutable_error()->set_message("Only host can start game");
         sendTo(conn, rspMsg);
-        return;
+        return false;
     }
 
     // Validate: all ready (min 2)
@@ -435,7 +435,7 @@ void RoomService::handleStartGame(const TcpConnectionPtr& conn,
         rsp->mutable_error()->set_code(2002);
         rsp->mutable_error()->set_message("All players must be ready (min 2)");
         sendTo(conn, rspMsg);
-        return;
+        return false;
     }
 
     // Start!
@@ -460,6 +460,57 @@ void RoomService::handleStartGame(const TcpConnectionPtr& conn,
         if (p->conn && p->isConnected) {
             sendRoomState(room->roomId, p->conn);
         }
+    }
+
+    return true;
+}
+
+void RoomService::markGameFinished(int64_t roomId) {
+    std::shared_ptr<Room> room;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = rooms_.find(roomId);
+        if (it == rooms_.end()) return;
+
+        room = it->second;
+        room->state = ::game::common::ROOM_STATE_WAITING;
+
+        bool hostStillPresent = false;
+        for (auto& p : room->players) {
+            p->isReady = false;
+            p->isHost = false;
+            p->totalScore = 0;
+            if (p->playerId == room->hostPlayerId)
+                hostStillPresent = true;
+        }
+
+        if (!room->players.empty()) {
+            if (!hostStillPresent)
+                room->hostPlayerId = room->players[0]->playerId;
+
+            bool hostAssigned = false;
+            for (auto& p : room->players) {
+                if (p->playerId == room->hostPlayerId) {
+                    p->isHost = true;
+                    hostAssigned = true;
+                    break;
+                }
+            }
+
+            if (!hostAssigned) {
+                room->hostPlayerId = room->players[0]->playerId;
+                room->players[0]->isHost = true;
+            }
+        } else {
+            room->hostPlayerId = 0;
+        }
+    }
+
+    LOG_INFO("[Room] Game finished in room %lld; returned to waiting", (long long)roomId);
+
+    for (auto& p : room->players) {
+        if (p->conn && p->isConnected)
+            sendRoomState(roomId, p->conn);
     }
 }
 

@@ -241,6 +241,12 @@ Acceptance:
 
 - reveal/game-over are readable and not just terminal text.
 
+Current implementation note:
+
+- Final `GameOver` rankings now include `Return to Room`.
+- Returning to room switches the Unity flow back to the existing waiting-room UI without sending LeaveRoom.
+- Server-side final GameOver now returns the room to waiting, clears ready flags, keeps online players, migrates host if needed through existing disconnect handling, and lets the next host Start create a fresh full game instead of restarting the ended game.
+
 ### Step 6: Visual Feedback / Animation Hooks
 
 Do lightweight visual feedback first:

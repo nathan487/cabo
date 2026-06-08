@@ -64,8 +64,11 @@ public:
                          const ::game::messages::ClientMessage& msg);
     void handleReady(const TcpConnectionPtr& conn,
                      const ::game::messages::ClientMessage& msg);
-    void handleStartGame(const TcpConnectionPtr& conn,
+    bool handleStartGame(const TcpConnectionPtr& conn,
                          const ::game::messages::ClientMessage& msg);
+
+    // Called by GameService after final GameOver has been broadcast.
+    void markGameFinished(int64_t roomId);
 
     // Called when a connection drops
     void onConnectionClosed(const TcpConnectionPtr& conn);

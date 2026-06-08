@@ -604,6 +604,60 @@ namespace Cabo.Client
                 });
         }
 
+        public void ReturnToRoomAfterGameOver()
+        {
+            if (Phase != GamePhase.GameOver)
+                return;
+
+            Phase = GamePhase.WaitingRoom;
+            MyCards.Clear();
+            DrawPileCount = 0;
+            DiscardPileCount = 0;
+            DiscardTopValue = -1;
+            CurrentPlayerId = 0;
+            RoundNumber = 0;
+            TurnNumber = 0;
+            HasDrawnCard = false;
+            DrawnCardValue = 0;
+            DrawnCardSkill = 0;
+            WaitingForDrawResponse = false;
+            WaitingForTakeResponse = false;
+            WaitingForCallSteadyResponse = false;
+            WaitingForSkillResponse = false;
+            IsFinalRound = false;
+            FinalRoundRemaining = 0;
+            SteadyCallerId = 0;
+            GameStartConfirmed = false;
+            RoundJustRevealed = false;
+            LastRoundResults.Clear();
+            FinalRankings.Clear();
+            LastPeekedValue = -1;
+            LastSwapOccurred = false;
+            LastActionMessage = "";
+            LastActionSequence = 0;
+            LastActionType = ActionType.Unknown;
+            LastActionSkill = SkillType.Unknown;
+            LastActionSourcePlayerId = 0;
+            LastActionTargetPlayerId = 0;
+            LastActionSourceSlot = -1;
+            LastActionTargetSlot = -1;
+            LastActionSwapOccurred = false;
+            LastActionTurnEnded = false;
+            LastActionExchangeSucceeded = false;
+            LastActionIncomingCardValue = -1;
+            LastActionDiscardedCount = 0;
+            LastActionAttemptedMultiCard = false;
+            LastActionAddedCardCount = 0;
+            LastActionDrewExtraPenaltyCard = false;
+            LastActionSelectedSlots.Clear();
+
+            foreach (var player in Players)
+            {
+                player.IsReady = false;
+                player.CardCount = 0;
+            }
+        }
+
         void UpsertPlayer(long playerId, string nickname, int seatId, bool isReady, bool isHost, int totalScore)
         {
             var existing = Players.Find(x => x.PlayerId == playerId);

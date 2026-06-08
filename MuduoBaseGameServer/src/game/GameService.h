@@ -79,9 +79,11 @@ struct GameRoom {
 class GameService {
 public:
     using SendFunc = std::function<void(const TcpConnectionPtr&, const std::string&)>;
+    using GameFinishedFunc = std::function<void(int64_t)>;
 
     GameService();
     void setSendFunc(SendFunc f) { sendFunc_ = std::move(f); }
+    void setGameFinishedFunc(GameFinishedFunc f) { gameFinishedFunc_ = std::move(f); }
 
     // Start a game for a room (called from RoomService when host starts)
     void startGame(int64_t roomId,
@@ -90,6 +92,7 @@ public:
 
     // Inter-round restart: resume existing game with startNewRound
     bool hasGame(int64_t roomId) const;
+    bool isGameOver(int64_t roomId) const;
     void restartRound(int64_t roomId);
 
     // Player action handlers
@@ -157,6 +160,7 @@ private:
                    int32_t code, const std::string& message);
 
     SendFunc sendFunc_;
+    GameFinishedFunc gameFinishedFunc_;
     std::mutex mutex_;
     std::mt19937 rng_;
     std::unordered_map<int64_t, std::shared_ptr<GameRoom>> games_;
