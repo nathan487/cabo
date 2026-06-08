@@ -1,5 +1,23 @@
 # Unity Game Scene Task
 
+## 2026-06-08 Status After Chat / Avatar Pass
+
+The log/chat/avatar task has a committed first implementation in `39bb458 Add room chat avatars and build UI resources`.
+
+Completed:
+
+- Game table has a switchable Game Log / Room Chat dock.
+- Waiting room also exposes room chat, so players can communicate before entering the game scene.
+- Room chat supports server-broadcast text and sticker identifiers.
+- Home avatar selection exists and selected avatars render in the waiting room and game table.
+- Sticker and avatar PNGs are mirrored into `Assets/Resources/Art` during Unity build prep.
+- Windows player UI text resources are now packaged through `Resources` and static TextCore font assets.
+
+Remaining follow-up:
+
+- Chinese labels render. A follow-up patch after `39bb458` makes the UI Chinese `FontAsset` dynamic and enables IME while UI Toolkit text fields are focused.
+- Needs Windows player verification for Chinese nickname input and Chinese room chat before expanding avatar sync further.
+
 ## 2026-06-08 Next Task: Log / Chat Panel and Avatars
 
 The card-table core is now usable, and the latest animation clarity pass has been accepted by user testing. The next feature should add social/table context without covering the actual cards.

@@ -131,6 +131,7 @@ namespace Cabo.Client.UI
 
             Root.Query<TextField>().ForEach(field =>
             {
+                EnsureImeSupport(field);
                 field.style.minWidth = 180;
                 field.style.color = new Color(0.12f, 0.12f, 0.16f);
             });
@@ -153,9 +154,21 @@ namespace Cabo.Client.UI
             return false;
         }
 
+        static void EnsureImeSupport(TextField field)
+        {
+            const string boundClass = "cabo-ime-bound";
+            if (field == null || field.ClassListContains(boundClass))
+                return;
+
+            field.AddToClassList(boundClass);
+            field.RegisterCallback<FocusInEvent>(_ => Input.imeCompositionMode = IMECompositionMode.On);
+            field.RegisterCallback<FocusOutEvent>(_ => Input.imeCompositionMode = IMECompositionMode.Auto);
+        }
+
         void OnDestroy()
         {
             if (_flow != null) _flow.StateChanged -= OnStateChanged;
+            Input.imeCompositionMode = IMECompositionMode.Auto;
         }
     }
 }

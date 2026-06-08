@@ -57,7 +57,7 @@ namespace Cabo.Client.Editor
             if (!fontAsset.TryAddCharacters(characters, out var missingCharacters, false))
                 Debug.LogWarning($"[CaboTextResourceBuilder] Missing {missingCharacters.Length} prewarmed UI character(s).");
 
-            fontAsset.atlasPopulationMode = AtlasPopulationMode.Static;
+            fontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
             fontAsset.isMultiAtlasTexturesEnabled = true;
             PersistGeneratedSubAssets(fontAsset);
             fontAsset.ReadFontAssetDefinition();

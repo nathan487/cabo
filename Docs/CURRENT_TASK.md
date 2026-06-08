@@ -1,5 +1,23 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-08 Update: Room Chat / Avatars / Build Text Baseline
+
+Latest committed work:
+
+- `39bb458 Add room chat avatars and build UI resources`
+  - Added protocol/server plumbing for room-level text and sticker chat.
+  - Added shared Unity room chat panel for waiting room and game-table chat tab.
+  - Added home avatar selection and avatar/sticker resource mirroring into `Assets/Resources/Art`.
+  - Added runtime `Resources` copies for UI Toolkit panel/theme/stylesheet assets so Windows player builds render consistently.
+  - Added static prewarmed UI Toolkit Chinese `FontAsset` / `PanelTextSettings` so build labels render Chinese.
+
+Current follow-up bug:
+
+- Windows build can render Chinese labels now, but player-entered Chinese text is still not usable for room chat or nickname input.
+- Follow-up fix implemented after `39bb458`: `CaboChineseFont.asset` is now prewarmed and dynamic, preserving its source font and atlas textures; UI Toolkit `TextField` focus now explicitly enables Unity IME. Needs user Windows player build verification.
+
+Server note: the user will build and start the server. Do not run server build/start unless explicitly asked.
+
 ## 2026-06-08 Latest Handoff Update
 
 Latest committed client work:

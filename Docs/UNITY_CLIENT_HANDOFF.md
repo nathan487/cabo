@@ -1,5 +1,21 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-08 Latest Stable Commit
+
+Latest committed baseline:
+
+- `39bb458 Add room chat avatars and build UI resources`
+  - Room chat protocol/server broadcast and Unity shared chat UI are implemented.
+  - Waiting room and game-table chat use the same room chat model.
+  - Home avatar selection is implemented; avatar/sticker assets are mirrored to `Assets/Resources/Art` for player builds.
+  - Windows player build now loads `GamePanelSettings`, `GameScreen.uss`, `RuntimeTheme.tss`, and UI text resources from `Resources`.
+  - UI Toolkit Chinese labels in player builds are fixed by `Assets/Resources/CaboPanelTextSettings.asset` and `Assets/Resources/Fonts/CaboChineseFont.asset`.
+
+Current known issue:
+
+- Chinese labels render in the Windows player. A follow-up patch now keeps the UI Chinese `FontAsset` dynamic with source font + atlas references and enables IME on focused UI Toolkit `TextField`s.
+- Next verification: rebuild the Windows player and test Chinese nickname creation/join plus Chinese room chat in waiting room and game scene. Keep server build/start as user-owned.
+
 ## 2026-06-08 Fast Resume Update
 
 Latest accepted client state:
