@@ -115,6 +115,10 @@ namespace Cabo.Client
         public bool LastActionExchangeSucceeded;
         public int LastActionIncomingCardValue;
         public int LastActionDiscardedCount;
+        public bool LastActionAttemptedMultiCard;
+        public int LastActionAddedCardCount;
+        public bool LastActionDrewExtraPenaltyCard;
+        public List<int> LastActionSelectedSlots = new();
 
         // Helpers
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
@@ -383,10 +387,10 @@ namespace Cabo.Client
             }
             else
             {
-                // Failure: add card to hand
-                MyCards.Add(new CardState { SlotIndex = MyCards.Count, Value = ex.IncomingCardValue, IsKnown = true });
+                AddFailedExchangeCards(ex);
             }
             HasDrawnCard = false;
+            SyncMyCardCount();
         }
 
         void HandleTakeFromDiscard(TakeFromDiscardRsp rsp)
@@ -417,8 +421,29 @@ namespace Cabo.Client
             }
             else
             {
-                MyCards.Add(new CardState { SlotIndex = MyCards.Count, Value = ex.IncomingCardValue, IsKnown = true });
+                AddFailedExchangeCards(ex);
             }
+            SyncMyCardCount();
+        }
+
+        void AddFailedExchangeCards(ExchangeAttemptResult ex)
+        {
+            MyCards.Add(new CardState
+            {
+                SlotIndex = MyCards.Count,
+                Value = ex.IncomingCardValue,
+                IsKnown = true
+            });
+
+            if (!ex.DrewExtraPenaltyCard)
+                return;
+
+            MyCards.Add(new CardState
+            {
+                SlotIndex = MyCards.Count,
+                Value = 0,
+                IsKnown = false
+            });
         }
 
         void HandleUseSkill(UseSkillRsp rsp)
@@ -450,15 +475,22 @@ namespace Cabo.Client
             LastActionExchangeSucceeded = ar.ExchangeResult?.Success ?? false;
             LastActionIncomingCardValue = ar.ExchangeResult?.IncomingCardValue ?? -1;
             LastActionDiscardedCount = ar.ExchangeResult?.DiscardedCount ?? 0;
+            LastActionAttemptedMultiCard = ar.ExchangeResult?.AttemptedMultiCard ?? false;
+            LastActionAddedCardCount = ar.ExchangeResult?.AddedCardCount ?? 0;
+            LastActionDrewExtraPenaltyCard = ar.ExchangeResult?.DrewExtraPenaltyCard ?? false;
+            LastActionSelectedSlots.Clear();
+            if (ar.ExchangeResult?.SelectedSlotIndices != null)
+                LastActionSelectedSlots.AddRange(ar.ExchangeResult.SelectedSlotIndices);
             if (ar.ActionType == ActionType.CallSteady)
                 SteadyCallerId = ar.SourcePlayerId;
 
             DrawPileCount = ar.DrawPile?.Count ?? 0;
             DiscardPileCount = ar.DiscardPile?.Count ?? 0;
             DiscardTopValue = ar.DiscardPile?.TopCard?.Value ?? -1;
-
-            // Note: PlayerHands not yet in generated C# proto — opponent counts
-            // updated via GameStartNotify per round
+            if (ar.PlayerHands != null && ar.PlayerHands.Count > 0)
+                ApplyPlayerHandCounts(ar.PlayerHands);
+            else
+                ApplyFallbackActionHandCount(ar);
 
             // Swap: update own card state
             if (ar.SwapOccurred)
@@ -476,8 +508,52 @@ namespace Cabo.Client
             }
 
             if (ar.TurnEnded) { HasDrawnCard = false; }
+            SyncMyCardCount();
 
             LastActionMessage = BuildActionMessage(ar);
+        }
+
+        void ApplyPlayerHandCounts(IEnumerable<OpponentHandState> hands)
+        {
+            foreach (var hand in hands)
+            {
+                var player = Players.Find(p => p.PlayerId == hand.PlayerId);
+                if (player != null)
+                    player.CardCount = hand.CardCount;
+            }
+        }
+
+        void ApplyFallbackActionHandCount(ActionResultNotify ar)
+        {
+            if (ar.ExchangeResult == null)
+                return;
+
+            var player = Players.Find(p => p.PlayerId == ar.SourcePlayerId);
+            if (player == null)
+                return;
+
+            var ex = ar.ExchangeResult;
+            if (ex.Success)
+            {
+                int removed = Mathf.Max(0, ex.DiscardedCount);
+                int added = Mathf.Max(0, ex.AddedCardCount);
+                if (removed > 0 || added > 0)
+                    player.CardCount = Mathf.Max(0, player.CardCount - removed + added);
+            }
+            else
+            {
+                int added = Mathf.Max(1, ex.AddedCardCount);
+                if (ex.DrewExtraPenaltyCard)
+                    added = Mathf.Max(added, 2);
+                player.CardCount = Mathf.Max(0, player.CardCount + added);
+            }
+        }
+
+        void SyncMyCardCount()
+        {
+            var me = Players.Find(x => x.PlayerId == MyPlayerId);
+            if (me != null)
+                me.CardCount = MyCards.Count;
         }
 
         void HandleRoundReveal(RoundRevealNotify rrn)

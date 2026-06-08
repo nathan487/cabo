@@ -1,6 +1,6 @@
 # Current Task: Unity Client Migration
 
-> Updated: 2026-06-07
+> Updated: 2026-06-08
 
 ## Goal
 
@@ -9,7 +9,7 @@ Build a functional Unity (C#) client based on the fully working C++ CLI client a
 Current immediate goal: implement the actual multiplayer card game scene in Unity. The CLI client remains the logic and state-machine reference, but the Unity game scene must be a real visual card table, not a terminal-style clone.
 
 See `Docs/UNITY_GAME_SCENE_TASK.md` for the next-session task brief.
-See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation, including the slower skill-inspection animations and CABO caller marker.
+See `Docs/UNITY_ANIMATION_NOTES.md` for the current Unity card-table animation implementation, including slot-level exchange animations, slower skill-inspection animations, and the CABO caller marker.
 
 ## What We Have
 
@@ -49,6 +49,8 @@ Important update: the original Phase 2 text describes functional data, not final
 11. **Take from discard animation** — Card from discard pile to hand
 12. **Skill animations** — PeekSelf (flip own card), Spy (point to opponent), Swap (exchange cards)
 
+Current Phase 3 status: first pass implemented for deck-to-player draw markers, selected-slot blanking for replace/take, failed exchange shake, opponent hand-count updates from `ActionResultNotify.player_hands`, and Swap slot cross-movement. User screenshot review found and fixed stale dual TURN borders plus 3-or-more failed multi-exchange penalty-card rendering.
+
 ### Phase 4: Game Flow
 13. **Round reveal panel** — All cards visible + scores. Must handle `roundJustRevealed` to prevent GameStartNotify from hiding it
 14. **Inter-round ready** — Show ready status, ready button, host start button
@@ -60,7 +62,7 @@ Important update: the original Phase 2 text describes functional data, not final
 |-----------|-------------|-------------|
 | Messages arrive in TCP bursts | `drainMessages()` drains ALL before deciding | Same pattern: read all available, then update UI once |
 | ActionResultNotify + TurnStartNotify in same frame | State machine checks phase transitions | 1.5s server delay + process Action first, render, then TurnStart |
-| Card count changes (multi-replace) | Rebuild myCards vector | Animate card removal + re-layout |
+| Card count changes (multi-replace) | Rebuild myCards vector | Unity now reads `ActionResultNotify.player_hands`; verify live count changes with screenshots |
 | Skill result not visible to other players | Broadcast `ActionResultNotify.skill_used + source/target_slot` | Play "peek" or "spy" animation on source/target player cards |
 | Round reveal hidden by GameStartNotify | `roundJustRevealed` flag | Show reveal panel, wait for user tap, then transition |
 | isFinalRound not reset between rounds | Reset in `GameStartNotify` handler | Reset flag on each new round |

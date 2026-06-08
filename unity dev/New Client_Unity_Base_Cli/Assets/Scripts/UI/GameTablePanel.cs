@@ -16,10 +16,11 @@ namespace Cabo.Client.UI
         const int SelfCardHeight = 96;
         const int OppCardWidth = 46;
         const int OppCardHeight = 64;
-        const float QuickMoveDuration = 0.95f;
-        const float SkillMoveDuration = 1.05f;
-        const float SkillHoldDuration = 1.75f;
-        const float FlipRevealDuration = 2.35f;
+        const float QuickMoveDuration = 1.15f;
+        const float SkillMoveDuration = 1.20f;
+        const float EmptySlotHoldDuration = 0.65f;
+        const float SkillHoldDuration = 2.25f;
+        const float FlipRevealDuration = 3.0f;
 
         readonly VisualElement _root;
         readonly VisualElement _container;
@@ -53,6 +54,9 @@ namespace Cabo.Client.UI
         long _lastAnimatedActionSequence;
         IVisualElementScheduledItem _drawAnimation;
         VisualElement _temporaryHiddenCard;
+        readonly Dictionary<long, VisualElement> _drawnCardMarkers = new();
+        readonly Dictionary<VisualElement, int> _pulseVersions = new();
+        float _animationQueueUntil;
         bool _inspectionActive;
         float _inspectionEndsAt;
         Vector2 _inspectionReturnStart;
@@ -243,9 +247,12 @@ namespace Cabo.Client.UI
         public void RenderGame()
         {
             var state = _flow.State;
-            bool shouldAnimateDraw = _lastRenderedSubState == GameSubState.WaitingDrawRsp
-                && _flow.SubState == GameSubState.AwaitingDrawnDecision
-                && state.HasDrawnCard;
+            ActionAnimationSnapshot pendingAction = null;
+            if (state.LastActionSequence > _lastAnimatedActionSequence)
+            {
+                _lastAnimatedActionSequence = state.LastActionSequence;
+                pendingAction = BuildActionAnimationSnapshot(state);
+            }
 
             ResetSelectionWhenSubStateChanges(_flow.SubState);
             if (!_inspectionActive)
@@ -261,13 +268,8 @@ namespace Cabo.Client.UI
             _statusLine.text = ShouldShowActionStatus(_flow.SubState) ? BuildStatusText(state) : "";
             _statusLine.style.display = string.IsNullOrWhiteSpace(_statusLine.text) ? DisplayStyle.None : DisplayStyle.Flex;
 
-            if (shouldAnimateDraw)
-                ScheduleDrawAnimation(state.DrawnCardValue);
-            if (state.LastActionSequence > _lastAnimatedActionSequence)
-            {
-                _lastAnimatedActionSequence = state.LastActionSequence;
-                ScheduleActionAnimation(state);
-            }
+            if (pendingAction != null)
+                EnqueueActionAnimation(pendingAction);
 
             _lastRenderedSubState = _flow.SubState;
         }
@@ -506,7 +508,7 @@ namespace Cabo.Client.UI
             _root.schedule.Execute(() => PlayDrawAnimation(value)).ExecuteLater(1);
         }
 
-        void ScheduleActionAnimation(GameState state)
+        ActionAnimationSnapshot BuildActionAnimationSnapshot(GameState state)
         {
             var snapshot = new ActionAnimationSnapshot
             {
@@ -517,11 +519,41 @@ namespace Cabo.Client.UI
                 SourceSlot = state.LastActionSourceSlot,
                 TargetSlot = state.LastActionTargetSlot,
                 SwapOccurred = state.LastActionSwapOccurred,
+                ExchangeSucceeded = state.LastActionExchangeSucceeded,
+                AttemptedMultiCard = state.LastActionAttemptedMultiCard,
                 IncomingCardValue = state.LastActionIncomingCardValue,
+                AddedCardCount = state.LastActionAddedCardCount,
+                DiscardedCount = state.LastActionDiscardedCount,
+                DrewExtraPenaltyCard = state.LastActionDrewExtraPenaltyCard,
                 DiscardTopValue = state.DiscardTopValue,
-                PeekedValue = state.LastPeekedValue
+                PeekedValue = state.LastPeekedValue,
+                SourcePlayerBounds = GetPlayerBounds(state.LastActionSourcePlayerId),
+                TargetPlayerBounds = GetPlayerBounds(state.LastActionTargetPlayerId),
+                DrawPileBounds = _drawPile.worldBound,
+                DiscardPileBounds = _discardPile.worldBound
             };
-            PlayActionAnimation(snapshot);
+
+            snapshot.SelectedSlots.AddRange(state.LastActionSelectedSlots);
+            if (snapshot.SelectedSlots.Count == 0
+                && (snapshot.ActionType == ActionType.ReplaceWithDrawn || snapshot.ActionType == ActionType.TakeFromDiscard)
+                && snapshot.SourceSlot >= 0)
+            {
+                snapshot.SelectedSlots.Add(snapshot.SourceSlot);
+            }
+
+            snapshot.SourceSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, snapshot.SelectedSlots));
+            snapshot.SourceSwapSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, new[] { snapshot.SourceSlot }));
+            snapshot.TargetSlotBounds.AddRange(CaptureSlotBounds(snapshot.TargetPlayerId, new[] { snapshot.TargetSlot }));
+            return snapshot;
+        }
+
+        void EnqueueActionAnimation(ActionAnimationSnapshot action)
+        {
+            float now = Time.realtimeSinceStartup;
+            float delay = Mathf.Max(0f, _animationQueueUntil - now);
+            float duration = EstimateActionAnimationDuration(action);
+            _animationQueueUntil = now + delay + duration;
+            ScheduleAfter(delay, () => PlayActionAnimation(action));
         }
 
         void PlayDrawAnimation(int value)
@@ -573,19 +605,16 @@ namespace Cabo.Client.UI
             switch (action.ActionType)
             {
                 case ActionType.Draw:
-                    PlayFlyCard(CenterOf(_drawPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), false, 0, new Color(0.30f, 0.55f, 1f), QuickMoveDuration);
+                    PlayDrawAction(action);
                     break;
                 case ActionType.DiscardDrawn:
-                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), true, action.DiscardTopValue, GetSkillColor(action.Skill), QuickMoveDuration);
-                    PulsePlayer(action.SourcePlayerId, GetSkillColor(action.Skill), 0.95f);
+                    PlayDiscardDrawnAction(action);
                     break;
                 case ActionType.ReplaceWithDrawn:
-                    PlayFlyCard(CenterOf(GetPlayerBounds(action.SourcePlayerId)), CenterOf(_discardPile.worldBound), false, 0, new Color(1f, 0.72f, 0.30f), QuickMoveDuration);
-                    PulsePlayer(action.SourcePlayerId, action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : new Color(1f, 0.72f, 0.30f), 0.95f);
+                    PlayReplaceWithDrawnAction(action);
                     break;
                 case ActionType.TakeFromDiscard:
-                    PlayFlyCard(CenterOf(_discardPile.worldBound), CenterOf(GetPlayerBounds(action.SourcePlayerId)), true, action.DiscardTopValue, new Color(1f, 0.85f, 0.42f), QuickMoveDuration);
-                    PulsePlayer(action.SourcePlayerId, new Color(1f, 0.85f, 0.42f), 0.95f);
+                    PlayTakeFromDiscardAction(action);
                     break;
                 case ActionType.UseSkill:
                     PlaySkillAnimation(action);
@@ -596,17 +625,134 @@ namespace Cabo.Client.UI
             }
         }
 
+        void PlayDrawAction(ActionAnimationSnapshot action)
+        {
+            var color = new Color(0.30f, 0.55f, 1f);
+            var start = CenterOf(action.DrawPileBounds);
+            if (start == Vector2.zero)
+                start = CenterOf(_drawPile.worldBound);
+            var end = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
+            if (end == Vector2.zero)
+                end = CenterOf(action.SourcePlayerBounds);
+
+            RemoveDrawnMarker(action.SourcePlayerId);
+            PlayMovingCard(start, end, false, 0, color, QuickMoveDuration, false,
+                () => ShowDrawnMarker(action.SourcePlayerId, end, color));
+            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + 0.35f);
+        }
+
+        void PlayDiscardDrawnAction(ActionAnimationSnapshot action)
+        {
+            var color = GetSkillColor(action.Skill);
+            var start = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
+            var end = CenterOf(action.DiscardPileBounds);
+            if (end == Vector2.zero)
+                end = CenterOf(_discardPile.worldBound);
+
+            RemoveDrawnMarker(action.SourcePlayerId);
+            PlayMovingCard(start, end, true, action.DiscardTopValue, color, QuickMoveDuration, true, null);
+            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + 0.45f);
+        }
+
+        void PlayReplaceWithDrawnAction(ActionAnimationSnapshot action)
+        {
+            var color = action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : new Color(1f, 0.72f, 0.30f);
+            if (!action.ExchangeSucceeded)
+            {
+                PlayFailedExchangeAction(action, color);
+                return;
+            }
+
+            var discardCenter = CenterOf(action.DiscardPileBounds);
+            if (discardCenter == Vector2.zero)
+                discardCenter = CenterOf(_discardPile.worldBound);
+            var incomingStart = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
+            var incomingTarget = GetPrimarySelectedSlotCenter(action);
+            if (incomingTarget == Vector2.zero)
+                incomingTarget = CenterOf(action.SourcePlayerBounds);
+
+            float total = QuickMoveDuration + EmptySlotHoldDuration + QuickMoveDuration + 0.35f;
+            ShowSelectedSlotBlanks(action, color, total);
+            HideCurrentSlots(action.SourcePlayerId, action.SelectedSlots, total);
+
+            for (int i = 0; i < action.SourceSlotBounds.Count; i++)
+            {
+                var slot = action.SourceSlotBounds[i];
+                float offset = i * 0.14f;
+                ScheduleAfter(offset, () =>
+                    PlayMovingCard(CenterOf(slot.Bounds), discardCenter, false, 0, color, QuickMoveDuration, true, null));
+            }
+
+            RemoveDrawnMarker(action.SourcePlayerId);
+            bool revealIncoming = action.SourcePlayerId == _flow.State.MyPlayerId && action.IncomingCardValue >= 0;
+            ScheduleAfter(QuickMoveDuration + EmptySlotHoldDuration, () =>
+                PlayMovingCard(incomingStart, incomingTarget, revealIncoming, action.IncomingCardValue, color, QuickMoveDuration, true, null));
+            PulsePlayer(action.SourcePlayerId, color, total);
+        }
+
+        void PlayTakeFromDiscardAction(ActionAnimationSnapshot action)
+        {
+            var color = new Color(1f, 0.85f, 0.42f);
+            if (!action.ExchangeSucceeded)
+            {
+                PlayFailedExchangeAction(action, color);
+                return;
+            }
+
+            var discardCenter = CenterOf(action.DiscardPileBounds);
+            if (discardCenter == Vector2.zero)
+                discardCenter = CenterOf(_discardPile.worldBound);
+            var incomingTarget = GetPrimarySelectedSlotCenter(action);
+            if (incomingTarget == Vector2.zero)
+                incomingTarget = CenterOf(action.SourcePlayerBounds);
+
+            float total = QuickMoveDuration + EmptySlotHoldDuration + QuickMoveDuration + 0.35f;
+            ShowSelectedSlotBlanks(action, color, total);
+            HideCurrentSlots(action.SourcePlayerId, action.SelectedSlots, total);
+
+            for (int i = 0; i < action.SourceSlotBounds.Count; i++)
+            {
+                var slot = action.SourceSlotBounds[i];
+                float offset = i * 0.14f;
+                ScheduleAfter(offset, () =>
+                    PlayMovingCard(CenterOf(slot.Bounds), discardCenter, false, 0, color, QuickMoveDuration, true, null));
+            }
+
+            int incomingValue = action.IncomingCardValue >= 0 ? action.IncomingCardValue : action.DiscardTopValue;
+            ScheduleAfter(QuickMoveDuration + EmptySlotHoldDuration, () =>
+                PlayMovingCard(discardCenter, incomingTarget, true, incomingValue, color, QuickMoveDuration, true, null));
+            PulsePlayer(action.SourcePlayerId, color, total);
+        }
+
+        void PlayFailedExchangeAction(ActionAnimationSnapshot action, Color color)
+        {
+            float total = QuickMoveDuration + EmptySlotHoldDuration + 0.65f;
+            foreach (var slot in action.SourceSlotBounds)
+                ShakeCardAt(slot.Bounds, color, 1.15f);
+            if (action.SourceSlotBounds.Count == 0)
+                PulsePlayer(action.SourcePlayerId, color, 1.15f);
+
+            var start = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
+            var end = CenterOf(action.SourcePlayerBounds);
+            RemoveDrawnMarker(action.SourcePlayerId);
+            ScheduleAfter(0.35f, () =>
+                PlayMovingCard(start, end, action.SourcePlayerId == _flow.State.MyPlayerId, action.IncomingCardValue, color, QuickMoveDuration, true, null));
+
+            if (action.DrewExtraPenaltyCard)
+            {
+                var deck = CenterOf(action.DrawPileBounds);
+                ScheduleAfter(0.70f, () =>
+                    PlayMovingCard(deck, end + new Vector2(18f, 0f), false, 0, new Color(0.30f, 0.55f, 1f), QuickMoveDuration, true, null));
+            }
+            PulsePlayer(action.SourcePlayerId, color, total);
+        }
+
         void PlaySkillAnimation(ActionAnimationSnapshot action)
         {
             var color = GetSkillColor(action.Skill);
             if (action.Skill == SkillType.Swap && action.SwapOccurred)
             {
-                var source = CenterOf(GetCardBounds(action.SourcePlayerId, action.SourceSlot));
-                var target = CenterOf(GetCardBounds(action.TargetPlayerId, action.TargetSlot));
-                PlayFlyCard(source, target, false, 0, color, SkillMoveDuration);
-                PlayFlyCard(target, source, false, 0, color, SkillMoveDuration);
-                PulseCard(action.SourcePlayerId, action.SourceSlot, color, 1.35f);
-                PulseCard(action.TargetPlayerId, action.TargetSlot, color, 1.35f);
+                PlaySwapAction(action, color);
                 return;
             }
 
@@ -627,7 +773,45 @@ namespace Cabo.Client.UI
             PulsePlayer(action.SourcePlayerId, color);
         }
 
+        void PlaySwapAction(ActionAnimationSnapshot action, Color color)
+        {
+            var sourceBounds = GetCapturedSlotBounds(action.SourceSwapSlotBounds, action.SourcePlayerId, action.SourceSlot);
+            var targetBounds = GetCapturedSlotBounds(action.TargetSlotBounds, action.TargetPlayerId, action.TargetSlot);
+            var source = CenterOf(sourceBounds);
+            var target = CenterOf(targetBounds);
+            if (source == Vector2.zero)
+                source = CenterOf(action.SourcePlayerBounds);
+            if (target == Vector2.zero)
+                target = CenterOf(action.TargetPlayerBounds);
+            if (source == Vector2.zero || target == Vector2.zero)
+            {
+                PulsePlayer(action.SourcePlayerId, color, SkillMoveDuration + SkillHoldDuration);
+                PulsePlayer(action.TargetPlayerId, color, SkillMoveDuration + SkillHoldDuration);
+                return;
+            }
+
+            float total = EmptySlotHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
+            ShowSlotBlank(sourceBounds, color, total);
+            ShowSlotBlank(targetBounds, color, total);
+            HideCurrentSlot(action.SourcePlayerId, action.SourceSlot, total);
+            HideCurrentSlot(action.TargetPlayerId, action.TargetSlot, total);
+
+            ScheduleAfter(EmptySlotHoldDuration, () =>
+            {
+                PlayMovingCard(source, target, false, 0, color, SkillMoveDuration, true, null);
+                PlayMovingCard(target, source, false, 0, color, SkillMoveDuration, true, null);
+            });
+
+            PulsePlayer(action.SourcePlayerId, color, total);
+            PulsePlayer(action.TargetPlayerId, color, total);
+        }
+
         void PlayFlyCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration)
+        {
+            PlayMovingCard(start, end, faceUp, value, color, duration, true, null);
+        }
+
+        void PlayMovingCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete)
         {
             var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
             if (start == Vector2.zero || end == Vector2.zero || !IsFinite(start) || !IsFinite(end) || !IsFinite(rootOrigin))
@@ -654,12 +838,13 @@ namespace Cabo.Client.UI
                 var p = Vector2.Lerp(start, end, eased) - rootOrigin;
                 card.style.left = p.x - width * 0.5f;
                 card.style.top = p.y - height * 0.5f;
-                card.style.opacity = Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.78f) / 0.22f));
+                card.style.opacity = fadeOut ? Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.78f) / 0.22f)) : 1f;
 
                 if (t >= 1f)
                 {
                     item?.Pause();
                     card.RemoveFromHierarchy();
+                    onComplete?.Invoke();
                 }
             }).Every(16);
         }
@@ -901,6 +1086,182 @@ namespace Cabo.Client.UI
             card.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
         }
 
+        List<SlotSnapshot> CaptureSlotBounds(long playerId, IEnumerable<int> slots)
+        {
+            var result = new List<SlotSnapshot>();
+            if (slots == null)
+                return result;
+
+            foreach (var slot in slots)
+            {
+                if (slot < 0)
+                    continue;
+                var element = GetCardElement(playerId, slot);
+                var bounds = element?.worldBound ?? Rect.zero;
+                if (bounds.width > 1 && bounds.height > 1)
+                    result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds });
+            }
+            return result;
+        }
+
+        float EstimateActionAnimationDuration(ActionAnimationSnapshot action)
+        {
+            if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Spy)
+                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + 0.35f;
+            if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
+                return EmptySlotHoldDuration + SkillMoveDuration + EmptySlotHoldDuration + 0.35f;
+            if (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
+                return QuickMoveDuration + EmptySlotHoldDuration + QuickMoveDuration + 0.55f;
+            return QuickMoveDuration + 0.55f;
+        }
+
+        Vector2 GetDrawnMarkerCenter(long playerId, Rect fallbackBounds)
+        {
+            if (_drawnCardMarkers.TryGetValue(playerId, out var marker) && marker != null && marker.panel != null)
+                return CenterOf(marker.worldBound);
+
+            var bounds = fallbackBounds.width > 1 ? fallbackBounds : GetPlayerBounds(playerId);
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero)
+                return Vector2.zero;
+            return center + new Vector2(bounds.width * 0.30f, -Mathf.Min(36f, bounds.height * 0.22f));
+        }
+
+        void ShowDrawnMarker(long playerId, Vector2 center, Color color)
+        {
+            if (center == Vector2.zero)
+                return;
+
+            RemoveDrawnMarker(playerId);
+            const int width = 46;
+            const int height = 62;
+            var marker = CreateCard(false, 0, width, height, false, false, null);
+            marker.name = $"DrawnMarker-{playerId}";
+            marker.style.position = Position.Absolute;
+            marker.style.marginLeft = 0;
+            marker.style.marginRight = 0;
+            marker.style.marginTop = 0;
+            marker.style.marginBottom = 0;
+            SetBorderColor(marker, color);
+            PositionAbsolute(marker, center, width, height);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(marker);
+            _drawnCardMarkers[playerId] = marker;
+        }
+
+        void RemoveDrawnMarker(long playerId)
+        {
+            if (!_drawnCardMarkers.TryGetValue(playerId, out var marker))
+                return;
+
+            if (marker != null && marker.panel != null)
+                marker.RemoveFromHierarchy();
+            _drawnCardMarkers.Remove(playerId);
+        }
+
+        void ShowSelectedSlotBlanks(ActionAnimationSnapshot action, Color color, float duration)
+        {
+            foreach (var slot in action.SourceSlotBounds)
+                ShowSlotBlank(slot.Bounds, color, duration);
+        }
+
+        void ShowSlotBlank(Rect bounds, Color color, float duration)
+        {
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero)
+                return;
+
+            var blank = new VisualElement();
+            blank.style.position = Position.Absolute;
+            blank.style.marginLeft = 0;
+            blank.style.marginRight = 0;
+            blank.style.marginTop = 0;
+            blank.style.marginBottom = 0;
+            blank.style.backgroundColor = new Color(0.015f, 0.08f, 0.07f, 0.88f);
+            blank.style.borderTopLeftRadius = 7;
+            blank.style.borderTopRightRadius = 7;
+            blank.style.borderBottomLeftRadius = 7;
+            blank.style.borderBottomRightRadius = 7;
+            SetBorderWidth(blank, 2);
+            SetBorderColor(blank, color);
+            PositionAbsolute(blank, center, bounds.width, bounds.height);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(blank);
+            ScheduleAfter(duration, () => blank.RemoveFromHierarchy());
+        }
+
+        void HideCurrentSlots(long playerId, IEnumerable<int> slots, float duration)
+        {
+            if (slots == null)
+                return;
+            foreach (var slot in slots)
+                HideCurrentSlot(playerId, slot, duration);
+        }
+
+        void HideCurrentSlot(long playerId, int slot, float duration)
+        {
+            var element = GetCardElement(playerId, slot);
+            if (element == null)
+                return;
+            element.style.visibility = Visibility.Hidden;
+            ScheduleAfter(duration, () =>
+            {
+                if (element.panel != null)
+                    element.style.visibility = Visibility.Visible;
+            });
+        }
+
+        Vector2 GetPrimarySelectedSlotCenter(ActionAnimationSnapshot action)
+        {
+            if (action.SourceSlotBounds.Count > 0)
+                return CenterOf(action.SourceSlotBounds[0].Bounds);
+            if (action.SelectedSlots.Count > 0)
+                return CenterOf(GetCardBounds(action.SourcePlayerId, action.SelectedSlots[0]));
+            return CenterOf(action.SourcePlayerBounds);
+        }
+
+        Rect GetCapturedSlotBounds(List<SlotSnapshot> slots, long playerId, int slot)
+        {
+            for (int i = 0; i < slots.Count; i++)
+                if (slots[i].PlayerId == playerId && slots[i].Slot == slot)
+                    return slots[i].Bounds;
+            return GetCardBounds(playerId, slot);
+        }
+
+        void ShakeCardAt(Rect bounds, Color color, float duration)
+        {
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero)
+                return;
+
+            const int width = 48;
+            const int height = 66;
+            var card = CreateCard(false, 0, width, height, false, false, null);
+            card.style.position = Position.Absolute;
+            card.style.marginLeft = 0;
+            card.style.marginRight = 0;
+            card.style.marginTop = 0;
+            card.style.marginBottom = 0;
+            SetBorderColor(card, color);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(card);
+
+            float startedAt = Time.realtimeSinceStartup;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
+                float offset = Mathf.Sin(t * Mathf.PI * 8f) * Mathf.Lerp(9f, 1f, t);
+                PositionAbsolute(card, center + new Vector2(offset, 0f), width, height);
+                card.style.opacity = Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.78f) / 0.22f));
+                if (t >= 1f)
+                {
+                    item?.Pause();
+                    card.RemoveFromHierarchy();
+                }
+            }).Every(16);
+        }
+
         void ScheduleAfter(float delaySeconds, Action action)
         {
             int remainingTicks = Mathf.Max(1, Mathf.CeilToInt(delaySeconds / 0.05f));
@@ -964,6 +1325,19 @@ namespace Cabo.Client.UI
             element.style.top = p.y - height * 0.5f;
         }
 
+        void PositionAbsolute(VisualElement element, Vector2 center, float width, float height)
+        {
+            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
+            if (!IsFinite(center) || !IsFinite(rootOrigin) || width <= 0f || height <= 0f)
+                return;
+
+            var p = center - rootOrigin;
+            element.style.width = width;
+            element.style.height = height;
+            element.style.left = p.x - width * 0.5f;
+            element.style.top = p.y - height * 0.5f;
+        }
+
         void PulsePlayer(long playerId, Color color, float duration = 0.48f)
         {
             PulseElement(GetSeatRoot(playerId), color, duration);
@@ -983,10 +1357,19 @@ namespace Cabo.Client.UI
             var originalRight = element.style.borderRightColor.value;
             var originalBottom = element.style.borderBottomColor.value;
             var originalLeft = element.style.borderLeftColor.value;
+            int version = _pulseVersions.TryGetValue(element, out var currentVersion) ? currentVersion + 1 : 1;
+            _pulseVersions[element] = version;
             float startedAt = Time.realtimeSinceStartup;
 
             _root.schedule.Execute(() =>
             {
+                if (element.panel == null
+                    || !_pulseVersions.TryGetValue(element, out var activeVersion)
+                    || activeVersion != version)
+                {
+                    return;
+                }
+
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
                 float pulse = Mathf.Sin(t * Mathf.PI);
                 var current = Color.Lerp(originalTop, color, pulse);
@@ -997,12 +1380,28 @@ namespace Cabo.Client.UI
 
                 if (t >= 1f)
                 {
-                    element.style.borderTopColor = originalTop;
-                    element.style.borderRightColor = originalRight;
-                    element.style.borderBottomColor = originalBottom;
-                    element.style.borderLeftColor = originalLeft;
+                    _pulseVersions.Remove(element);
+                    if (IsSeatRoot(element))
+                    {
+                        RenderGame();
+                    }
+                    else
+                    {
+                        element.style.borderTopColor = originalTop;
+                        element.style.borderRightColor = originalRight;
+                        element.style.borderBottomColor = originalBottom;
+                        element.style.borderLeftColor = originalLeft;
+                    }
                 }
             }).Every(16).Until(() => Time.realtimeSinceStartup - startedAt >= duration);
+        }
+
+        bool IsSeatRoot(VisualElement element)
+        {
+            return element == _selfSeat.Root
+                || element == _topSeat.Root
+                || element == _leftSeat.Root
+                || element == _rightSeat.Root;
         }
 
         Rect GetPlayerBounds(long playerId)
@@ -1689,7 +2088,7 @@ namespace Cabo.Client.UI
             }
         }
 
-        struct ActionAnimationSnapshot
+        sealed class ActionAnimationSnapshot
         {
             public ActionType ActionType;
             public SkillType Skill;
@@ -1698,9 +2097,29 @@ namespace Cabo.Client.UI
             public int SourceSlot;
             public int TargetSlot;
             public bool SwapOccurred;
+            public bool ExchangeSucceeded;
+            public bool AttemptedMultiCard;
             public int IncomingCardValue;
+            public int DiscardedCount;
+            public int AddedCardCount;
+            public bool DrewExtraPenaltyCard;
             public int DiscardTopValue;
             public int PeekedValue;
+            public Rect SourcePlayerBounds;
+            public Rect TargetPlayerBounds;
+            public Rect DrawPileBounds;
+            public Rect DiscardPileBounds;
+            public readonly List<int> SelectedSlots = new();
+            public readonly List<SlotSnapshot> SourceSlotBounds = new();
+            public readonly List<SlotSnapshot> SourceSwapSlotBounds = new();
+            public readonly List<SlotSnapshot> TargetSlotBounds = new();
+        }
+
+        struct SlotSnapshot
+        {
+            public long PlayerId;
+            public int Slot;
+            public Rect Bounds;
         }
     }
 }

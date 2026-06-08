@@ -5536,6 +5536,7 @@ namespace Game.Game {
       exchangeResult_ = other.exchangeResult_ != null ? other.exchangeResult_.Clone() : null;
       sourceSlot_ = other.sourceSlot_;
       targetSlot_ = other.targetSlot_;
+      playerHands_ = other.playerHands_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -5746,6 +5747,20 @@ namespace Game.Game {
       }
     }
 
+    /// <summary>Field number for the "player_hands" field.</summary>
+    public const int PlayerHandsFieldNumber = 15;
+    private static readonly pb::FieldCodec<global::Game.Common.OpponentHandState> _repeated_playerHands_codec
+        = pb::FieldCodec.ForMessage(122, global::Game.Common.OpponentHandState.Parser);
+    private readonly pbc::RepeatedField<global::Game.Common.OpponentHandState> playerHands_ = new pbc::RepeatedField<global::Game.Common.OpponentHandState>();
+    /// <summary>
+    /// Current public hand counts after this action.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Game.Common.OpponentHandState> PlayerHands {
+      get { return playerHands_; }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -5775,6 +5790,7 @@ namespace Game.Game {
       if (!object.Equals(ExchangeResult, other.ExchangeResult)) return false;
       if (SourceSlot != other.SourceSlot) return false;
       if (TargetSlot != other.TargetSlot) return false;
+      if(!playerHands_.Equals(other.playerHands_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -5796,6 +5812,7 @@ namespace Game.Game {
       if (exchangeResult_ != null) hash ^= ExchangeResult.GetHashCode();
       if (SourceSlot != 0) hash ^= SourceSlot.GetHashCode();
       if (TargetSlot != 0) hash ^= TargetSlot.GetHashCode();
+      hash ^= playerHands_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5870,6 +5887,7 @@ namespace Game.Game {
         output.WriteRawTag(112);
         output.WriteInt32(TargetSlot);
       }
+      playerHands_.WriteTo(output, _repeated_playerHands_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -5936,6 +5954,7 @@ namespace Game.Game {
         output.WriteRawTag(112);
         output.WriteInt32(TargetSlot);
       }
+      playerHands_.WriteTo(ref output, _repeated_playerHands_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -5988,6 +6007,7 @@ namespace Game.Game {
       if (TargetSlot != 0) {
         size += 1 + pb::CodedOutputStream.ComputeInt32Size(TargetSlot);
       }
+      size += playerHands_.CalculateSize(_repeated_playerHands_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -6051,6 +6071,7 @@ namespace Game.Game {
       if (other.TargetSlot != 0) {
         TargetSlot = other.TargetSlot;
       }
+      playerHands_.Add(other.playerHands_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -6131,6 +6152,10 @@ namespace Game.Game {
             TargetSlot = input.ReadInt32();
             break;
           }
+          case 122: {
+            playerHands_.AddEntriesFrom(input, _repeated_playerHands_codec);
+            break;
+          }
         }
       }
     #endif
@@ -6209,6 +6234,10 @@ namespace Game.Game {
           }
           case 112: {
             TargetSlot = input.ReadInt32();
+            break;
+          }
+          case 122: {
+            playerHands_.AddEntriesFrom(ref input, _repeated_playerHands_codec);
             break;
           }
         }

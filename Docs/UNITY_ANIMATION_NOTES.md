@@ -1,6 +1,6 @@
 # Unity Animation Notes
 
-> Updated: 2026-06-07
+> Updated: 2026-06-08
 > Target project: `unity dev/New Client_Unity_Base_Cli`
 
 ## Purpose
@@ -79,9 +79,11 @@ Important: `ActionResultNotify` is broadcast by the server, so these animations 
 Timing note:
 
 - Public action movement now uses slower timings than the first pass so players can read the table action.
-- Basic draw/discard/replace/take movement is about 0.95-1.10s.
-- Spy inspection is about 1.05s into the center inspection zone, about 1.75s held, then about 1.05s returned.
-- Peek flip hold is about 2.35s total.
+- Basic draw/discard/replace/take movement is about 1.15s per move segment.
+- Replace/take/swap actions reserve an empty slot for about 0.65s before the incoming card lands.
+- Spy inspection is about 1.20s into the center inspection zone, about 2.25s held, then about 1.20s returned.
+- Peek flip hold is about 3.00s total.
+- Public action animations are queued so back-to-back server broadcasts do not clear each other immediately.
 
 ### Draw
 
@@ -92,7 +94,8 @@ Trigger:
 
 Current visual:
 
-- A temporary card flies from the deck pile to the acting player seat or drawn-card decision area.
+- A temporary card back flies from the deck pile to the acting player seat.
+- The card remains near that seat as a drawn-card marker until the follow-up action consumes it.
 
 Limitations:
 
@@ -107,7 +110,7 @@ Trigger:
 
 Current visual:
 
-- A temporary card flies from acting player seat to discard pile.
+- The acting player's drawn-card marker moves from their seat to the discard pile.
 - Acting player seat pulses.
 - Skill cards use skill-tinted pulse color.
 
@@ -123,14 +126,17 @@ Trigger:
 
 Current visual:
 
-- Temporary card motion from acting player toward discard pile.
-- Acting player seat pulses with a color based on `IncomingCardValue` when available.
+- The selected slot or slots are captured before the new server state is rendered.
+- Selected slots are temporarily blanked so observers can identify exactly which hand positions were exchanged.
+- Outgoing hand cards move from those slot positions to the discard pile.
+- After a short empty-slot hold, the drawn-card marker moves into the primary selected slot.
+- Failed exchanges shake the selected slots and animate the incoming/penalty card into the acting player's hand area.
+- Failed multi-card exchanges follow the server rule visually and in local hand state: 2-card mismatch adds the incoming card (+1), while 3-or-more mismatch also adds the extra penalty draw (+2 total).
 
 Limitations:
 
-- Does not yet animate from exact source slots.
-- Does not yet distinguish multi-card success from failed exchange visually.
-- Does not yet animate card count re-layout.
+- Hidden outgoing card values are still shown as backs unless the protocol later exposes public values.
+- Multi-card final layout is still rendered by server state; the animation shows the selected old slots and then lets the UI settle into the authoritative count.
 
 ### Take From Discard
 
@@ -140,13 +146,14 @@ Trigger:
 
 Current visual:
 
-- Temporary card flies from discard pile to acting player seat.
-- Acting player seat pulses.
+- The selected slot or slots are temporarily blanked.
+- Outgoing hand cards move from selected slots to the discard pile.
+- The previous discard top value moves from the discard pile into the primary selected slot.
+- Failed exchanges shake the selected slots and leave the discard card in place.
 
 Limitations:
 
-- Does not yet animate to exact selected slot(s).
-- Does not yet show failure animation separately.
+- Hidden outgoing card values are still shown as backs.
 
 ### Peek Self
 
@@ -194,14 +201,17 @@ Trigger:
 
 Current visual:
 
-- Two temporary card backs fly between source slot and target slot.
-- Both affected slots pulse.
+- Source and target slots are temporarily blanked before movement starts.
+- Two temporary card backs cross between the source and target slots.
+- Both affected player seats pulse for the whole sequence.
 - Movement is slower than the first pass so observers can read both endpoints.
+- Seat pulse recovery re-renders from current game state instead of restoring stale border colors, so old turn highlights do not remain after `TurnStartNotify`.
 
 Limitations:
 
 - Uses card backs only.
-- Does not physically reorder visual card elements before/after server state is applied.
+- Does not reveal either swapped value.
+- Final ownership is rendered from authoritative server state after the animation completes.
 - If one endpoint is missing, it falls back to player-seat bounds.
 
 ### Call CABO
@@ -239,21 +249,19 @@ Future direction:
 
 Recommended next iterations:
 
-1. Exact slot movement for replace/take actions.
-2. Failed exchange animation: shake selected cards, then show incoming card added to hand.
-3. Private reveal animation for PeekSelf and Spy on the acting client only.
-4. Swap animation that waits for both source and target card elements, then visually exchanges them before final re-render.
-5. Round reveal animation: flip all cards face-up, then score rows.
-6. CABO call animation: visible table-wide signal and final-round counter transition.
-7. Animation queue: process multiple `ActionResultNotify` messages in order instead of playing only latest immediately.
-8. Dedicated animation data model instead of many `LastAction...` fields on `GameState`.
+1. Round reveal animation: flip all cards face-up, then score rows.
+2. CABO call animation: visible table-wide signal and final-round counter transition.
+3. Dedicated animation data model instead of many `LastAction...` fields on `GameState`.
+4. Optional public per-card discard detail if the server later exposes every outgoing card value.
 
 ## Known Technical Constraints
 
 - UI Toolkit scheduled animations are frame-driven but lightweight; they are suitable for this 2D table pass.
 - Screenshots can still miss movement segments, but the current skill inspection hold is long enough to capture in normal Game View verification.
-- The server does not expose every visual detail needed for perfect animation. For example, discarded card value and exact multi-card exchange visuals may require either protocol additions or carefully maintained client pending-action state.
+- The Unity C# generated proto now includes `ActionResultNotify.player_hands`, so opponent hand counts can update after every broadcast.
+- The server does not expose every visual detail needed for perfect animation. For example, hidden outgoing hand-card values are intentionally not revealed.
 - `ActionResultNotify + TurnStartNotify` can arrive in the same TCP burst. The client must keep the existing drain-then-decide behavior and avoid blocking state updates on animations.
+- Seat-border pulse animations must not restore captured border colors after the turn changes; they should re-render seat headers from `GameState`.
 
 ## Verification Notes
 
@@ -261,6 +269,7 @@ Verified with Unity MCP:
 
 - Script validation passed for `GameState.cs` and `GameTablePanel.cs`.
 - Unity compilation completed after refresh.
-- Play Mode simulation triggered public `Draw` and `Swap` animations.
+- Script validation also passed for `Assets/Scripts/Proto/Generated/Game.cs` after syncing `player_hands`.
 - Console reported 0 errors and 0 warnings after verification.
-- Temporary screenshots under `Assets/Screenshots` were cleaned after verification.
+- MCP Game View screenshot captured only the camera background in the current editor state, so final animation visual approval should use user-provided real-game screenshots.
+- After user screenshot review, fixed stale dual TURN borders and corrected 3-or-more failed multi-exchange rendering to show the extra penalty card.
