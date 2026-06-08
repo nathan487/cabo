@@ -258,7 +258,7 @@ namespace Cabo.Client.UI
             if (!_inspectionActive)
                 HideInspectionZone();
 
-            _roundLabel.text = $"Round {state.RoundNumber}  Turn {state.TurnNumber}";
+            _roundLabel.text = $"第 {state.RoundNumber} 轮  第 {state.TurnNumber} 回合";
             _turnLabel.text = BuildTurnText(state);
 
             RenderSeats(state);
@@ -277,8 +277,8 @@ namespace Cabo.Client.UI
         public void RenderReveal()
         {
             var state = _flow.State;
-            _roundLabel.text = $"Round {state.RoundNumber} reveal";
-            _turnLabel.text = "Cards are face up for scoring";
+            _roundLabel.text = $"第 {state.RoundNumber} 轮结算";
+            _turnLabel.text = "所有手牌已翻开计分";
             HideSeatsForOverlay();
             RenderPiles(state);
 
@@ -286,7 +286,7 @@ namespace Cabo.Client.UI
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
 
-            var title = new Label("Round scores");
+            var title = new Label("本轮得分");
             StylePanelTitle(title);
             _actionPanel.Add(title);
 
@@ -298,8 +298,8 @@ namespace Cabo.Client.UI
 
         public void RenderGameOver()
         {
-            _roundLabel.text = "Game over";
-            _turnLabel.text = "Final ranking";
+            _roundLabel.text = "游戏结束";
+            _turnLabel.text = "最终排名";
             HideSeatsForOverlay();
             _drawnCardSlot.Clear();
             _pileRow.Clear();
@@ -307,13 +307,13 @@ namespace Cabo.Client.UI
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
 
-            var title = new Label("Final scores");
+            var title = new Label("最终得分");
             StylePanelTitle(title);
             _actionPanel.Add(title);
 
             foreach (var rank in _flow.State.FinalRankings)
             {
-                var row = new Label($"{rank.Rank}. {rank.Nickname}  {rank.FinalScore}" + (rank.IsWinner ? "  Winner" : ""));
+                var row = new Label($"{rank.Rank}. {rank.Nickname}  {rank.FinalScore}" + (rank.IsWinner ? "  胜者" : ""));
                 row.style.fontSize = rank.IsWinner ? 18 : 15;
                 row.style.unityFontStyleAndWeight = rank.IsWinner ? FontStyle.Bold : FontStyle.Normal;
                 row.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -326,11 +326,11 @@ namespace Cabo.Client.UI
             controls.style.justifyContent = Justify.Center;
             controls.style.marginTop = 14;
             _actionPanel.Add(controls);
-            controls.Add(CreatePanelButton("Return to Room", () => _flow.ReturnToRoomAfterGameOver(),
+            controls.Add(CreatePanelButton("返回房间", () => _flow.ReturnToRoomAfterGameOver(),
                 _flow.State.MyPlayerId > 0 && _flow.State.RoomId > 0));
-            controls.Add(CreatePanelButton("Exit Game", () => _flow.ExitGame(), true));
+            controls.Add(CreatePanelButton("退出游戏", () => _flow.ExitGame(), true));
 
-            _statusLine.text = "Return to the room to ready up for a new game.";
+            _statusLine.text = "返回房间后可重新准备并开始新对局。";
             _statusLine.style.display = DisplayStyle.Flex;
         }
 
@@ -345,7 +345,7 @@ namespace Cabo.Client.UI
 
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
             bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
-            _selfSeat.RenderHeader(myInfo?.Nickname ?? "You", myInfo?.TotalScore ?? 0, state.IsMyTurn, selfCabo ? "CABO" : "You", selfCabo);
+            _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, state.IsMyTurn, selfCabo ? "CABO" : "你", selfCabo);
             _selfSeat.CardRow.Clear();
             for (int i = 0; i < state.MyCards.Count; i++)
             {
@@ -375,7 +375,7 @@ namespace Cabo.Client.UI
                 bool current = player.PlayerId == state.CurrentPlayerId;
                 bool selected = _selectedOpponentPlayerId == player.PlayerId;
                 bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
-                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "Target" : "Opponent", cabo);
+                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "目标" : "对手", cabo);
                 _opponentSeats[i].CardRow.Clear();
 
                 int cardCount = Mathf.Max(0, player.CardCount);
@@ -400,8 +400,8 @@ namespace Cabo.Client.UI
             _drawPile.Clear();
             _discardPile.Clear();
 
-            _drawPile.Add(CreatePileCard("Deck", "CABO", state.DrawPileCount.ToString(), false));
-            _discardPile.Add(CreatePileCard("Discard", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true));
+            _drawPile.Add(CreatePileCard("牌库", "CABO", state.DrawPileCount.ToString(), false));
+            _discardPile.Add(CreatePileCard("弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true));
 
             _pileRow.Add(_drawPile);
             _pileRow.Add(_discardPile);
@@ -418,82 +418,82 @@ namespace Cabo.Client.UI
             switch (_flow.SubState)
             {
                 case GameSubState.AwaitingMainInput:
-                    _actionTitle.text = "Your turn";
-                    _actionBody.text = "Choose a pile action or call CABO.";
-                    AddActionButton("Draw", () => _flow.DoDraw(), true);
-                    AddActionButton("Take discard", () => _flow.DoTakeFromDiscard(), state.TurnNumber > 1 && state.DiscardPileCount > 0);
-                    AddActionButton("Call CABO", () => _flow.DoCallSteady(), !state.IsFinalRound);
+                    _actionTitle.text = "你的回合";
+                    _actionBody.text = "选择牌堆操作，或喊 CABO。";
+                    AddActionButton("抽牌", () => _flow.DoDraw(), true);
+                    AddActionButton("拿弃牌", () => _flow.DoTakeFromDiscard(), state.TurnNumber > 1 && state.DiscardPileCount > 0);
+                    AddActionButton("喊 CABO", () => _flow.DoCallSteady(), !state.IsFinalRound);
                     break;
 
                 case GameSubState.AwaitingDrawnDecision:
-                    _actionTitle.text = "Drawn card";
-                    _actionBody.text = "Discard it, replace selected cards, or use its skill after discarding.";
+                    _actionTitle.text = "抽到的牌";
+                    _actionBody.text = "可以弃掉、替换手牌，或弃掉后发动技能。";
                     _drawnCardSlot.style.display = DisplayStyle.Flex;
                     _drawnCardSlot.Add(CreateDrawnCard(state, 48, 64));
-                    AddActionButton("Discard", () => _flow.DoDiscardDrawn(false), true);
-                    AddActionButton("Replace", () => _flow.BeginReplaceWithDrawn(), true);
+                    AddActionButton("弃牌", () => _flow.DoDiscardDrawn(false), true);
+                    AddActionButton("替换", () => _flow.BeginReplaceWithDrawn(), true);
                     AddActionButton(BuildSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), state.DrawnCardSkill > 0);
                     break;
 
                 case GameSubState.AwaitingReplaceSlots:
-                    _actionTitle.text = "Replace with drawn card";
-                    _actionBody.text = "Select one or more of your cards, then confirm.";
+                    _actionTitle.text = "用抽牌替换";
+                    _actionBody.text = "选择一张或多张自己的手牌，然后确认。";
                     _drawnCardSlot.style.display = DisplayStyle.Flex;
                     _drawnCardSlot.Add(CreateDrawnCard(state, 48, 64));
-                    AddActionButton("Confirm replace", () => ConfirmReplace(), _selectedOwnSlots.Count > 0);
-                    AddActionButton("Discard instead", () => _flow.DoDiscardDrawn(false), true);
+                    AddActionButton("确认替换", () => ConfirmReplace(), _selectedOwnSlots.Count > 0);
+                    AddActionButton("改为弃牌", () => _flow.DoDiscardDrawn(false), true);
                     break;
 
                 case GameSubState.AwaitingTakeSlots:
-                    _actionTitle.text = "Take discard";
-                    _actionBody.text = "Select one or more of your cards to exchange with the discard top.";
-                    AddActionButton("Confirm take", () => ConfirmTakeDiscard(), _selectedOwnSlots.Count > 0);
+                    _actionTitle.text = "拿弃牌";
+                    _actionBody.text = "选择一张或多张自己的手牌，与弃牌堆顶交换。";
+                    AddActionButton("确认拿牌", () => ConfirmTakeDiscard(), _selectedOwnSlots.Count > 0);
                     break;
 
                 case GameSubState.SkillPeekSlot:
-                    _actionTitle.text = "Peek skill";
-                    _actionBody.text = "Select one of your cards to reveal privately.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "看牌技能";
+                    _actionBody.text = "选择一张自己的牌私下查看。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSpyTarget:
-                    _actionTitle.text = "Spy skill";
-                    _actionBody.text = "Choose an opponent seat.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "偷看技能";
+                    _actionBody.text = "选择一名对手。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSpySlot:
-                    _actionTitle.text = "Spy skill";
-                    _actionBody.text = "Choose a target card from the selected opponent.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "偷看技能";
+                    _actionBody.text = "选择该对手的一张牌。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapMySlot:
-                    _actionTitle.text = "Swap skill";
-                    _actionBody.text = "Choose one of your cards to swap.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "换牌技能";
+                    _actionBody.text = "选择自己要交换的一张牌。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapTargetPlayer:
-                    _actionTitle.text = "Swap skill";
-                    _actionBody.text = "Choose an opponent seat.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "换牌技能";
+                    _actionBody.text = "选择一名对手。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapTargetSlot:
-                    _actionTitle.text = "Swap skill";
-                    _actionBody.text = "Choose a target card from the selected opponent.";
-                    AddActionButton("Skip skill", () => _flow.DoSkipSkill(), true);
+                    _actionTitle.text = "换牌技能";
+                    _actionBody.text = "选择该对手要交换的一张牌。";
+                    AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.Idle:
-                    _actionTitle.text = "Waiting";
-                    _actionBody.text = state.IsMyTurn ? "Preparing your actions." : "Another player is taking a turn.";
+                    _actionTitle.text = "等待中";
+                    _actionBody.text = state.IsMyTurn ? "正在准备你的操作。" : "其他玩家正在行动。";
                     break;
 
                 default:
-                    _actionTitle.text = "Waiting for server";
-                    _actionBody.text = "The request has been sent.";
+                    _actionTitle.text = "等待服务器";
+                    _actionBody.text = "请求已发送。";
                     break;
             }
         }
@@ -871,8 +871,8 @@ namespace Cabo.Client.UI
 
             PulseCard(playerId, slot, color, FlipRevealDuration);
             bool revealValue = privateValue >= 0;
-            PlayFlipCardAt(center, revealValue, privateValue, color, "PEEK", FlipRevealDuration);
-            ShowHeldInspectionCard(center, revealValue, privateValue, color, "PEEK", FlipRevealDuration);
+            PlayFlipCardAt(center, revealValue, privateValue, color, "看牌", FlipRevealDuration);
+            ShowHeldInspectionCard(center, revealValue, privateValue, color, "看牌", FlipRevealDuration);
         }
 
         void PlaySpyCardInspection(long sourcePlayerId, long targetPlayerId, int targetSlot, int privateValue, Color color)
@@ -890,7 +890,7 @@ namespace Cabo.Client.UI
                 return;
             }
 
-            end = ShowInspectionZone(privateValue >= 0, privateValue, color, "SPY");
+            end = ShowInspectionZone(privateValue >= 0, privateValue, color, "偷看");
             if (end == Vector2.zero)
                 end = CenterOf(_centerTable.worldBound);
 
@@ -1067,7 +1067,7 @@ namespace Cabo.Client.UI
             SetBorderColor(card, color);
             wrap.Add(card);
 
-            var label = new Label(caption == "SPY" ? "Inspecting card" : caption);
+            var label = new Label(caption == "偷看" ? "查看卡牌" : caption);
             label.style.fontSize = 13;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -1614,7 +1614,7 @@ namespace Cabo.Client.UI
             row.style.borderBottomWidth = 1;
             row.style.borderBottomColor = new Color(0.20f, 0.36f, 0.31f);
 
-            var name = new Label(result.Nickname + (result.IsSteadyCaller ? "  CABO" : "") + (result.IsLowest ? "  Lowest" : ""));
+            var name = new Label(result.Nickname + (result.IsSteadyCaller ? "  CABO" : "") + (result.IsLowest ? "  最低" : ""));
             name.style.width = 180;
             name.style.fontSize = 13;
             row.Add(name);
@@ -1626,7 +1626,7 @@ namespace Cabo.Client.UI
                 cards.Add(CreateCard(true, value, 36, 50, false, false, null));
             row.Add(cards);
 
-            var score = new Label($"{result.HandTotal} + {result.Penalty} = {result.RoundScore}    total {result.CumulativeScore}");
+            var score = new Label($"{result.HandTotal} + {result.Penalty} = {result.RoundScore}    总分 {result.CumulativeScore}");
             score.style.width = 190;
             score.style.fontSize = 13;
             score.style.unityTextAlign = TextAnchor.MiddleRight;
@@ -1652,7 +1652,7 @@ namespace Cabo.Client.UI
             divider.style.backgroundColor = new Color(0.22f, 0.42f, 0.36f);
             _actionPanel.Add(divider);
 
-            var readyTitle = new Label("Ready for next round");
+            var readyTitle = new Label("下一轮准备");
             readyTitle.style.fontSize = 15;
             readyTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             readyTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -1674,13 +1674,13 @@ namespace Cabo.Client.UI
             controls.style.flexWrap = Wrap.Wrap;
             _actionPanel.Add(controls);
 
-            controls.Add(CreatePanelButton(myReady ? "Ready" : "Ready up", () => _flow.SendReady(), !myReady && state.MyPlayerId > 0 && state.RoomId > 0));
+            controls.Add(CreatePanelButton(myReady ? "已准备" : "准备", () => _flow.SendReady(), !myReady && state.MyPlayerId > 0 && state.RoomId > 0));
 
             if (isHost)
-                controls.Add(CreatePanelButton("Start next round", () => _flow.SendStartGame(), allReady && state.MyPlayerId > 0 && state.RoomId > 0));
+                controls.Add(CreatePanelButton("开始下一轮", () => _flow.SendStartGame(), allReady && state.MyPlayerId > 0 && state.RoomId > 0));
             else
             {
-                var wait = new Label(allReady ? "Waiting for host to start" : "Waiting for all players");
+                var wait = new Label(allReady ? "等待房主开始" : "等待所有玩家准备");
                 wait.style.fontSize = 12;
                 wait.style.unityTextAlign = TextAnchor.MiddleCenter;
                 wait.style.marginTop = 7;
@@ -1690,8 +1690,8 @@ namespace Cabo.Client.UI
             }
 
             _statusLine.text = isHost
-                ? $"{readyCount}/{playerCount} ready. Start unlocks when everyone is ready."
-                : $"{readyCount}/{playerCount} ready.";
+                ? $"{readyCount}/{playerCount} 已准备。全员准备后可开始。"
+                : $"{readyCount}/{playerCount} 已准备。";
             _statusLine.style.display = DisplayStyle.Flex;
         }
 
@@ -1729,14 +1729,14 @@ namespace Cabo.Client.UI
             dot.style.backgroundColor = player.IsReady ? new Color(0.50f, 1f, 0.58f) : new Color(0.50f, 0.56f, 0.54f);
             badge.Add(dot);
 
-            var name = new Label((isSelf ? "You " : "") + player.Nickname);
+            var name = new Label((isSelf ? "你 " : "") + player.Nickname);
             name.style.flexGrow = 1;
             name.style.fontSize = 12;
             name.style.unityTextAlign = TextAnchor.MiddleLeft;
             name.style.color = Color.white;
             badge.Add(name);
 
-            var readyState = new Label(player.IsReady ? "Ready" : "...");
+            var readyState = new Label(player.IsReady ? "已准备" : "...");
             readyState.style.fontSize = 11;
             readyState.style.unityTextAlign = TextAnchor.MiddleRight;
             readyState.style.color = player.IsReady ? new Color(0.72f, 1f, 0.75f) : new Color(0.76f, 0.80f, 0.78f);
@@ -1747,8 +1747,8 @@ namespace Cabo.Client.UI
         Button CreatePanelButton(string text, Action action, bool enabled)
         {
             var button = new Button(action) { text = text };
-            button.style.minWidth = 148;
-            button.style.height = 32;
+            button.style.minWidth = 120;
+            button.style.height = 34;
             button.style.marginLeft = 5;
             button.style.marginRight = 5;
             button.style.marginTop = 4;
@@ -1775,8 +1775,8 @@ namespace Cabo.Client.UI
         void AddActionButton(string text, Action action, bool enabled)
         {
             var button = new Button(action) { text = text };
-            button.style.minWidth = 132;
-            button.style.height = 30;
+            button.style.minWidth = 116;
+            button.style.height = 32;
             button.style.marginLeft = 5;
             button.style.marginRight = 5;
             button.style.marginTop = 4;
@@ -1895,24 +1895,24 @@ namespace Cabo.Client.UI
         string BuildTurnText(GameState state)
         {
             var current = state.Players.Find(p => p.PlayerId == state.CurrentPlayerId);
-            string name = current?.Nickname ?? "Waiting";
+            string name = current?.Nickname ?? "等待中";
             if (state.SteadyCallerId != 0)
             {
                 var caller = state.Players.Find(p => p.PlayerId == state.SteadyCallerId);
-                string callerName = caller?.Nickname ?? "A player";
+                string callerName = caller?.Nickname ?? "有玩家";
                 if (state.IsFinalRound)
-                    return $"Final round after {callerName} called CABO. {state.FinalRoundRemaining} turns left. Current turn: {name}";
+                    return $"{callerName} 已喊 CABO，最终轮剩余 {state.FinalRoundRemaining} 回合。当前：{name}";
             }
             if (state.IsFinalRound)
-                return $"Final round: {state.FinalRoundRemaining} turns left. Current turn: {name}";
-            return state.IsMyTurn ? "Your turn" : $"Current turn: {name}";
+                return $"最终轮剩余 {state.FinalRoundRemaining} 回合。当前：{name}";
+            return state.IsMyTurn ? "你的回合" : $"当前回合：{name}";
         }
 
         string BuildStatusText(GameState state)
         {
-            if (state.Players.Count < 4) return "Waiting for players.";
-            if (state.DiscardPileCount == 0) return "Discard pile is empty.";
-            return "Table is synced with the server.";
+            if (state.Players.Count < 4) return "等待玩家加入。";
+            if (state.DiscardPileCount == 0) return "弃牌堆为空。";
+            return "牌桌已与服务器同步。";
         }
 
         static bool ShouldShowActionStatus(GameSubState subState)
@@ -1929,25 +1929,25 @@ namespace Cabo.Client.UI
 
         static string BuildSkillButtonText(int skill)
         {
-            return skill > 0 ? $"Use {GetSkillName(skill)}" : "Use skill";
+            return skill > 0 ? $"使用{GetSkillName(skill)}" : "使用技能";
         }
 
         static string GetSkillName(int skill)
         {
             return skill switch
             {
-                2 => "Peek self",
-                3 => "Spy",
-                4 => "Swap",
-                _ => "No skill"
+                2 => "看牌",
+                3 => "偷看",
+                4 => "换牌",
+                _ => "无技能"
             };
         }
 
         static string GetSkillShortName(int value)
         {
-            if (value == 7 || value == 8) return "PEEK";
-            if (value == 9 || value == 10) return "SPY";
-            if (value == 11 || value == 12) return "SWAP";
+            if (value == 7 || value == 8) return "看牌";
+            if (value == 9 || value == 10) return "偷看";
+            if (value == 11 || value == 12) return "换牌";
             return "";
         }
 
@@ -2080,8 +2080,8 @@ namespace Cabo.Client.UI
             public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false)
             {
                 _name.text = name;
-                _score.text = $"Score {score}";
-                _tag.text = isCurrentTurn && isCaboCaller ? "CABO TURN" : isCurrentTurn ? "TURN" : tag;
+                _score.text = $"总分 {score}";
+                _tag.text = isCurrentTurn && isCaboCaller ? "CABO 回合" : isCurrentTurn ? "回合" : tag;
                 _tag.style.color = isCaboCaller ? Color.white : isCurrentTurn ? new Color(0.12f, 0.09f, 0.02f) : new Color(0.82f, 0.76f, 0.52f);
                 _tag.style.backgroundColor = isCaboCaller ? new Color(0.74f, 0.10f, 0.18f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : Color.clear;
                 Root.style.backgroundColor = isCaboCaller ? new Color(0.20f, 0.055f, 0.075f) : new Color(0.025f, 0.13f, 0.11f);

@@ -27,7 +27,7 @@ namespace Cabo.Client.UI
             _container.style.paddingRight = 40;
             root.Add(_container);
 
-            var title = new Label("Cabo - Waiting Room");
+            var title = new Label("CABO - 等待房间");
             title.style.fontSize = 28;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -44,9 +44,9 @@ namespace Cabo.Client.UI
                 var roomCode = _flow.State.RoomCode;
                 if (string.IsNullOrEmpty(roomCode)) return;
                 GUIUtility.systemCopyBuffer = roomCode;
-                _status.text = $"Copied room code: {roomCode}";
+                _status.text = $"已复制房间码：{roomCode}";
             });
-            _btnCopyRoomCode.text = "Copy Code";
+            _btnCopyRoomCode.text = "复制房间码";
             _btnCopyRoomCode.style.alignSelf = Align.Center;
             _btnCopyRoomCode.style.marginTop = 8;
             _btnCopyRoomCode.style.fontSize = 14;
@@ -65,7 +65,7 @@ namespace Cabo.Client.UI
             _status.style.color = new Color(0.5f, 0.5f, 0.5f);
             _container.Add(_status);
 
-            _nicknameInput = new TextField("Nickname");
+            _nicknameInput = new TextField("昵称");
             _nicknameInput.style.marginTop = 16;
             _nicknameInput.style.width = 260;
             _nicknameInput.style.maxWidth = 260;
@@ -73,7 +73,7 @@ namespace Cabo.Client.UI
             _nicknameInput.maxLength = 20;
             _container.Add(_nicknameInput);
 
-            _joinCodeInput = new TextField("Room Code");
+            _joinCodeInput = new TextField("房间码");
             _joinCodeInput.style.marginTop = 16;
             _joinCodeInput.style.width = 260;
             _joinCodeInput.style.maxWidth = 260;
@@ -94,7 +94,7 @@ namespace Cabo.Client.UI
                 if (nickname == null) return;
                 _flow.CreateRoom(nickname);
             });
-            btnCreate.text = "Create Room";
+            btnCreate.text = "创建房间";
             btnCreate.style.marginRight = 10;
             btnCreate.style.fontSize = 18;
             btnRow.Add(btnCreate);
@@ -108,25 +108,25 @@ namespace Cabo.Client.UI
                 var code = _joinCodeInput.value?.Trim().ToUpperInvariant();
                 if (string.IsNullOrEmpty(code))
                 {
-                    _status.text = "Enter a room code first.";
+                    _status.text = "请先输入房间码。";
                     return;
                 }
                 _flow.JoinRoom(code, nickname);
             });
-            btnJoin.text = "Join Room";
+            btnJoin.text = "加入房间";
             btnJoin.style.fontSize = 18;
             btnRow.Add(btnJoin);
             _btnJoin = btnJoin;
 
             // Ready/Start buttons (waiting room, hidden initially)
-            _btnReady = new Button(() => { _flow.SendReady(); _status.text = "Ready sent!"; });
-            _btnReady.text = "Ready";
+            _btnReady = new Button(() => { _flow.SendReady(); _status.text = "已发送准备。"; });
+            _btnReady.text = "准备";
             _btnReady.style.marginRight = 10;
             _btnReady.style.fontSize = 18;
             btnRow.Add(_btnReady);
 
-            _btnStart = new Button(() => { _flow.SendStartGame(); _status.text = "Starting game..."; });
-            _btnStart.text = "Start Game";
+            _btnStart = new Button(() => { _flow.SendStartGame(); _status.text = "正在开始游戏..."; });
+            _btnStart.text = "开始游戏";
             _btnStart.style.fontSize = 18;
             btnRow.Add(_btnStart);
         }
@@ -141,12 +141,12 @@ namespace Cabo.Client.UI
             var nickname = _nicknameInput.value?.Trim();
             if (string.IsNullOrEmpty(nickname))
             {
-                _status.text = "Enter a nickname first.";
+                _status.text = "请先输入昵称。";
                 return null;
             }
             if (nickname.Length > 20)
             {
-                _status.text = "Nickname must be 1-20 characters.";
+                _status.text = "昵称长度需为 1-20 个字符。";
                 return null;
             }
             return nickname;
@@ -157,7 +157,7 @@ namespace Cabo.Client.UI
             var s = _flow.State;
             bool inRoom = s.RoomId > 0 || s.Players.Count > 0;
             bool hasRoomCode = !string.IsNullOrEmpty(s.RoomCode);
-            _roomCode.text = hasRoomCode ? $"Room Code: {s.RoomCode}" : (inRoom ? "Joining..." : "");
+            _roomCode.text = hasRoomCode ? $"房间码：{s.RoomCode}" : (inRoom ? "正在加入..." : "");
             if (_btnCopyRoomCode != null) _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
 
             // Show create/join only when NOT in room
@@ -176,9 +176,9 @@ namespace Cabo.Client.UI
             foreach (var p in s.Players)
             {
                 string tag = "";
-                if (p.PlayerId == s.MyPlayerId) tag += " (You)";
-                if (p.IsHost) tag += " [Host]";
-                string ready = p.IsReady ? " Ready" : " Not ready";
+                if (p.PlayerId == s.MyPlayerId) tag += "（你）";
+                if (p.IsHost) tag += " [房主]";
+                string ready = p.IsReady ? " 已准备" : " 未准备";
                 list += $"{p.Nickname}{tag}:{ready}\n";
                 if (p.IsReady) readyCount++;
             }
@@ -190,7 +190,7 @@ namespace Cabo.Client.UI
                 if (p.PlayerId == s.MyPlayerId && p.IsHost) { isHost = true; break; }
 
             _btnStart.SetEnabled(isHost && allReady);
-            _status.text = $"{readyCount}/{s.Players.Count} ready" + (allReady && isHost ? " - You can start!" : "");
+            _status.text = $"{readyCount}/{s.Players.Count} 已准备" + (allReady && isHost ? " - 可以开始" : "");
         }
     }
 }

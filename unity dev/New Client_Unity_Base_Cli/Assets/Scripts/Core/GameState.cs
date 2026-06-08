@@ -293,7 +293,7 @@ namespace Cabo.Client
                     Players.Add(new PlayerInfo
                     {
                         PlayerId = MyPlayerId,
-                        Nickname = "You",
+                        Nickname = "你",
                         SeatId = 0,
                         CardCount = MyCards.Count,
                         IsHost = true
@@ -314,7 +314,7 @@ namespace Cabo.Client
                         Players.Add(new PlayerInfo
                         {
                             PlayerId = oh.PlayerId,
-                            Nickname = $"Player {Players.Count + 1}",
+                            Nickname = $"玩家 {Players.Count + 1}",
                             SeatId = Players.Count,
                             CardCount = oh.CardCount
                         });
@@ -684,55 +684,55 @@ namespace Cabo.Client
 
         string BuildActionMessage(ActionResultNotify ar)
         {
-            string name = "Player";
+            string name = "玩家";
             var pl = Players.Find(p => p.PlayerId == ar.SourcePlayerId);
             if (pl != null) name = pl.Nickname;
-            string you = ar.SourcePlayerId == MyPlayerId ? " (You)" : "";
+            string you = ar.SourcePlayerId == MyPlayerId ? "（你）" : "";
 
             switch (ar.ActionType)
             {
-                case ActionType.Draw: return $">>> {name}{you} drew a card";
+                case ActionType.Draw: return $">>> {name}{you} 抽了一张牌";
                 case ActionType.DiscardDrawn:
                     string skill = ar.SkillUsed switch
                     {
-                        SkillType.PeekSelf => " (Peek Self)",
-                        SkillType.Spy => " (Spy)",
-                        SkillType.Swap => " (Swap)",
+                        SkillType.PeekSelf => "（看牌）",
+                        SkillType.Spy => "（偷看）",
+                        SkillType.Swap => "（换牌）",
                         _ => ""
                     };
-                    return $">>> {name}{you} discarded the card{skill}";
+                    return $">>> {name}{you} 弃掉抽到的牌{skill}";
                 case ActionType.ReplaceWithDrawn:
                     if (ar.ExchangeResult != null)
                         return ar.ExchangeResult.Success
-                            ? $">>> {name}{you} replaced {ar.ExchangeResult.DiscardedCount} card(s)"
-                            : $">>> {name}{you} replace FAILED — card added to hand";
+                            ? $">>> {name}{you} 替换了 {ar.ExchangeResult.DiscardedCount} 张牌"
+                            : $">>> {name}{you} 替换失败，牌加入手牌";
                     break;
                 case ActionType.TakeFromDiscard:
                     if (ar.ExchangeResult != null)
                         return ar.ExchangeResult.Success
-                            ? $">>> {name}{you} took from discard, replaced {ar.ExchangeResult.DiscardedCount} card(s)"
-                            : $">>> {name}{you} take from discard FAILED";
+                            ? $">>> {name}{you} 拿弃牌并替换了 {ar.ExchangeResult.DiscardedCount} 张牌"
+                            : $">>> {name}{you} 拿弃牌失败";
                     break;
                 case ActionType.UseSkill:
                     if (ar.SkillUsed == SkillType.PeekSelf)
-                        return $">>> {name}{you} peeked at own slot {ar.SourceSlot}";
+                        return $">>> {name}{you} 查看了自己的第 {ar.SourceSlot + 1} 张牌";
                     if (ar.SkillUsed == SkillType.Spy)
                     {
-                        string tgt = "Player";
+                        string tgt = "玩家";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
                         if (tp != null) tgt = tp.Nickname;
-                        return $">>> {name}{you} spied on {tgt}'s slot {ar.TargetSlot}";
+                        return $">>> {name}{you} 偷看了 {tgt} 的第 {ar.TargetSlot + 1} 张牌";
                     }
                     if (ar.SkillUsed == SkillType.Swap)
                     {
-                        string tgt = "Player";
+                        string tgt = "玩家";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
                         if (tp != null) tgt = tp.Nickname;
-                        return $">>> {name}{you} swapped slot {ar.SourceSlot} with {tgt}'s slot {ar.TargetSlot}";
+                        return $">>> {name}{you} 将第 {ar.SourceSlot + 1} 张牌与 {tgt} 的第 {ar.TargetSlot + 1} 张牌交换";
                     }
                     break;
                 case ActionType.CallSteady:
-                    return $">>> {name}{you} called CABO!";
+                    return $">>> {name}{you} 喊了 CABO！";
             }
             return "";
         }

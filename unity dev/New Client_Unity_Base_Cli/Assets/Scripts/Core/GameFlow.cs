@@ -39,7 +39,7 @@ namespace Cabo.Client
 
         public event Action StateChanged;  // Fire when UI should refresh
 
-        string _host, _nickname = "Player";
+        string _host, _nickname = "玩家";
         int _port;
         bool _running = true;
 
@@ -75,7 +75,7 @@ namespace Cabo.Client
         static string NormalizeNickname(string nickname)
         {
             var trimmed = nickname?.Trim();
-            return string.IsNullOrEmpty(trimmed) ? "Player" : trimmed;
+            return string.IsNullOrEmpty(trimmed) ? "玩家" : trimmed;
         }
 
         public void SendReady()
