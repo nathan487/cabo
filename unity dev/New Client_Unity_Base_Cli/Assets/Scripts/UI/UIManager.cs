@@ -40,6 +40,7 @@ namespace Cabo.Client.UI
                 Root.style.top = 0;
                 Root.style.bottom = 0;
                 Root.style.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 1f);
+                Root.style.color = new Color(0.86f, 0.86f, 0.90f);
                 Debug.Log($"[UIManager] Root ready: {Root != null}, childCount={Root?.childCount}, panelSettings={uiDocument.panelSettings != null}");
             }
             if (Root == null) Debug.LogError("[UIManager] Cannot find UIDocument!");
@@ -84,6 +85,72 @@ namespace Cabo.Client.UI
             if (showGame) GameTablePanel.RenderGame();
             if (showReveal) GameTablePanel.RenderReveal();
             if (showOver) GameTablePanel.RenderGameOver();
+
+            ApplyRuntimeUiFallback();
+        }
+
+        void ApplyRuntimeUiFallback()
+        {
+            if (Root == null)
+                return;
+
+            Root.style.color = new Color(0.86f, 0.86f, 0.90f);
+            Root.style.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 1f);
+
+            Root.Query<Label>().ForEach(label =>
+            {
+                if (IsOnBrightSurface(label))
+                    return;
+                label.style.color = new Color(0.86f, 0.86f, 0.90f);
+            });
+
+            Root.Query<Button>().ForEach(button =>
+            {
+                button.style.color = new Color(0.92f, 0.92f, 0.96f);
+                button.style.backgroundColor = new Color(0.20f, 0.20f, 0.32f);
+                button.style.borderTopLeftRadius = 6;
+                button.style.borderTopRightRadius = 6;
+                button.style.borderBottomLeftRadius = 6;
+                button.style.borderBottomRightRadius = 6;
+                button.style.borderTopWidth = 1;
+                button.style.borderRightWidth = 1;
+                button.style.borderBottomWidth = 1;
+                button.style.borderLeftWidth = 1;
+                button.style.borderTopColor = new Color(0.39f, 0.39f, 0.59f);
+                button.style.borderRightColor = new Color(0.39f, 0.39f, 0.59f);
+                button.style.borderBottomColor = new Color(0.39f, 0.39f, 0.59f);
+                button.style.borderLeftColor = new Color(0.39f, 0.39f, 0.59f);
+                button.style.paddingTop = 8;
+                button.style.paddingBottom = 8;
+                button.style.paddingLeft = 14;
+                button.style.paddingRight = 14;
+                button.style.minWidth = 104;
+                button.style.minHeight = 34;
+                button.style.unityTextAlign = TextAnchor.MiddleCenter;
+            });
+
+            Root.Query<TextField>().ForEach(field =>
+            {
+                field.style.minWidth = 180;
+                field.style.color = new Color(0.12f, 0.12f, 0.16f);
+            });
+
+            Root.Query<VisualElement>(className: "unity-text-field__input").ForEach(input =>
+            {
+                input.style.color = new Color(0.12f, 0.12f, 0.16f);
+                input.style.backgroundColor = new Color(0.96f, 0.96f, 0.98f);
+            });
+        }
+
+        static bool IsOnBrightSurface(VisualElement element)
+        {
+            for (var current = element.parent; current != null; current = current.parent)
+            {
+                var bg = current.resolvedStyle.backgroundColor;
+                if (bg.a > 0.2f && (bg.r + bg.g + bg.b) / 3f > 0.55f)
+                    return true;
+            }
+            return false;
         }
 
         void OnDestroy()

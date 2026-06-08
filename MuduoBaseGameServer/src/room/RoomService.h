@@ -66,6 +66,8 @@ public:
                      const ::game::messages::ClientMessage& msg);
     bool handleStartGame(const TcpConnectionPtr& conn,
                          const ::game::messages::ClientMessage& msg);
+    void handleRoomChat(const TcpConnectionPtr& conn,
+                        const ::game::messages::ClientMessage& msg);
 
     // Called by GameService after final GameOver has been broadcast.
     void markGameFinished(int64_t roomId);
@@ -84,6 +86,7 @@ private:
     std::string generateSessionToken();
     int64_t nextPlayerId();
     int64_t nextRoomId();
+    int64_t nextChatMessageId();
 
     std::unordered_map<int64_t, std::shared_ptr<Room>> rooms_;
     // Maps playerId -> room (for quick room lookup)
@@ -94,6 +97,7 @@ private:
     std::mt19937 rng_;
     int64_t nextPlayerId_ = 10000;
     int64_t nextRoomId_ = 1;
+    int64_t nextChatMessageId_ = 1;
 };
 
 } // namespace game

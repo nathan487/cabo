@@ -32,6 +32,7 @@ message ClientMessage {
     .game.room.ReadyReq ready_req = 13;
     .game.room.StartGameReq start_game_req = 14;
     .game.room.KickPlayerReq kick_player_req = 15;
+    .game.room.RoomChatReq room_chat_req = 16;
 
     // Game Actions
     .game.game.DrawCardReq draw_card_req = 20;
@@ -65,6 +66,8 @@ message ServerMessage {
     .game.room.PlayerLeaveNotify player_leave_notify = 18;
     .game.room.PlayerReadyNotify player_ready_notify = 19;
     .game.room.RoomStartNotify room_start_notify = 20;
+    .game.room.RoomChatRsp room_chat_rsp = 21;
+    .game.room.RoomChatNotify room_chat_notify = 22;
 
     // Game
     .game.game.GameStartNotify game_start_notify = 30;

@@ -31,6 +31,7 @@ namespace Cabo.Client
         public NetworkGateway Gateway { get; }
         public FlowState Flow { get; private set; } = FlowState.Home;
         public bool IsConnected => Gateway?.IsConnected ?? false;
+        public bool CanSendRoomChat => IsConnected && State.MyPlayerId > 0 && State.RoomId > 0;
         public string ConnectedAddress { get; private set; } = "";
         public string LastConnectError { get; private set; } = "";
 
@@ -163,6 +164,25 @@ namespace Cabo.Client
         {
             if (State.MyPlayerId > 0 && State.RoomId > 0)
                 Gateway.SendStartGame(State.MyPlayerId, State.RoomId);
+        }
+
+        public void SendRoomChatText(string text)
+        {
+            var trimmed = text?.Trim();
+            if (!CanSendRoomChat || string.IsNullOrEmpty(trimmed))
+                return;
+
+            if (trimmed.Length > 120)
+                trimmed = trimmed.Substring(0, 120);
+            Gateway.SendRoomChatText(State.MyPlayerId, State.RoomId, trimmed);
+        }
+
+        public void SendRoomChatSticker(string stickerPack, string stickerName)
+        {
+            if (!CanSendRoomChat || string.IsNullOrWhiteSpace(stickerPack) || string.IsNullOrWhiteSpace(stickerName))
+                return;
+
+            Gateway.SendRoomChatSticker(State.MyPlayerId, State.RoomId, stickerPack.Trim(), stickerName.Trim());
         }
 
         public void LeaveRoomToHome()

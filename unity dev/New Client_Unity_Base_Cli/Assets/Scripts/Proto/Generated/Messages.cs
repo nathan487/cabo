@@ -25,64 +25,68 @@ namespace Game.Messages {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Cg5tZXNzYWdlcy5wcm90bxINZ2FtZS5tZXNzYWdlcxoKcm9vbS5wcm90bxoK",
-            "Z2FtZS5wcm90bxoKc3luYy5wcm90byKUBgoNQ2xpZW50TWVzc2FnZRILCgNz",
+            "Z2FtZS5wcm90bxoKc3luYy5wcm90byLFBgoNQ2xpZW50TWVzc2FnZRILCgNz",
             "ZXEYASABKAMSMwoPY3JlYXRlX3Jvb21fcmVxGAogASgLMhguZ2FtZS5yb29t",
             "LkNyZWF0ZVJvb21SZXFIABIvCg1qb2luX3Jvb21fcmVxGAsgASgLMhYuZ2Ft",
             "ZS5yb29tLkpvaW5Sb29tUmVxSAASMQoObGVhdmVfcm9vbV9yZXEYDCABKAsy",
             "Fy5nYW1lLnJvb20uTGVhdmVSb29tUmVxSAASKAoJcmVhZHlfcmVxGA0gASgL",
             "MhMuZ2FtZS5yb29tLlJlYWR5UmVxSAASMQoOc3RhcnRfZ2FtZV9yZXEYDiAB",
             "KAsyFy5nYW1lLnJvb20uU3RhcnRHYW1lUmVxSAASMwoPa2lja19wbGF5ZXJf",
-            "cmVxGA8gASgLMhguZ2FtZS5yb29tLktpY2tQbGF5ZXJSZXFIABIvCg1kcmF3",
-            "X2NhcmRfcmVxGBQgASgLMhYuZ2FtZS5nYW1lLkRyYXdDYXJkUmVxSAASNwoR",
-            "ZGlzY2FyZF9kcmF3bl9yZXEYFSABKAsyGi5nYW1lLmdhbWUuRGlzY2FyZERy",
-            "YXduUmVxSAASQAoWcmVwbGFjZV93aXRoX2RyYXduX3JlcRgWIAEoCzIeLmdh",
-            "bWUuZ2FtZS5SZXBsYWNlV2l0aERyYXduUmVxSAASPgoVdGFrZV9mcm9tX2Rp",
-            "c2NhcmRfcmVxGBcgASgLMh0uZ2FtZS5nYW1lLlRha2VGcm9tRGlzY2FyZFJl",
-            "cUgAEi8KDXVzZV9za2lsbF9yZXEYGCABKAsyFi5nYW1lLmdhbWUuVXNlU2tp",
-            "bGxSZXFIABIzCg9jYWxsX3N0ZWFkeV9yZXEYGSABKAsyGC5nYW1lLmdhbWUu",
-            "Q2FsbFN0ZWFkeVJlcUgAEjAKDXJlY29ubmVjdF9yZXEYHiABKAsyFy5nYW1l",
-            "LnN5bmMuUmVjb25uZWN0UmVxSAASMAoNaGVhcnRiZWF0X3JlcRgfIAEoCzIX",
-            "LmdhbWUuc3luYy5IZWFydGJlYXRSZXFIAEIJCgdwYXlsb2FkSgQIGhAbSgQI",
-            "GxAcIvsLCg1TZXJ2ZXJNZXNzYWdlEhIKCnNlcnZlcl9zZXEYASABKAMSFgoO",
-            "c2VydmVyX3RpbWVfbXMYAiABKAMSMwoPY3JlYXRlX3Jvb21fcnNwGAogASgL",
-            "MhguZ2FtZS5yb29tLkNyZWF0ZVJvb21Sc3BIABIvCg1qb2luX3Jvb21fcnNw",
-            "GAsgASgLMhYuZ2FtZS5yb29tLkpvaW5Sb29tUnNwSAASMQoObGVhdmVfcm9v",
-            "bV9yc3AYDCABKAsyFy5nYW1lLnJvb20uTGVhdmVSb29tUnNwSAASKAoJcmVh",
-            "ZHlfcnNwGA0gASgLMhMuZ2FtZS5yb29tLlJlYWR5UnNwSAASMQoOc3RhcnRf",
-            "Z2FtZV9yc3AYDiABKAsyFy5nYW1lLnJvb20uU3RhcnRHYW1lUnNwSAASMwoP",
-            "a2lja19wbGF5ZXJfcnNwGA8gASgLMhguZ2FtZS5yb29tLktpY2tQbGF5ZXJS",
-            "c3BIABI3ChFyb29tX3N0YXRlX25vdGlmeRgQIAEoCzIaLmdhbWUucm9vbS5S",
-            "b29tU3RhdGVOb3RpZnlIABI5ChJwbGF5ZXJfam9pbl9ub3RpZnkYESABKAsy",
-            "Gy5nYW1lLnJvb20uUGxheWVySm9pbk5vdGlmeUgAEjsKE3BsYXllcl9sZWF2",
-            "ZV9ub3RpZnkYEiABKAsyHC5nYW1lLnJvb20uUGxheWVyTGVhdmVOb3RpZnlI",
-            "ABI7ChNwbGF5ZXJfcmVhZHlfbm90aWZ5GBMgASgLMhwuZ2FtZS5yb29tLlBs",
-            "YXllclJlYWR5Tm90aWZ5SAASNwoRcm9vbV9zdGFydF9ub3RpZnkYFCABKAsy",
-            "Gi5nYW1lLnJvb20uUm9vbVN0YXJ0Tm90aWZ5SAASNwoRZ2FtZV9zdGFydF9u",
-            "b3RpZnkYHiABKAsyGi5nYW1lLmdhbWUuR2FtZVN0YXJ0Tm90aWZ5SAASNwoR",
-            "dHVybl9zdGFydF9ub3RpZnkYHyABKAsyGi5nYW1lLmdhbWUuVHVyblN0YXJ0",
-            "Tm90aWZ5SAASLwoNZHJhd19jYXJkX3JzcBggIAEoCzIWLmdhbWUuZ2FtZS5E",
-            "cmF3Q2FyZFJzcEgAEjcKEWRpc2NhcmRfZHJhd25fcnNwGCEgASgLMhouZ2Ft",
-            "ZS5nYW1lLkRpc2NhcmREcmF3blJzcEgAEkAKFnJlcGxhY2Vfd2l0aF9kcmF3",
-            "bl9yc3AYIiABKAsyHi5nYW1lLmdhbWUuUmVwbGFjZVdpdGhEcmF3blJzcEgA",
-            "Ej4KFXRha2VfZnJvbV9kaXNjYXJkX3JzcBgjIAEoCzIdLmdhbWUuZ2FtZS5U",
-            "YWtlRnJvbURpc2NhcmRSc3BIABIvCg11c2Vfc2tpbGxfcnNwGCQgASgLMhYu",
-            "Z2FtZS5nYW1lLlVzZVNraWxsUnNwSAASMwoPY2FsbF9zdGVhZHlfcnNwGCUg",
-            "ASgLMhguZ2FtZS5nYW1lLkNhbGxTdGVhZHlSc3BIABI9ChRhY3Rpb25fcmVz",
-            "dWx0X25vdGlmeRgoIAEoCzIdLmdhbWUuZ2FtZS5BY3Rpb25SZXN1bHROb3Rp",
-            "ZnlIABI7ChNyb3VuZF9yZXZlYWxfbm90aWZ5GCogASgLMhwuZ2FtZS5nYW1l",
-            "LlJvdW5kUmV2ZWFsTm90aWZ5SAASOwoTc2NvcmVfdXBkYXRlX25vdGlmeRgr",
-            "IAEoCzIcLmdhbWUuZ2FtZS5TY29yZVVwZGF0ZU5vdGlmeUgAEjUKEGdhbWVf",
-            "b3Zlcl9ub3RpZnkYLCABKAsyGS5nYW1lLmdhbWUuR2FtZU92ZXJOb3RpZnlI",
-            "ABIwCg1yZWNvbm5lY3RfcnNwGDIgASgLMhcuZ2FtZS5zeW5jLlJlY29ubmVj",
-            "dFJzcEgAEjcKEXN0YXRlX3N5bmNfbm90aWZ5GDMgASgLMhouZ2FtZS5zeW5j",
-            "LlN0YXRlU3luY05vdGlmeUgAEjAKDWhlYXJ0YmVhdF9yc3AYNCABKAsyFy5n",
-            "YW1lLnN5bmMuSGVhcnRiZWF0UnNwSABCCQoHcGF5bG9hZEoECCYQJ0oECCcQ",
-            "KEoECCkQKkIQqgINR2FtZS5NZXNzYWdlc2IGcHJvdG8z"));
+            "cmVxGA8gASgLMhguZ2FtZS5yb29tLktpY2tQbGF5ZXJSZXFIABIvCg1yb29t",
+            "X2NoYXRfcmVxGBAgASgLMhYuZ2FtZS5yb29tLlJvb21DaGF0UmVxSAASLwoN",
+            "ZHJhd19jYXJkX3JlcRgUIAEoCzIWLmdhbWUuZ2FtZS5EcmF3Q2FyZFJlcUgA",
+            "EjcKEWRpc2NhcmRfZHJhd25fcmVxGBUgASgLMhouZ2FtZS5nYW1lLkRpc2Nh",
+            "cmREcmF3blJlcUgAEkAKFnJlcGxhY2Vfd2l0aF9kcmF3bl9yZXEYFiABKAsy",
+            "Hi5nYW1lLmdhbWUuUmVwbGFjZVdpdGhEcmF3blJlcUgAEj4KFXRha2VfZnJv",
+            "bV9kaXNjYXJkX3JlcRgXIAEoCzIdLmdhbWUuZ2FtZS5UYWtlRnJvbURpc2Nh",
+            "cmRSZXFIABIvCg11c2Vfc2tpbGxfcmVxGBggASgLMhYuZ2FtZS5nYW1lLlVz",
+            "ZVNraWxsUmVxSAASMwoPY2FsbF9zdGVhZHlfcmVxGBkgASgLMhguZ2FtZS5n",
+            "YW1lLkNhbGxTdGVhZHlSZXFIABIwCg1yZWNvbm5lY3RfcmVxGB4gASgLMhcu",
+            "Z2FtZS5zeW5jLlJlY29ubmVjdFJlcUgAEjAKDWhlYXJ0YmVhdF9yZXEYHyAB",
+            "KAsyFy5nYW1lLnN5bmMuSGVhcnRiZWF0UmVxSABCCQoHcGF5bG9hZEoECBoQ",
+            "G0oECBsQHCLjDAoNU2VydmVyTWVzc2FnZRISCgpzZXJ2ZXJfc2VxGAEgASgD",
+            "EhYKDnNlcnZlcl90aW1lX21zGAIgASgDEjMKD2NyZWF0ZV9yb29tX3JzcBgK",
+            "IAEoCzIYLmdhbWUucm9vbS5DcmVhdGVSb29tUnNwSAASLwoNam9pbl9yb29t",
+            "X3JzcBgLIAEoCzIWLmdhbWUucm9vbS5Kb2luUm9vbVJzcEgAEjEKDmxlYXZl",
+            "X3Jvb21fcnNwGAwgASgLMhcuZ2FtZS5yb29tLkxlYXZlUm9vbVJzcEgAEigK",
+            "CXJlYWR5X3JzcBgNIAEoCzITLmdhbWUucm9vbS5SZWFkeVJzcEgAEjEKDnN0",
+            "YXJ0X2dhbWVfcnNwGA4gASgLMhcuZ2FtZS5yb29tLlN0YXJ0R2FtZVJzcEgA",
+            "EjMKD2tpY2tfcGxheWVyX3JzcBgPIAEoCzIYLmdhbWUucm9vbS5LaWNrUGxh",
+            "eWVyUnNwSAASNwoRcm9vbV9zdGF0ZV9ub3RpZnkYECABKAsyGi5nYW1lLnJv",
+            "b20uUm9vbVN0YXRlTm90aWZ5SAASOQoScGxheWVyX2pvaW5fbm90aWZ5GBEg",
+            "ASgLMhsuZ2FtZS5yb29tLlBsYXllckpvaW5Ob3RpZnlIABI7ChNwbGF5ZXJf",
+            "bGVhdmVfbm90aWZ5GBIgASgLMhwuZ2FtZS5yb29tLlBsYXllckxlYXZlTm90",
+            "aWZ5SAASOwoTcGxheWVyX3JlYWR5X25vdGlmeRgTIAEoCzIcLmdhbWUucm9v",
+            "bS5QbGF5ZXJSZWFkeU5vdGlmeUgAEjcKEXJvb21fc3RhcnRfbm90aWZ5GBQg",
+            "ASgLMhouZ2FtZS5yb29tLlJvb21TdGFydE5vdGlmeUgAEi8KDXJvb21fY2hh",
+            "dF9yc3AYFSABKAsyFi5nYW1lLnJvb20uUm9vbUNoYXRSc3BIABI1ChByb29t",
+            "X2NoYXRfbm90aWZ5GBYgASgLMhkuZ2FtZS5yb29tLlJvb21DaGF0Tm90aWZ5",
+            "SAASNwoRZ2FtZV9zdGFydF9ub3RpZnkYHiABKAsyGi5nYW1lLmdhbWUuR2Ft",
+            "ZVN0YXJ0Tm90aWZ5SAASNwoRdHVybl9zdGFydF9ub3RpZnkYHyABKAsyGi5n",
+            "YW1lLmdhbWUuVHVyblN0YXJ0Tm90aWZ5SAASLwoNZHJhd19jYXJkX3JzcBgg",
+            "IAEoCzIWLmdhbWUuZ2FtZS5EcmF3Q2FyZFJzcEgAEjcKEWRpc2NhcmRfZHJh",
+            "d25fcnNwGCEgASgLMhouZ2FtZS5nYW1lLkRpc2NhcmREcmF3blJzcEgAEkAK",
+            "FnJlcGxhY2Vfd2l0aF9kcmF3bl9yc3AYIiABKAsyHi5nYW1lLmdhbWUuUmVw",
+            "bGFjZVdpdGhEcmF3blJzcEgAEj4KFXRha2VfZnJvbV9kaXNjYXJkX3JzcBgj",
+            "IAEoCzIdLmdhbWUuZ2FtZS5UYWtlRnJvbURpc2NhcmRSc3BIABIvCg11c2Vf",
+            "c2tpbGxfcnNwGCQgASgLMhYuZ2FtZS5nYW1lLlVzZVNraWxsUnNwSAASMwoP",
+            "Y2FsbF9zdGVhZHlfcnNwGCUgASgLMhguZ2FtZS5nYW1lLkNhbGxTdGVhZHlS",
+            "c3BIABI9ChRhY3Rpb25fcmVzdWx0X25vdGlmeRgoIAEoCzIdLmdhbWUuZ2Ft",
+            "ZS5BY3Rpb25SZXN1bHROb3RpZnlIABI7ChNyb3VuZF9yZXZlYWxfbm90aWZ5",
+            "GCogASgLMhwuZ2FtZS5nYW1lLlJvdW5kUmV2ZWFsTm90aWZ5SAASOwoTc2Nv",
+            "cmVfdXBkYXRlX25vdGlmeRgrIAEoCzIcLmdhbWUuZ2FtZS5TY29yZVVwZGF0",
+            "ZU5vdGlmeUgAEjUKEGdhbWVfb3Zlcl9ub3RpZnkYLCABKAsyGS5nYW1lLmdh",
+            "bWUuR2FtZU92ZXJOb3RpZnlIABIwCg1yZWNvbm5lY3RfcnNwGDIgASgLMhcu",
+            "Z2FtZS5zeW5jLlJlY29ubmVjdFJzcEgAEjcKEXN0YXRlX3N5bmNfbm90aWZ5",
+            "GDMgASgLMhouZ2FtZS5zeW5jLlN0YXRlU3luY05vdGlmeUgAEjAKDWhlYXJ0",
+            "YmVhdF9yc3AYNCABKAsyFy5nYW1lLnN5bmMuSGVhcnRiZWF0UnNwSABCCQoH",
+            "cGF5bG9hZEoECCYQJ0oECCcQKEoECCkQKkIQqgINR2FtZS5NZXNzYWdlc2IG",
+            "cHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Game.Room.RoomReflection.Descriptor, global::Game.Game.GameReflection.Descriptor, global::Game.Sync.SyncReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ClientMessage), global::Game.Messages.ClientMessage.Parser, new[]{ "Seq", "CreateRoomReq", "JoinRoomReq", "LeaveRoomReq", "ReadyReq", "StartGameReq", "KickPlayerReq", "DrawCardReq", "DiscardDrawnReq", "ReplaceWithDrawnReq", "TakeFromDiscardReq", "UseSkillReq", "CallSteadyReq", "ReconnectReq", "HeartbeatReq" }, new[]{ "Payload" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ServerMessage), global::Game.Messages.ServerMessage.Parser, new[]{ "ServerSeq", "ServerTimeMs", "CreateRoomRsp", "JoinRoomRsp", "LeaveRoomRsp", "ReadyRsp", "StartGameRsp", "KickPlayerRsp", "RoomStateNotify", "PlayerJoinNotify", "PlayerLeaveNotify", "PlayerReadyNotify", "RoomStartNotify", "GameStartNotify", "TurnStartNotify", "DrawCardRsp", "DiscardDrawnRsp", "ReplaceWithDrawnRsp", "TakeFromDiscardRsp", "UseSkillRsp", "CallSteadyRsp", "ActionResultNotify", "RoundRevealNotify", "ScoreUpdateNotify", "GameOverNotify", "ReconnectRsp", "StateSyncNotify", "HeartbeatRsp" }, new[]{ "Payload" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ClientMessage), global::Game.Messages.ClientMessage.Parser, new[]{ "Seq", "CreateRoomReq", "JoinRoomReq", "LeaveRoomReq", "ReadyReq", "StartGameReq", "KickPlayerReq", "RoomChatReq", "DrawCardReq", "DiscardDrawnReq", "ReplaceWithDrawnReq", "TakeFromDiscardReq", "UseSkillReq", "CallSteadyReq", "ReconnectReq", "HeartbeatReq" }, new[]{ "Payload" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ServerMessage), global::Game.Messages.ServerMessage.Parser, new[]{ "ServerSeq", "ServerTimeMs", "CreateRoomRsp", "JoinRoomRsp", "LeaveRoomRsp", "ReadyRsp", "StartGameRsp", "KickPlayerRsp", "RoomStateNotify", "PlayerJoinNotify", "PlayerLeaveNotify", "PlayerReadyNotify", "RoomStartNotify", "RoomChatRsp", "RoomChatNotify", "GameStartNotify", "TurnStartNotify", "DrawCardRsp", "DiscardDrawnRsp", "ReplaceWithDrawnRsp", "TakeFromDiscardRsp", "UseSkillRsp", "CallSteadyRsp", "ActionResultNotify", "RoundRevealNotify", "ScoreUpdateNotify", "GameOverNotify", "ReconnectRsp", "StateSyncNotify", "HeartbeatRsp" }, new[]{ "Payload" }, null, null, null)
           }));
     }
     #endregion
@@ -145,6 +149,9 @@ namespace Game.Messages {
           break;
         case PayloadOneofCase.KickPlayerReq:
           KickPlayerReq = other.KickPlayerReq.Clone();
+          break;
+        case PayloadOneofCase.RoomChatReq:
+          RoomChatReq = other.RoomChatReq.Clone();
           break;
         case PayloadOneofCase.DrawCardReq:
           DrawCardReq = other.DrawCardReq.Clone();
@@ -271,6 +278,18 @@ namespace Game.Messages {
       }
     }
 
+    /// <summary>Field number for the "room_chat_req" field.</summary>
+    public const int RoomChatReqFieldNumber = 16;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomChatReq RoomChatReq {
+      get { return payloadCase_ == PayloadOneofCase.RoomChatReq ? (global::Game.Room.RoomChatReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomChatReq;
+      }
+    }
+
     /// <summary>Field number for the "draw_card_req" field.</summary>
     public const int DrawCardReqFieldNumber = 20;
     /// <summary>
@@ -383,6 +402,7 @@ namespace Game.Messages {
       ReadyReq = 13,
       StartGameReq = 14,
       KickPlayerReq = 15,
+      RoomChatReq = 16,
       DrawCardReq = 20,
       DiscardDrawnReq = 21,
       ReplaceWithDrawnReq = 22,
@@ -428,6 +448,7 @@ namespace Game.Messages {
       if (!object.Equals(ReadyReq, other.ReadyReq)) return false;
       if (!object.Equals(StartGameReq, other.StartGameReq)) return false;
       if (!object.Equals(KickPlayerReq, other.KickPlayerReq)) return false;
+      if (!object.Equals(RoomChatReq, other.RoomChatReq)) return false;
       if (!object.Equals(DrawCardReq, other.DrawCardReq)) return false;
       if (!object.Equals(DiscardDrawnReq, other.DiscardDrawnReq)) return false;
       if (!object.Equals(ReplaceWithDrawnReq, other.ReplaceWithDrawnReq)) return false;
@@ -451,6 +472,7 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.ReadyReq) hash ^= ReadyReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.StartGameReq) hash ^= StartGameReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.KickPlayerReq) hash ^= KickPlayerReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomChatReq) hash ^= RoomChatReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) hash ^= DrawCardReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DiscardDrawnReq) hash ^= DiscardDrawnReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.ReplaceWithDrawnReq) hash ^= ReplaceWithDrawnReq.GetHashCode();
@@ -505,6 +527,10 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.KickPlayerReq) {
         output.WriteRawTag(122);
         output.WriteMessage(KickPlayerReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
+        output.WriteRawTag(130, 1);
+        output.WriteMessage(RoomChatReq);
       }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         output.WriteRawTag(162, 1);
@@ -576,6 +602,10 @@ namespace Game.Messages {
         output.WriteRawTag(122);
         output.WriteMessage(KickPlayerReq);
       }
+      if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
+        output.WriteRawTag(130, 1);
+        output.WriteMessage(RoomChatReq);
+      }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         output.WriteRawTag(162, 1);
         output.WriteMessage(DrawCardReq);
@@ -638,6 +668,9 @@ namespace Game.Messages {
       }
       if (payloadCase_ == PayloadOneofCase.KickPlayerReq) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(KickPlayerReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomChatReq);
       }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(DrawCardReq);
@@ -714,6 +747,12 @@ namespace Game.Messages {
             KickPlayerReq = new global::Game.Room.KickPlayerReq();
           }
           KickPlayerReq.MergeFrom(other.KickPlayerReq);
+          break;
+        case PayloadOneofCase.RoomChatReq:
+          if (RoomChatReq == null) {
+            RoomChatReq = new global::Game.Room.RoomChatReq();
+          }
+          RoomChatReq.MergeFrom(other.RoomChatReq);
           break;
         case PayloadOneofCase.DrawCardReq:
           if (DrawCardReq == null) {
@@ -836,6 +875,15 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             KickPlayerReq = subBuilder;
+            break;
+          }
+          case 130: {
+            global::Game.Room.RoomChatReq subBuilder = new global::Game.Room.RoomChatReq();
+            if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
+              subBuilder.MergeFrom(RoomChatReq);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatReq = subBuilder;
             break;
           }
           case 162: {
@@ -981,6 +1029,15 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             KickPlayerReq = subBuilder;
+            break;
+          }
+          case 130: {
+            global::Game.Room.RoomChatReq subBuilder = new global::Game.Room.RoomChatReq();
+            if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
+              subBuilder.MergeFrom(RoomChatReq);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatReq = subBuilder;
             break;
           }
           case 162: {
@@ -1134,6 +1191,12 @@ namespace Game.Messages {
           break;
         case PayloadOneofCase.RoomStartNotify:
           RoomStartNotify = other.RoomStartNotify.Clone();
+          break;
+        case PayloadOneofCase.RoomChatRsp:
+          RoomChatRsp = other.RoomChatRsp.Clone();
+          break;
+        case PayloadOneofCase.RoomChatNotify:
+          RoomChatNotify = other.RoomChatNotify.Clone();
           break;
         case PayloadOneofCase.GameStartNotify:
           GameStartNotify = other.GameStartNotify.Clone();
@@ -1356,6 +1419,30 @@ namespace Game.Messages {
       }
     }
 
+    /// <summary>Field number for the "room_chat_rsp" field.</summary>
+    public const int RoomChatRspFieldNumber = 21;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomChatRsp RoomChatRsp {
+      get { return payloadCase_ == PayloadOneofCase.RoomChatRsp ? (global::Game.Room.RoomChatRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomChatRsp;
+      }
+    }
+
+    /// <summary>Field number for the "room_chat_notify" field.</summary>
+    public const int RoomChatNotifyFieldNumber = 22;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomChatNotify RoomChatNotify {
+      get { return payloadCase_ == PayloadOneofCase.RoomChatNotify ? (global::Game.Room.RoomChatNotify) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomChatNotify;
+      }
+    }
+
     /// <summary>Field number for the "game_start_notify" field.</summary>
     public const int GameStartNotifyFieldNumber = 30;
     /// <summary>
@@ -1557,6 +1644,8 @@ namespace Game.Messages {
       PlayerLeaveNotify = 18,
       PlayerReadyNotify = 19,
       RoomStartNotify = 20,
+      RoomChatRsp = 21,
+      RoomChatNotify = 22,
       GameStartNotify = 30,
       TurnStartNotify = 31,
       DrawCardRsp = 32,
@@ -1615,6 +1704,8 @@ namespace Game.Messages {
       if (!object.Equals(PlayerLeaveNotify, other.PlayerLeaveNotify)) return false;
       if (!object.Equals(PlayerReadyNotify, other.PlayerReadyNotify)) return false;
       if (!object.Equals(RoomStartNotify, other.RoomStartNotify)) return false;
+      if (!object.Equals(RoomChatRsp, other.RoomChatRsp)) return false;
+      if (!object.Equals(RoomChatNotify, other.RoomChatNotify)) return false;
       if (!object.Equals(GameStartNotify, other.GameStartNotify)) return false;
       if (!object.Equals(TurnStartNotify, other.TurnStartNotify)) return false;
       if (!object.Equals(DrawCardRsp, other.DrawCardRsp)) return false;
@@ -1651,6 +1742,8 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.PlayerLeaveNotify) hash ^= PlayerLeaveNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.PlayerReadyNotify) hash ^= PlayerReadyNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.RoomStartNotify) hash ^= RoomStartNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomChatRsp) hash ^= RoomChatRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomChatNotify) hash ^= RoomChatNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) hash ^= GameStartNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.TurnStartNotify) hash ^= TurnStartNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DrawCardRsp) hash ^= DrawCardRsp.GetHashCode();
@@ -1736,6 +1829,14 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.RoomStartNotify) {
         output.WriteRawTag(162, 1);
         output.WriteMessage(RoomStartNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatRsp) {
+        output.WriteRawTag(170, 1);
+        output.WriteMessage(RoomChatRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
+        output.WriteRawTag(178, 1);
+        output.WriteMessage(RoomChatNotify);
       }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         output.WriteRawTag(242, 1);
@@ -1859,6 +1960,14 @@ namespace Game.Messages {
         output.WriteRawTag(162, 1);
         output.WriteMessage(RoomStartNotify);
       }
+      if (payloadCase_ == PayloadOneofCase.RoomChatRsp) {
+        output.WriteRawTag(170, 1);
+        output.WriteMessage(RoomChatRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
+        output.WriteRawTag(178, 1);
+        output.WriteMessage(RoomChatNotify);
+      }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         output.WriteRawTag(242, 1);
         output.WriteMessage(GameStartNotify);
@@ -1967,6 +2076,12 @@ namespace Game.Messages {
       }
       if (payloadCase_ == PayloadOneofCase.RoomStartNotify) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomStartNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomChatRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomChatNotify);
       }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(GameStartNotify);
@@ -2097,6 +2212,18 @@ namespace Game.Messages {
             RoomStartNotify = new global::Game.Room.RoomStartNotify();
           }
           RoomStartNotify.MergeFrom(other.RoomStartNotify);
+          break;
+        case PayloadOneofCase.RoomChatRsp:
+          if (RoomChatRsp == null) {
+            RoomChatRsp = new global::Game.Room.RoomChatRsp();
+          }
+          RoomChatRsp.MergeFrom(other.RoomChatRsp);
+          break;
+        case PayloadOneofCase.RoomChatNotify:
+          if (RoomChatNotify == null) {
+            RoomChatNotify = new global::Game.Room.RoomChatNotify();
+          }
+          RoomChatNotify.MergeFrom(other.RoomChatNotify);
           break;
         case PayloadOneofCase.GameStartNotify:
           if (GameStartNotify == null) {
@@ -2310,6 +2437,24 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             RoomStartNotify = subBuilder;
+            break;
+          }
+          case 170: {
+            global::Game.Room.RoomChatRsp subBuilder = new global::Game.Room.RoomChatRsp();
+            if (payloadCase_ == PayloadOneofCase.RoomChatRsp) {
+              subBuilder.MergeFrom(RoomChatRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatRsp = subBuilder;
+            break;
+          }
+          case 178: {
+            global::Game.Room.RoomChatNotify subBuilder = new global::Game.Room.RoomChatNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
+              subBuilder.MergeFrom(RoomChatNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatNotify = subBuilder;
             break;
           }
           case 242: {
@@ -2567,6 +2712,24 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             RoomStartNotify = subBuilder;
+            break;
+          }
+          case 170: {
+            global::Game.Room.RoomChatRsp subBuilder = new global::Game.Room.RoomChatRsp();
+            if (payloadCase_ == PayloadOneofCase.RoomChatRsp) {
+              subBuilder.MergeFrom(RoomChatRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatRsp = subBuilder;
+            break;
+          }
+          case 178: {
+            global::Game.Room.RoomChatNotify subBuilder = new global::Game.Room.RoomChatNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
+              subBuilder.MergeFrom(RoomChatNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomChatNotify = subBuilder;
             break;
           }
           case 242: {

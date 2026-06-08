@@ -49,7 +49,7 @@ namespace Game.Common {
             "dWx0aV9jYXJkGAEgASgIEg8KB3N1Y2Nlc3MYAiABKAgSHQoVc2VsZWN0ZWRf",
             "c2xvdF9pbmRpY2VzGAMgAygFEhsKE2luY29taW5nX2NhcmRfdmFsdWUYBCAB",
             "KAUSFwoPZGlzY2FyZGVkX2NvdW50GAUgASgFEhgKEGFkZGVkX2NhcmRfY291",
-            "bnQYBiABKAUSHwoXZHJld19leHRyYV9wZW5hbHR5X2NhcmQYByABKAgq6AkK",
+            "bnQYBiABKAUSHwoXZHJld19leHRyYV9wZW5hbHR5X2NhcmQYByABKAgqvAoK",
             "BU1zZ0lkEhIKDk1TR19JRF9VTktOT1dOEAASGwoWTVNHX0lEX0NSRUFURV9S",
             "T09NX1JFURDpBxIbChZNU0dfSURfQ1JFQVRFX1JPT01fUlNQEOoHEhkKFE1T",
             "R19JRF9KT0lOX1JPT01fUkVREOsHEhkKFE1TR19JRF9KT0lOX1JPT01fUlNQ",
@@ -61,44 +61,46 @@ namespace Game.Common {
             "R19JRF9ST09NX1NUQVRFX05PVElGWRD8BxIeChlNU0dfSURfUExBWUVSX0pP",
             "SU5fTk9USUZZEP0HEh8KGk1TR19JRF9QTEFZRVJfTEVBVkVfTk9USUZZEP4H",
             "Eh8KGk1TR19JRF9QTEFZRVJfUkVBRFlfTk9USUZZEP8HEh0KGE1TR19JRF9S",
-            "T09NX1NUQVJUX05PVElGWRCACBIdChhNU0dfSURfR0FNRV9TVEFSVF9OT1RJ",
-            "RlkQzQgSHQoYTVNHX0lEX1RVUk5fU1RBUlRfTk9USUZZEM4IEhkKFE1TR19J",
-            "RF9EUkFXX0NBUkRfUkVREM8IEhkKFE1TR19JRF9EUkFXX0NBUkRfUlNQENAI",
-            "Eh0KGE1TR19JRF9ESVNDQVJEX0RSQVdOX1JFURDRCBIdChhNU0dfSURfRElT",
-            "Q0FSRF9EUkFXTl9SU1AQ0ggSIgodTVNHX0lEX1JFUExBQ0VfV0lUSF9EUkFX",
-            "Tl9SRVEQ0wgSIgodTVNHX0lEX1JFUExBQ0VfV0lUSF9EUkFXTl9SU1AQ1AgS",
-            "IQocTVNHX0lEX1RBS0VfRlJPTV9ESVNDQVJEX1JFURDVCBIhChxNU0dfSURf",
-            "VEFLRV9GUk9NX0RJU0NBUkRfUlNQENYIEhkKFE1TR19JRF9VU0VfU0tJTExf",
-            "UkVRENcIEhkKFE1TR19JRF9VU0VfU0tJTExfUlNQENgIEhsKFk1TR19JRF9D",
-            "QUxMX1NURUFEWV9SRVEQ2QgSGwoWTVNHX0lEX0NBTExfU1RFQURZX1JTUBDa",
-            "CBIgChtNU0dfSURfQUNUSU9OX1JFU1VMVF9OT1RJRlkQ4AgSHwoaTVNHX0lE",
-            "X1JPVU5EX1JFVkVBTF9OT1RJRlkQ4ggSHwoaTVNHX0lEX1NDT1JFX1VQREFU",
-            "RV9OT1RJRlkQ4wgSHAoXTVNHX0lEX0dBTUVfT1ZFUl9OT1RJRlkQ5AgSGQoU",
-            "TVNHX0lEX1JFQ09OTkVDVF9SRVEQsQkSGQoUTVNHX0lEX1JFQ09OTkVDVF9S",
-            "U1AQsgkSHQoYTVNHX0lEX1NUQVRFX1NZTkNfTk9USUZZELMJEhkKFE1TR19J",
-            "RF9IRUFSVEJFQVRfUkVRELQJEhkKFE1TR19JRF9IRUFSVEJFQVRfUlNQELUJ",
-            "IgYI2wgQ2wgiBgjcCBDcCCIGCN0IEN0IIgYI3ggQ3ggiBgjhCBDhCCqgAQoJ",
-            "R2FtZVBoYXNlEhYKEkdBTUVfUEhBU0VfVU5LTk9XThAAEhYKEkdBTUVfUEhB",
-            "U0VfV0FJVElORxABEhYKEkdBTUVfUEhBU0VfUExBWUlORxACEhoKFkdBTUVf",
-            "UEhBU0VfRklOQUxfUk9VTkQQAxIVChFHQU1FX1BIQVNFX1JFVkVBTBAEEhgK",
-            "FEdBTUVfUEhBU0VfR0FNRV9PVkVSEAUqbQoNUm9vbVN0YXRlVHlwZRIWChJS",
-            "T09NX1NUQVRFX1VOS05PV04QABIWChJST09NX1NUQVRFX1dBSVRJTkcQARIU",
-            "ChBST09NX1NUQVRFX1JFQURZEAISFgoSUk9PTV9TVEFURV9QTEFZSU5HEAMq",
-            "owIKCUNhcmRWYWx1ZRIWChJDQVJEX1ZBTFVFX1VOS05PV04QABIQCgxDQVJE",
-            "X1ZBTFVFXzAQARIQCgxDQVJEX1ZBTFVFXzEQAhIQCgxDQVJEX1ZBTFVFXzIQ",
-            "AxIQCgxDQVJEX1ZBTFVFXzMQBBIQCgxDQVJEX1ZBTFVFXzQQBRIQCgxDQVJE",
-            "X1ZBTFVFXzUQBhIQCgxDQVJEX1ZBTFVFXzYQBxIQCgxDQVJEX1ZBTFVFXzcQ",
-            "CBIQCgxDQVJEX1ZBTFVFXzgQCRIQCgxDQVJEX1ZBTFVFXzkQChIRCg1DQVJE",
-            "X1ZBTFVFXzEwEAsSEQoNQ0FSRF9WQUxVRV8xMRAMEhEKDUNBUkRfVkFMVUVf",
-            "MTIQDRIRCg1DQVJEX1ZBTFVFXzEzEA4qgQEKCVNraWxsVHlwZRIWChJTS0lM",
-            "TF9UWVBFX1VOS05PV04QABITCg9TS0lMTF9UWVBFX05PTkUQARIYChRTS0lM",
-            "TF9UWVBFX1BFRUtfU0VMRhACEhIKDlNLSUxMX1RZUEVfU1BZEAMSEwoPU0tJ",
-            "TExfVFlQRV9TV0FQEAQiBAgFEAUq2QEKCkFjdGlvblR5cGUSFwoTQUNUSU9O",
-            "X1RZUEVfVU5LTk9XThAAEhQKEEFDVElPTl9UWVBFX0RSQVcQARIdChlBQ1RJ",
-            "T05fVFlQRV9ESVNDQVJEX0RSQVdOEAISIgoeQUNUSU9OX1RZUEVfUkVQTEFD",
-            "RV9XSVRIX0RSQVdOEAMSIQodQUNUSU9OX1RZUEVfVEFLRV9GUk9NX0RJU0NB",
-            "UkQQBBIZChVBQ1RJT05fVFlQRV9VU0VfU0tJTEwQBRIbChdBQ1RJT05fVFlQ",
-            "RV9DQUxMX1NURUFEWRAGQg6qAgtHYW1lLkNvbW1vbmIGcHJvdG8z"));
+            "T09NX1NUQVJUX05PVElGWRCACBIZChRNU0dfSURfUk9PTV9DSEFUX1JFURCB",
+            "CBIZChRNU0dfSURfUk9PTV9DSEFUX1JTUBCCCBIcChdNU0dfSURfUk9PTV9D",
+            "SEFUX05PVElGWRCDCBIdChhNU0dfSURfR0FNRV9TVEFSVF9OT1RJRlkQzQgS",
+            "HQoYTVNHX0lEX1RVUk5fU1RBUlRfTk9USUZZEM4IEhkKFE1TR19JRF9EUkFX",
+            "X0NBUkRfUkVREM8IEhkKFE1TR19JRF9EUkFXX0NBUkRfUlNQENAIEh0KGE1T",
+            "R19JRF9ESVNDQVJEX0RSQVdOX1JFURDRCBIdChhNU0dfSURfRElTQ0FSRF9E",
+            "UkFXTl9SU1AQ0ggSIgodTVNHX0lEX1JFUExBQ0VfV0lUSF9EUkFXTl9SRVEQ",
+            "0wgSIgodTVNHX0lEX1JFUExBQ0VfV0lUSF9EUkFXTl9SU1AQ1AgSIQocTVNH",
+            "X0lEX1RBS0VfRlJPTV9ESVNDQVJEX1JFURDVCBIhChxNU0dfSURfVEFLRV9G",
+            "Uk9NX0RJU0NBUkRfUlNQENYIEhkKFE1TR19JRF9VU0VfU0tJTExfUkVRENcI",
+            "EhkKFE1TR19JRF9VU0VfU0tJTExfUlNQENgIEhsKFk1TR19JRF9DQUxMX1NU",
+            "RUFEWV9SRVEQ2QgSGwoWTVNHX0lEX0NBTExfU1RFQURZX1JTUBDaCBIgChtN",
+            "U0dfSURfQUNUSU9OX1JFU1VMVF9OT1RJRlkQ4AgSHwoaTVNHX0lEX1JPVU5E",
+            "X1JFVkVBTF9OT1RJRlkQ4ggSHwoaTVNHX0lEX1NDT1JFX1VQREFURV9OT1RJ",
+            "RlkQ4wgSHAoXTVNHX0lEX0dBTUVfT1ZFUl9OT1RJRlkQ5AgSGQoUTVNHX0lE",
+            "X1JFQ09OTkVDVF9SRVEQsQkSGQoUTVNHX0lEX1JFQ09OTkVDVF9SU1AQsgkS",
+            "HQoYTVNHX0lEX1NUQVRFX1NZTkNfTk9USUZZELMJEhkKFE1TR19JRF9IRUFS",
+            "VEJFQVRfUkVRELQJEhkKFE1TR19JRF9IRUFSVEJFQVRfUlNQELUJIgYI2wgQ",
+            "2wgiBgjcCBDcCCIGCN0IEN0IIgYI3ggQ3ggiBgjhCBDhCCqgAQoJR2FtZVBo",
+            "YXNlEhYKEkdBTUVfUEhBU0VfVU5LTk9XThAAEhYKEkdBTUVfUEhBU0VfV0FJ",
+            "VElORxABEhYKEkdBTUVfUEhBU0VfUExBWUlORxACEhoKFkdBTUVfUEhBU0Vf",
+            "RklOQUxfUk9VTkQQAxIVChFHQU1FX1BIQVNFX1JFVkVBTBAEEhgKFEdBTUVf",
+            "UEhBU0VfR0FNRV9PVkVSEAUqbQoNUm9vbVN0YXRlVHlwZRIWChJST09NX1NU",
+            "QVRFX1VOS05PV04QABIWChJST09NX1NUQVRFX1dBSVRJTkcQARIUChBST09N",
+            "X1NUQVRFX1JFQURZEAISFgoSUk9PTV9TVEFURV9QTEFZSU5HEAMqowIKCUNh",
+            "cmRWYWx1ZRIWChJDQVJEX1ZBTFVFX1VOS05PV04QABIQCgxDQVJEX1ZBTFVF",
+            "XzAQARIQCgxDQVJEX1ZBTFVFXzEQAhIQCgxDQVJEX1ZBTFVFXzIQAxIQCgxD",
+            "QVJEX1ZBTFVFXzMQBBIQCgxDQVJEX1ZBTFVFXzQQBRIQCgxDQVJEX1ZBTFVF",
+            "XzUQBhIQCgxDQVJEX1ZBTFVFXzYQBxIQCgxDQVJEX1ZBTFVFXzcQCBIQCgxD",
+            "QVJEX1ZBTFVFXzgQCRIQCgxDQVJEX1ZBTFVFXzkQChIRCg1DQVJEX1ZBTFVF",
+            "XzEwEAsSEQoNQ0FSRF9WQUxVRV8xMRAMEhEKDUNBUkRfVkFMVUVfMTIQDRIR",
+            "Cg1DQVJEX1ZBTFVFXzEzEA4qgQEKCVNraWxsVHlwZRIWChJTS0lMTF9UWVBF",
+            "X1VOS05PV04QABITCg9TS0lMTF9UWVBFX05PTkUQARIYChRTS0lMTF9UWVBF",
+            "X1BFRUtfU0VMRhACEhIKDlNLSUxMX1RZUEVfU1BZEAMSEwoPU0tJTExfVFlQ",
+            "RV9TV0FQEAQiBAgFEAUq2QEKCkFjdGlvblR5cGUSFwoTQUNUSU9OX1RZUEVf",
+            "VU5LTk9XThAAEhQKEEFDVElPTl9UWVBFX0RSQVcQARIdChlBQ1RJT05fVFlQ",
+            "RV9ESVNDQVJEX0RSQVdOEAISIgoeQUNUSU9OX1RZUEVfUkVQTEFDRV9XSVRI",
+            "X0RSQVdOEAMSIQodQUNUSU9OX1RZUEVfVEFLRV9GUk9NX0RJU0NBUkQQBBIZ",
+            "ChVBQ1RJT05fVFlQRV9VU0VfU0tJTEwQBRIbChdBQ1RJT05fVFlQRV9DQUxM",
+            "X1NURUFEWRAGQg6qAgtHYW1lLkNvbW1vbmIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Game.Common.MsgId), typeof(global::Game.Common.GamePhase), typeof(global::Game.Common.RoomStateType), typeof(global::Game.Common.CardValue), typeof(global::Game.Common.SkillType), typeof(global::Game.Common.ActionType), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -142,6 +144,9 @@ namespace Game.Common {
     [pbr::OriginalName("MSG_ID_PLAYER_LEAVE_NOTIFY")] PlayerLeaveNotify = 1022,
     [pbr::OriginalName("MSG_ID_PLAYER_READY_NOTIFY")] PlayerReadyNotify = 1023,
     [pbr::OriginalName("MSG_ID_ROOM_START_NOTIFY")] RoomStartNotify = 1024,
+    [pbr::OriginalName("MSG_ID_ROOM_CHAT_REQ")] RoomChatReq = 1025,
+    [pbr::OriginalName("MSG_ID_ROOM_CHAT_RSP")] RoomChatRsp = 1026,
+    [pbr::OriginalName("MSG_ID_ROOM_CHAT_NOTIFY")] RoomChatNotify = 1027,
     /// <summary>
     /// Game Actions (1100–1199)
     /// </summary>
@@ -176,23 +181,23 @@ namespace Game.Common {
   public enum GamePhase {
     [pbr::OriginalName("GAME_PHASE_UNKNOWN")] Unknown = 0,
     /// <summary>
-    /// WaitingPlayer准备
+    /// 等待玩家准备
     /// </summary>
     [pbr::OriginalName("GAME_PHASE_WAITING")] Waiting = 1,
     /// <summary>
-    /// 正常Turn
+    /// 正常回合
     /// </summary>
     [pbr::OriginalName("GAME_PHASE_PLAYING")] Playing = 2,
     /// <summary>
-    /// 有人喊Cabo后的最后一
+    /// 有人喊稳态后的最后一轮
     /// </summary>
     [pbr::OriginalName("GAME_PHASE_FINAL_ROUND")] FinalRound = 3,
     /// <summary>
-    /// 亮牌计pts
+    /// 亮牌计分
     /// </summary>
     [pbr::OriginalName("GAME_PHASE_REVEAL")] Reveal = 4,
     /// <summary>
-    /// GAME OVER
+    /// 游戏结束
     /// </summary>
     [pbr::OriginalName("GAME_PHASE_GAME_OVER")] GameOver = 5,
   }
@@ -200,11 +205,11 @@ namespace Game.Common {
   public enum RoomStateType {
     [pbr::OriginalName("ROOM_STATE_UNKNOWN")] RoomStateUnknown = 0,
     /// <summary>
-    /// WaitingPlayer加入/准备
+    /// 等待玩家加入/准备
     /// </summary>
     [pbr::OriginalName("ROOM_STATE_WAITING")] RoomStateWaiting = 1,
     /// <summary>
-    /// 全员准备，Waiting房主开始
+    /// 全员准备，等待房主开始
     /// </summary>
     [pbr::OriginalName("ROOM_STATE_READY")] RoomStateReady = 2,
     /// <summary>
@@ -250,7 +255,7 @@ namespace Game.Common {
     /// </summary>
     [pbr::OriginalName("CARD_VALUE_12")] _12 = 13,
     /// <summary>
-    /// 无Skill
+    /// 无技能
     /// </summary>
     [pbr::OriginalName("CARD_VALUE_13")] _13 = 14,
   }
@@ -258,7 +263,7 @@ namespace Game.Common {
   public enum SkillType {
     [pbr::OriginalName("SKILL_TYPE_UNKNOWN")] Unknown = 0,
     /// <summary>
-    /// 无Skill (0–6)
+    /// 无技能 (0–6)
     /// </summary>
     [pbr::OriginalName("SKILL_TYPE_NONE")] None = 1,
     /// <summary>
@@ -266,7 +271,7 @@ namespace Game.Common {
     /// </summary>
     [pbr::OriginalName("SKILL_TYPE_PEEK_SELF")] PeekSelf = 2,
     /// <summary>
-    /// 偷看Opponent一张暗牌 (9–10)
+    /// 偷看对手一张暗牌 (9–10)
     /// </summary>
     [pbr::OriginalName("SKILL_TYPE_SPY")] Spy = 3,
     /// <summary>
@@ -278,27 +283,27 @@ namespace Game.Common {
   public enum ActionType {
     [pbr::OriginalName("ACTION_TYPE_UNKNOWN")] Unknown = 0,
     /// <summary>
-    /// Draw
+    /// 抽牌
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_DRAW")] Draw = 1,
     /// <summary>
-    /// Discard刚抽的牌
+    /// 弃掉刚抽的牌
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_DISCARD_DRAWN")] DiscardDrawn = 2,
     /// <summary>
-    /// 用Drew的牌Replace自己一张
+    /// 用抽到的牌替换自己一张
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_REPLACE_WITH_DRAWN")] ReplaceWithDrawn = 3,
     /// <summary>
-    /// 从Discard堆拿牌Replace
+    /// 从弃牌堆拿牌替换
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_TAKE_FROM_DISCARD")] TakeFromDiscard = 4,
     /// <summary>
-    /// 使用Skill
+    /// 使用技能
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_USE_SKILL")] UseSkill = 5,
     /// <summary>
-    /// 喊Cabo
+    /// 喊稳态
     /// </summary>
     [pbr::OriginalName("ACTION_TYPE_CALL_STEADY")] CallSteady = 6,
   }
@@ -355,7 +360,7 @@ namespace Game.Common {
     public const int CodeFieldNumber = 1;
     private int code_;
     /// <summary>
-    /// 0=Success, 非0=错误码
+    /// 0=成功, 非0=错误码
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -618,7 +623,7 @@ namespace Game.Common {
     public const int SkillFieldNumber = 3;
     private global::Game.Common.SkillType skill_ = global::Game.Common.SkillType.Unknown;
     /// <summary>
-    /// Skill类型（由value推导）
+    /// 技能类型（由value推导）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -860,7 +865,7 @@ namespace Game.Common {
     public const int SlotIndexFieldNumber = 1;
     private int slotIndex_;
     /// <summary>
-    /// 槽位，从 0 开始；Failed交换可能让牌区超过 4 张
+    /// 槽位，从 0 开始；失败交换可能让牌区超过 4 张
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -875,7 +880,7 @@ namespace Game.Common {
     public const int IsKnownFieldNumber = 2;
     private bool isKnown_;
     /// <summary>
-    /// 该Player是否知道这张牌的点数
+    /// 该玩家是否知道这张牌的点数
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1143,7 +1148,7 @@ namespace Game.Common {
     public const int CardCountFieldNumber = 2;
     private int cardCount_;
     /// <summary>
-    /// Current牌区数量，Failed交换后可能超过 4
+    /// 当前牌区数量，失败交换后可能超过 4
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1360,7 +1365,7 @@ namespace Game.Common {
     public const int CountFieldNumber = 1;
     private int count_;
     /// <summary>
-    /// Discard堆总数
+    /// 弃牌堆总数
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1375,7 +1380,7 @@ namespace Game.Common {
     public const int TopCardFieldNumber = 2;
     private global::Game.Common.CardInfo topCard_;
     /// <summary>
-    /// Discard堆最上面一张（公开可见）
+    /// 弃牌堆最上面一张（公开可见）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1876,7 +1881,7 @@ namespace Game.Common {
     public const int TotalScoreFieldNumber = 7;
     private int totalScore_;
     /// <summary>
-    /// 跨Total总pts
+    /// 跨轮累计总分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2417,7 +2422,7 @@ namespace Game.Common {
     public const int TargetSlotIndexFieldNumber = 2;
     private int targetSlotIndex_;
     /// <summary>
-    /// 偷看Opponent的哪个槽位 (0-3)
+    /// 偷看对手的哪个槽位 (0-3)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2662,7 +2667,7 @@ namespace Game.Common {
     public const int TargetSlotIndexFieldNumber = 3;
     private int targetSlotIndex_;
     /// <summary>
-    /// Opponent用于交换的槽位
+    /// 对手用于交换的槽位
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2920,7 +2925,7 @@ namespace Game.Common {
     public const int SourcePlayerIdFieldNumber = 2;
     private long sourcePlayerId_;
     /// <summary>
-    /// 发起Skill的Player
+    /// 发起技能的玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2935,7 +2940,7 @@ namespace Game.Common {
     public const int TargetPlayerIdFieldNumber = 3;
     private long targetPlayerId_;
     /// <summary>
-    /// 目标Player（如有）
+    /// 目标玩家（如有）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2950,7 +2955,7 @@ namespace Game.Common {
     public const int SwappedFieldNumber = 4;
     private bool swapped_;
     /// <summary>
-    /// 不同Skill的结果通过以下可选字段承载：
+    /// 不同技能的结果通过以下可选字段承载：
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2995,7 +3000,7 @@ namespace Game.Common {
     public const int SourcePeekedValueFieldNumber = 7;
     private bool sourcePeekedValue_;
     /// <summary>
-    /// 是否向发起方揭示了卡牌数值（偷看类Skill用）
+    /// 是否向发起方揭示了卡牌数值（偷看类技能用）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3337,7 +3342,7 @@ namespace Game.Common {
     public const int AttemptedMultiCardFieldNumber = 1;
     private bool attemptedMultiCard_;
     /// <summary>
-    /// 是否尝试Replace多张牌
+    /// 是否尝试替换多张牌
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3352,7 +3357,7 @@ namespace Game.Common {
     public const int SuccessFieldNumber = 2;
     private bool success_;
     /// <summary>
-    /// 单张Replace恒为 true；多张同点数才为 true
+    /// 单张替换恒为 true；多张同点数才为 true
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3369,7 +3374,7 @@ namespace Game.Common {
         = pb::FieldCodec.ForInt32(26);
     private readonly pbc::RepeatedField<int> selectedSlotIndices_ = new pbc::RepeatedField<int>();
     /// <summary>
-    /// Player选择换出的槽位
+    /// 玩家选择换出的槽位
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3381,7 +3386,7 @@ namespace Game.Common {
     public const int IncomingCardValueFieldNumber = 4;
     private int incomingCardValue_;
     /// <summary>
-    /// 换入牌点数；Discard堆来源公开，Draw来源只给CurrentPlayer视图
+    /// 换入牌点数；弃牌堆来源公开，抽牌来源只给当前玩家视图
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3396,7 +3401,7 @@ namespace Game.Common {
     public const int DiscardedCountFieldNumber = 5;
     private int discardedCount_;
     /// <summary>
-    /// Success时进入Discard堆的牌数
+    /// 成功时进入弃牌堆的牌数
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3411,7 +3416,7 @@ namespace Game.Common {
     public const int AddedCardCountFieldNumber = 6;
     private int addedCardCount_;
     /// <summary>
-    /// Failed时加入自己牌区的牌数（通常 1，三张及以上Failed为 2）
+    /// 失败时加入自己牌区的牌数（通常 1，三张及以上失败为 2）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3426,7 +3431,7 @@ namespace Game.Common {
     public const int DrewExtraPenaltyCardFieldNumber = 7;
     private bool drewExtraPenaltyCard_;
     /// <summary>
-    /// 是否因尝试换出 3 张及以上Failed而额外Draw
+    /// 是否因尝试换出 3 张及以上失败而额外抽牌
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]

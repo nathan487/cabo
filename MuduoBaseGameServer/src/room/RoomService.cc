@@ -2,9 +2,42 @@
 #include "common/MessageCodec.h"
 #include <mymuduo/logger.h>
 #include <algorithm>
+#include <chrono>
+#include <cctype>
 #include <sstream>
 
 namespace game {
+
+namespace {
+
+std::string trimAsciiWhitespace(const std::string& input) {
+    size_t begin = 0;
+    size_t end = input.size();
+    while (begin < end && std::isspace(static_cast<unsigned char>(input[begin]))) {
+        ++begin;
+    }
+    while (end > begin && std::isspace(static_cast<unsigned char>(input[end - 1]))) {
+        --end;
+    }
+    return input.substr(begin, end - begin);
+}
+
+int64_t nowMs() {
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+size_t utf8CodePointCount(const std::string& input) {
+    size_t count = 0;
+    for (unsigned char ch : input) {
+        if ((ch & 0xC0) != 0x80) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+} // namespace
 
 RoomService::RoomService() : rng_(std::random_device{}()) {}
 
@@ -47,6 +80,10 @@ int64_t RoomService::nextPlayerId() {
 
 int64_t RoomService::nextRoomId() {
     return nextRoomId_++;
+}
+
+int64_t RoomService::nextChatMessageId() {
+    return nextChatMessageId_++;
 }
 
 void RoomService::sendTo(const TcpConnectionPtr& conn,
@@ -463,6 +500,101 @@ bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
     }
 
     return true;
+}
+
+void RoomService::handleRoomChat(const TcpConnectionPtr& conn,
+                                  const ::game::messages::ClientMessage& msg) {
+    const auto& req = msg.room_chat_req();
+    const int64_t playerId = req.player_id();
+    const int64_t roomId = req.room_id();
+    const auto chatType = req.type();
+    const std::string text = trimAsciiWhitespace(req.text());
+    const std::string stickerPack = trimAsciiWhitespace(req.sticker_pack());
+    const std::string stickerName = trimAsciiWhitespace(req.sticker_name());
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_room_chat_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto fail = [&](int code, const std::string& message) {
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendTo(conn, rspMsg);
+    };
+
+    if (playerId <= 0 || roomId <= 0) {
+        fail(3001, "Invalid room chat identity");
+        return;
+    }
+
+    if (chatType == ::game::room::ROOM_CHAT_TYPE_TEXT) {
+        if (text.empty()) {
+            fail(3002, "Text message is empty");
+            return;
+        }
+        if (utf8CodePointCount(text) > 120) {
+            fail(3003, "Text message is too long");
+            return;
+        }
+    } else if (chatType == ::game::room::ROOM_CHAT_TYPE_STICKER) {
+        if (stickerPack.empty() || stickerName.empty()) {
+            fail(3004, "Sticker pack and name are required");
+            return;
+        }
+    } else {
+        fail(3005, "Unsupported room chat type");
+        return;
+    }
+
+    std::string nickname;
+    int64_t messageId = 0;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto roomIt = rooms_.find(roomId);
+        auto playerRoomIt = playerRooms_.find(playerId);
+        if (roomIt == rooms_.end() || playerRoomIt == playerRooms_.end()
+            || playerRoomIt->second.get() != roomIt->second.get()) {
+            rsp->mutable_error()->set_code(3006);
+            rsp->mutable_error()->set_message("Player is not in this room");
+            sendTo(conn, rspMsg);
+            return;
+        }
+
+        bool foundOnlineSender = false;
+        for (auto& p : roomIt->second->players) {
+            if (p->playerId != playerId) {
+                continue;
+            }
+            foundOnlineSender = p->isConnected && p->conn && p->conn.get() == conn.get();
+            nickname = p->nickname;
+            break;
+        }
+
+        if (!foundOnlineSender) {
+            rsp->mutable_error()->set_code(3007);
+            rsp->mutable_error()->set_message("Player connection is not active in this room");
+            sendTo(conn, rspMsg);
+            return;
+        }
+
+        messageId = nextChatMessageId();
+    }
+
+    rsp->mutable_error()->set_code(0);
+    sendTo(conn, rspMsg);
+
+    ::game::messages::ServerMessage notifyMsg;
+    auto* notify = notifyMsg.mutable_room_chat_notify();
+    notify->set_room_id(roomId);
+    notify->set_message_id(messageId);
+    notify->set_sender_player_id(playerId);
+    notify->set_sender_nickname(nickname);
+    notify->set_type(chatType);
+    notify->set_text(chatType == ::game::room::ROOM_CHAT_TYPE_TEXT ? text : "");
+    notify->set_sticker_pack(chatType == ::game::room::ROOM_CHAT_TYPE_STICKER ? stickerPack : "");
+    notify->set_sticker_name(chatType == ::game::room::ROOM_CHAT_TYPE_STICKER ? stickerName : "");
+    notify->set_server_time_ms(nowMs());
+    broadcastToRoom(roomId, notifyMsg);
 }
 
 void RoomService::markGameFinished(int64_t roomId) {

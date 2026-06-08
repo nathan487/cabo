@@ -45,6 +45,19 @@ namespace Cabo.Client
         public bool IsWinner;
     }
 
+    public class RoomChatMessage
+    {
+        public long RoomId;
+        public long MessageId;
+        public long SenderPlayerId;
+        public string SenderNickname;
+        public RoomChatType Type = RoomChatType.Unknown;
+        public string Text;
+        public string StickerPack;
+        public string StickerName;
+        public long ServerTimeMs;
+    }
+
     /// <summary>
     /// Client-side game state. Mirrors server state.
     /// Direct C# translation of CLI's GameState.h/cpp.
@@ -96,6 +109,10 @@ namespace Cabo.Client
         // Scoring
         public List<RoundResult> LastRoundResults = new();
         public List<FinalRank> FinalRankings = new();
+
+        // Room chat
+        public List<RoomChatMessage> RoomChatMessages = new();
+        public string LastRoomChatError = "";
 
         // Skill results
         public int LastPeekedValue = -1;
@@ -170,6 +187,10 @@ namespace Cabo.Client
                     HandleStartGame(msg.StartGameRsp); break;
                 case ServerMessage.PayloadOneofCase.RoomStartNotify:
                     HandleRoomStart(msg.RoomStartNotify); break;
+                case ServerMessage.PayloadOneofCase.RoomChatRsp:
+                    HandleRoomChatRsp(msg.RoomChatRsp); break;
+                case ServerMessage.PayloadOneofCase.RoomChatNotify:
+                    HandleRoomChatNotify(msg.RoomChatNotify); break;
                 case ServerMessage.PayloadOneofCase.GameStartNotify:
                     HandleGameStart(msg.GameStartNotify); break;
                 case ServerMessage.PayloadOneofCase.TurnStartNotify:
@@ -288,6 +309,39 @@ namespace Cabo.Client
         }
 
         void HandleRoomStart(RoomStartNotify notify) { }
+
+        void HandleRoomChatRsp(RoomChatRsp rsp)
+        {
+            LastRoomChatError = rsp.Error?.Code == 0
+                ? ""
+                : (string.IsNullOrEmpty(rsp.Error?.Message) ? "聊天发送失败" : rsp.Error.Message);
+        }
+
+        void HandleRoomChatNotify(RoomChatNotify notify)
+        {
+            if (notify == null)
+                return;
+            if (RoomId > 0 && notify.RoomId != RoomId)
+                return;
+            if (RoomChatMessages.Exists(m => m.MessageId == notify.MessageId && m.RoomId == notify.RoomId))
+                return;
+
+            RoomChatMessages.Add(new RoomChatMessage
+            {
+                RoomId = notify.RoomId,
+                MessageId = notify.MessageId,
+                SenderPlayerId = notify.SenderPlayerId,
+                SenderNickname = notify.SenderNickname,
+                Type = notify.Type,
+                Text = notify.Text,
+                StickerPack = notify.StickerPack,
+                StickerName = notify.StickerName,
+                ServerTimeMs = notify.ServerTimeMs
+            });
+
+            while (RoomChatMessages.Count > 50)
+                RoomChatMessages.RemoveAt(0);
+        }
 
         void HandleGameStart(GameStartNotify notify)
         {
@@ -712,6 +766,8 @@ namespace Cabo.Client
             RoundJustRevealed = false;
             LastRoundResults.Clear();
             FinalRankings.Clear();
+            RoomChatMessages.Clear();
+            LastRoomChatError = "";
             LastPeekedValue = -1;
             LastSwapOccurred = false;
             LastActionMessage = "";

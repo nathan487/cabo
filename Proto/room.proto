@@ -104,6 +104,41 @@ message KickPlayerRsp {
 // 房间状态
 // ============================================================
 
+// --- 房间交流 ---
+
+enum RoomChatType {
+  ROOM_CHAT_TYPE_UNKNOWN = 0;
+  ROOM_CHAT_TYPE_TEXT = 1;
+  ROOM_CHAT_TYPE_STICKER = 2;
+}
+
+message RoomChatReq {
+  int64 request_id = 1;
+  int64 room_id = 2;
+  int64 player_id = 3;
+  RoomChatType type = 4;
+  string text = 5;
+  string sticker_pack = 6;
+  string sticker_name = 7;
+}
+
+message RoomChatRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+}
+
+message RoomChatNotify {
+  int64 room_id = 1;
+  int64 message_id = 2;
+  int64 sender_player_id = 3;
+  string sender_nickname = 4;
+  RoomChatType type = 5;
+  string text = 6;
+  string sticker_pack = 7;
+  string sticker_name = 8;
+  int64 server_time_ms = 9;
+}
+
 message RoomState {
   int64 room_id = 1;
   string room_code = 2;

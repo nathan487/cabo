@@ -56,6 +56,12 @@ public:
             });
 
         // ── Game action handlers ──
+        dispatcher_.registerHandler(16, // room_chat_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleRoomChat(conn, msg);
+            });
+
         dispatcher_.registerHandler(20, // draw_card_req
             [this](const cabogame::TcpConnectionPtr& conn,
                    const ::game::messages::ClientMessage& msg) {

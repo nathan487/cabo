@@ -1,0 +1,46 @@
+{
+    "avatars": [
+        {
+            "name": "nailong1",
+            "pack": "",
+            "path": "Art/Avatars/nailong1"
+        },
+        {
+            "name": "nailong2",
+            "pack": "",
+            "path": "Art/Avatars/nailong2"
+        },
+        {
+            "name": "nailong3",
+            "pack": "",
+            "path": "Art/Avatars/nailong3"
+        },
+        {
+            "name": "nailong4",
+            "pack": "",
+            "path": "Art/Avatars/nailong4"
+        }
+    ],
+    "stickers": [
+        {
+            "name": "mianqiangbengzhu",
+            "pack": "initial_test",
+            "path": "Art/Stickers/initial_test/mianqiangbengzhu"
+        },
+        {
+            "name": "nailong",
+            "pack": "initial_test",
+            "path": "Art/Stickers/initial_test/nailong"
+        },
+        {
+            "name": "ysh",
+            "pack": "initial_test",
+            "path": "Art/Stickers/initial_test/ysh"
+        },
+        {
+            "name": "yuanchou",
+            "pack": "initial_test",
+            "path": "Art/Stickers/initial_test/yuanchou"
+        }
+    ]
+}

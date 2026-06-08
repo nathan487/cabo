@@ -10,7 +10,9 @@ namespace Cabo.Client.UI
     {
         VisualElement _root, _container;
         VisualElement _serverRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
-        Label _title, _roomCode, _playerList, _status;
+        VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView;
+        RoomChatPanel _chatPanel;
+        Label _title, _roomCode, _playerList, _avatarStatus, _status;
         TextField _serverAddressInput, _nicknameInput, _joinCodeInput;
         Button _btnConnect, _btnCreate, _btnShowJoin, _btnConfirmJoin, _btnExitGame;
         Button _btnReady, _btnStart, _btnLeaveRoom, _btnCopyRoomCode;
@@ -85,6 +87,13 @@ namespace Cabo.Client.UI
             _playerList.style.whiteSpace = WhiteSpace.Normal;
             _container.Add(_playerList);
 
+            _playerListView = new VisualElement();
+            _playerListView.style.marginTop = 18;
+            _playerListView.style.alignSelf = Align.Center;
+            _playerListView.style.width = 420;
+            _playerListView.style.maxWidth = Length.Percent(100);
+            _container.Add(_playerListView);
+
             _status = new Label();
             _status.style.fontSize = 14;
             _status.style.marginTop = 10;
@@ -99,6 +108,47 @@ namespace Cabo.Client.UI
             _nicknameInput.style.alignSelf = Align.Center;
             _nicknameInput.maxLength = 20;
             _container.Add(_nicknameInput);
+
+            _avatarSection = new VisualElement();
+            _avatarSection.style.alignSelf = Align.Center;
+            _avatarSection.style.width = 520;
+            _avatarSection.style.maxWidth = Length.Percent(100);
+            _avatarSection.style.marginTop = 14;
+            _avatarSection.style.paddingLeft = 12;
+            _avatarSection.style.paddingRight = 12;
+            _avatarSection.style.paddingTop = 10;
+            _avatarSection.style.paddingBottom = 10;
+            _avatarSection.style.backgroundColor = new Color(0.06f, 0.12f, 0.13f);
+            _avatarSection.style.borderTopLeftRadius = 8;
+            _avatarSection.style.borderTopRightRadius = 8;
+            _avatarSection.style.borderBottomLeftRadius = 8;
+            _avatarSection.style.borderBottomRightRadius = 8;
+            _container.Add(_avatarSection);
+
+            var avatarTitle = new Label("头像");
+            avatarTitle.style.fontSize = 14;
+            avatarTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            avatarTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _avatarSection.Add(avatarTitle);
+
+            _avatarPreview = new VisualElement();
+            _avatarPreview.style.alignSelf = Align.Center;
+            _avatarPreview.style.marginTop = 6;
+            _avatarSection.Add(_avatarPreview);
+
+            _avatarChoices = new VisualElement();
+            _avatarChoices.style.flexDirection = FlexDirection.Row;
+            _avatarChoices.style.flexWrap = Wrap.Wrap;
+            _avatarChoices.style.justifyContent = Justify.Center;
+            _avatarChoices.style.marginTop = 8;
+            _avatarSection.Add(_avatarChoices);
+
+            _avatarStatus = new Label();
+            _avatarStatus.style.fontSize = 11;
+            _avatarStatus.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _avatarStatus.style.marginTop = 5;
+            _avatarStatus.style.color = new Color(0.74f, 0.82f, 0.78f);
+            _avatarSection.Add(_avatarStatus);
 
             _homeButtonRow = new VisualElement();
             _homeButtonRow.style.flexDirection = FlexDirection.Row;
@@ -199,6 +249,30 @@ namespace Cabo.Client.UI
             _btnLeaveRoom.text = "退出房间";
             _btnLeaveRoom.style.fontSize = 18;
             _roomButtonRow.Add(_btnLeaveRoom);
+
+            _chatPanel = new RoomChatPanel(_flow);
+            _chatPanel.Root.style.alignSelf = Align.Center;
+            _chatPanel.Root.style.width = 540;
+            _chatPanel.Root.style.maxWidth = Length.Percent(100);
+            _chatPanel.Root.style.marginTop = 14;
+            _chatPanel.Root.style.paddingLeft = 12;
+            _chatPanel.Root.style.paddingRight = 12;
+            _chatPanel.Root.style.paddingTop = 10;
+            _chatPanel.Root.style.paddingBottom = 10;
+            _chatPanel.Root.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
+            _chatPanel.Root.style.borderTopLeftRadius = 8;
+            _chatPanel.Root.style.borderTopRightRadius = 8;
+            _chatPanel.Root.style.borderBottomLeftRadius = 8;
+            _chatPanel.Root.style.borderBottomRightRadius = 8;
+            _chatPanel.Root.style.borderTopWidth = 1;
+            _chatPanel.Root.style.borderRightWidth = 1;
+            _chatPanel.Root.style.borderBottomWidth = 1;
+            _chatPanel.Root.style.borderLeftWidth = 1;
+            _chatPanel.Root.style.borderTopColor = new Color(0.12f, 0.32f, 0.27f);
+            _chatPanel.Root.style.borderRightColor = new Color(0.12f, 0.32f, 0.27f);
+            _chatPanel.Root.style.borderBottomColor = new Color(0.12f, 0.32f, 0.27f);
+            _chatPanel.Root.style.borderLeftColor = new Color(0.12f, 0.32f, 0.27f);
+            _container.Add(_chatPanel.Root);
         }
 
         public void SetVisible(bool visible)
@@ -236,9 +310,12 @@ namespace Cabo.Client.UI
 
             _serverRow.style.display = inRoom ? DisplayStyle.None : DisplayStyle.Flex;
             _nicknameInput.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
+            _avatarSection.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
             _homeButtonRow.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
             _joinFormRow.style.display = (!inRoom && connected && _joinFormVisible) ? DisplayStyle.Flex : DisplayStyle.None;
             _roomButtonRow.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _chatPanel.Root.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _playerList.style.display = DisplayStyle.None;
 
             _btnConnect.SetEnabled(!connecting);
             _btnConnect.text = connecting ? "连接中..." : (connected ? "重新连接" : "连接");
@@ -249,6 +326,9 @@ namespace Cabo.Client.UI
             if (!inRoom)
             {
                 _playerList.text = "";
+                _playerListView.Clear();
+                _chatPanel.Root.style.display = DisplayStyle.None;
+                RenderAvatarSelector();
                 if (connecting)
                     _status.text = "正在连接服务器...";
                 else if (connected)
@@ -264,6 +344,7 @@ namespace Cabo.Client.UI
 
             string list = "";
             int readyCount = 0;
+            _playerListView.Clear();
             foreach (var p in s.Players)
             {
                 string tag = "";
@@ -271,6 +352,7 @@ namespace Cabo.Client.UI
                 if (p.IsHost) tag += " [房主]";
                 string ready = p.IsReady ? " 已准备" : " 未准备";
                 list += $"{p.Nickname}{tag}: {ready}\n";
+                _playerListView.Add(CreatePlayerListRow(p, p.PlayerId == s.MyPlayerId));
                 if (p.IsReady) readyCount++;
             }
             _playerList.text = list;
@@ -288,6 +370,123 @@ namespace Cabo.Client.UI
 
             _btnStart.SetEnabled(isHost && allReady);
             _status.text = $"{readyCount}/{s.Players.Count} 已准备" + (allReady && isHost ? " - 可以开始" : "");
+            _chatPanel.Render();
+        }
+
+        void RenderAvatarSelector()
+        {
+            _avatarPreview.Clear();
+            _avatarChoices.Clear();
+
+            var nickname = string.IsNullOrWhiteSpace(_nicknameInput.value) ? "你" : _nicknameInput.value.Trim();
+            _avatarPreview.Add(PlayerProfileStore.CreateAvatarVisual(nickname, PlayerProfileStore.SelectedAvatarPath, 56));
+
+            AddAvatarChoice("默认", "", string.IsNullOrEmpty(PlayerProfileStore.SelectedAvatarPath), nickname);
+
+            var avatars = PlayerProfileStore.GetAvatarAssets();
+            foreach (var avatar in avatars)
+                AddAvatarChoice(avatar.DisplayName, avatar.AssetPath, avatar.AssetPath == PlayerProfileStore.SelectedAvatarPath, nickname);
+
+            _avatarStatus.text = avatars.Count == 0 ? "暂无可选头像，使用默认头像" : $"已找到 {avatars.Count} 个头像";
+        }
+
+        void AddAvatarChoice(string label, string avatarPath, bool selected, string nickname)
+        {
+            var choice = new VisualElement();
+            choice.style.width = 78;
+            choice.style.height = 72;
+            choice.style.alignItems = Align.Center;
+            choice.style.justifyContent = Justify.Center;
+            choice.style.marginLeft = 4;
+            choice.style.marginRight = 4;
+            choice.style.marginTop = 4;
+            choice.style.marginBottom = 4;
+            choice.style.paddingLeft = 4;
+            choice.style.paddingRight = 4;
+            choice.style.paddingTop = 4;
+            choice.style.paddingBottom = 4;
+            choice.style.backgroundColor = selected ? new Color(0.12f, 0.26f, 0.20f) : new Color(0.05f, 0.13f, 0.12f);
+            choice.style.borderTopLeftRadius = 7;
+            choice.style.borderTopRightRadius = 7;
+            choice.style.borderBottomLeftRadius = 7;
+            choice.style.borderBottomRightRadius = 7;
+            choice.style.borderTopWidth = selected ? 2 : 1;
+            choice.style.borderRightWidth = selected ? 2 : 1;
+            choice.style.borderBottomWidth = selected ? 2 : 1;
+            choice.style.borderLeftWidth = selected ? 2 : 1;
+            var border = selected ? new Color(1f, 0.78f, 0.22f) : new Color(0.24f, 0.38f, 0.36f);
+            choice.style.borderTopColor = border;
+            choice.style.borderRightColor = border;
+            choice.style.borderBottomColor = border;
+            choice.style.borderLeftColor = border;
+            choice.Add(PlayerProfileStore.CreateAvatarVisual(nickname, avatarPath, 34));
+
+            var text = new Label(label);
+            text.style.fontSize = 10;
+            text.style.unityTextAlign = TextAnchor.MiddleCenter;
+            text.style.marginTop = 3;
+            text.style.color = new Color(0.86f, 0.90f, 0.86f);
+            choice.Add(text);
+
+            choice.RegisterCallback<ClickEvent>(_ =>
+            {
+                PlayerProfileStore.SelectedAvatarPath = avatarPath;
+                RenderAvatarSelector();
+            });
+            _avatarChoices.Add(choice);
+        }
+
+        VisualElement CreatePlayerListRow(PlayerInfo player, bool isSelf)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 5;
+            row.style.marginBottom = 5;
+            row.style.paddingLeft = 10;
+            row.style.paddingRight = 10;
+            row.style.paddingTop = 7;
+            row.style.paddingBottom = 7;
+            row.style.backgroundColor = player.IsReady ? new Color(0.08f, 0.20f, 0.15f) : new Color(0.07f, 0.11f, 0.12f);
+            row.style.borderTopLeftRadius = 6;
+            row.style.borderTopRightRadius = 6;
+            row.style.borderBottomLeftRadius = 6;
+            row.style.borderBottomRightRadius = 6;
+            row.style.borderTopWidth = 1;
+            row.style.borderRightWidth = 1;
+            row.style.borderBottomWidth = 1;
+            row.style.borderLeftWidth = 1;
+            var border = player.IsReady ? new Color(0.34f, 0.62f, 0.43f) : new Color(0.22f, 0.34f, 0.32f);
+            row.style.borderTopColor = border;
+            row.style.borderRightColor = border;
+            row.style.borderBottomColor = border;
+            row.style.borderLeftColor = border;
+
+            var avatarPath = PlayerProfileStore.GetAvatarPathForPlayer(player.PlayerId, isSelf);
+            var avatar = PlayerProfileStore.CreateAvatarVisual(player.Nickname, avatarPath, 38);
+            avatar.style.marginRight = 10;
+            row.Add(avatar);
+
+            var name = new Label(player.Nickname + (isSelf ? "（你）" : ""));
+            name.style.flexGrow = 1;
+            name.style.fontSize = 14;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            row.Add(name);
+
+            var tag = new Label(player.IsHost ? "房主" : "");
+            tag.style.width = 44;
+            tag.style.fontSize = 12;
+            tag.style.color = new Color(0.90f, 0.78f, 0.44f);
+            tag.style.unityTextAlign = TextAnchor.MiddleCenter;
+            row.Add(tag);
+
+            var ready = new Label(player.IsReady ? "已准备" : "未准备");
+            ready.style.width = 62;
+            ready.style.fontSize = 12;
+            ready.style.color = player.IsReady ? new Color(0.68f, 1f, 0.72f) : new Color(0.76f, 0.80f, 0.78f);
+            ready.style.unityTextAlign = TextAnchor.MiddleRight;
+            row.Add(ready);
+            return row;
         }
     }
 }

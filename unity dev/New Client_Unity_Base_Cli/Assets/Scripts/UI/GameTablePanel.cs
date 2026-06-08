@@ -45,10 +45,17 @@ namespace Cabo.Client.UI
         readonly VisualElement _drawnCardSlot;
         readonly VisualElement _buttonRow;
         readonly Label _statusLine;
+        readonly VisualElement _socialPanel;
+        readonly VisualElement _socialContent;
+        readonly RoomChatPanel _roomChatPanel;
+        readonly Button _logTabButton;
+        readonly Button _chatTabButton;
         readonly VisualElement _animationLayer;
 
         readonly HashSet<int> _selectedOwnSlots = new();
+        readonly List<TableFeedEntry> _gameLogEntries = new();
         long _selectedOpponentPlayerId;
+        long _lastLoggedActionSequence;
         GameSubState _lastSubState = GameSubState.Idle;
         GameSubState _lastRenderedSubState = GameSubState.Idle;
         long _lastAnimatedActionSequence;
@@ -61,6 +68,7 @@ namespace Cabo.Client.UI
         long _heldActionSourcePlayerId;
         float _heldActionUntil;
         bool _inspectionActive;
+        bool _showChat;
         float _inspectionEndsAt;
         Vector2 _inspectionReturnStart;
         Vector2 _inspectionReturnEnd;
@@ -225,6 +233,56 @@ namespace Cabo.Client.UI
             _centerTable.Add(_statusLine);
 
             middle.Add(_rightSeat.Root);
+
+            _socialPanel = new VisualElement { name = "TableSocialPanel" };
+            _socialPanel.style.width = 286;
+            _socialPanel.style.flexShrink = 0;
+            _socialPanel.style.marginLeft = 12;
+            _socialPanel.style.paddingLeft = 10;
+            _socialPanel.style.paddingRight = 10;
+            _socialPanel.style.paddingTop = 10;
+            _socialPanel.style.paddingBottom = 10;
+            _socialPanel.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
+            _socialPanel.style.borderTopLeftRadius = 8;
+            _socialPanel.style.borderTopRightRadius = 8;
+            _socialPanel.style.borderBottomLeftRadius = 8;
+            _socialPanel.style.borderBottomRightRadius = 8;
+            SetBorderWidth(_socialPanel, 1);
+            SetBorderColor(_socialPanel, new Color(0.12f, 0.32f, 0.27f));
+            middle.Add(_socialPanel);
+
+            var socialTabs = new VisualElement();
+            socialTabs.style.flexDirection = FlexDirection.Row;
+            socialTabs.style.marginBottom = 8;
+            _socialPanel.Add(socialTabs);
+
+            _logTabButton = new Button(() =>
+            {
+                _showChat = false;
+                RenderSocialPanel(_flow.State);
+            }) { text = "游戏日志" };
+            StyleSocialTab(_logTabButton);
+            socialTabs.Add(_logTabButton);
+
+            _chatTabButton = new Button(() =>
+            {
+                _showChat = true;
+                RenderSocialPanel(_flow.State);
+            }) { text = "房间交流" };
+            StyleSocialTab(_chatTabButton);
+            socialTabs.Add(_chatTabButton);
+
+            _socialContent = new VisualElement();
+            _socialContent.style.flexGrow = 1;
+            _socialContent.style.minHeight = 160;
+            _socialContent.style.maxHeight = 250;
+            _socialContent.style.paddingLeft = 2;
+            _socialContent.style.paddingRight = 2;
+            _socialPanel.Add(_socialContent);
+
+            _roomChatPanel = new RoomChatPanel(_flow, true);
+            _socialPanel.Add(_roomChatPanel.Root);
+
             _container.Add(_selfSeat.Root);
         }
 
@@ -271,6 +329,8 @@ namespace Cabo.Client.UI
             RenderSeats(state, visualCurrentPlayerId);
             RenderPiles(state);
             RenderActionPanel(state, deferNewTurnActions);
+            UpdateGameLogFromState(state);
+            RenderSocialPanel(state);
 
             _statusLine.text = ShouldShowActionStatus(_flow.SubState) ? BuildStatusText(state) : "";
             _statusLine.style.display = string.IsNullOrWhiteSpace(_statusLine.text) ? DisplayStyle.None : DisplayStyle.Flex;
@@ -288,6 +348,7 @@ namespace Cabo.Client.UI
             _turnLabel.text = "所有手牌已翻开计分";
             HideSeatsForOverlay();
             RenderPiles(state);
+            RenderSocialPanel(state);
 
             _drawnCardSlot.Clear();
             _actionPanel.Clear();
@@ -310,6 +371,7 @@ namespace Cabo.Client.UI
             HideSeatsForOverlay();
             _drawnCardSlot.Clear();
             _pileRow.Clear();
+            RenderSocialPanel(_flow.State);
 
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
@@ -354,7 +416,8 @@ namespace Cabo.Client.UI
 
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
             bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
-            _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, visualCurrentPlayerId == state.MyPlayerId, selfCabo ? "CABO" : "你", selfCabo);
+            _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, visualCurrentPlayerId == state.MyPlayerId, selfCabo ? "CABO" : "你", selfCabo,
+                PlayerProfileStore.GetAvatarPathForPlayer(state.MyPlayerId, true));
             _selfSeat.CardRow.Clear();
             for (int i = 0; i < state.MyCards.Count; i++)
             {
@@ -384,7 +447,8 @@ namespace Cabo.Client.UI
                 bool current = player.PlayerId == visualCurrentPlayerId;
                 bool selected = _selectedOpponentPlayerId == player.PlayerId;
                 bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
-                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "目标" : "对手", cabo);
+                _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "目标" : "对手", cabo,
+                    PlayerProfileStore.GetAvatarPathForPlayer(player.PlayerId, false));
                 _opponentSeats[i].CardRow.Clear();
 
                 int cardCount = Mathf.Max(0, player.CardCount);
@@ -512,6 +576,204 @@ namespace Cabo.Client.UI
                     _actionBody.text = "请求已发送。";
                     break;
             }
+        }
+
+        void UpdateGameLogFromState(GameState state)
+        {
+            if (state.LastActionSequence <= 0 || state.LastActionSequence == _lastLoggedActionSequence)
+                return;
+
+            _lastLoggedActionSequence = state.LastActionSequence;
+            if (string.IsNullOrWhiteSpace(state.LastActionMessage))
+                return;
+
+            _gameLogEntries.Add(new TableFeedEntry
+            {
+                PlayerName = "",
+                Message = state.LastActionMessage.Replace(">>> ", ""),
+                AvatarPath = "",
+                IsSticker = false
+            });
+            TrimFeed(_gameLogEntries, 40);
+        }
+
+        void RenderSocialPanel(GameState state)
+        {
+            StyleSocialTabState(_logTabButton, !_showChat);
+            StyleSocialTabState(_chatTabButton, _showChat);
+
+            _socialContent.Clear();
+            _socialContent.style.display = _showChat ? DisplayStyle.None : DisplayStyle.Flex;
+            _roomChatPanel.Root.style.display = _showChat ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (_showChat)
+            {
+                _roomChatPanel.Render();
+            }
+            else
+            {
+                if (_gameLogEntries.Count == 0 && state.LastActionSequence == 0)
+                    AddFeedPlaceholder("本局动作会显示在这里");
+                else
+                    RenderFeed(_gameLogEntries, "等待第一条游戏日志");
+            }
+        }
+
+        void RenderFeed(List<TableFeedEntry> entries, string emptyText)
+        {
+            if (entries.Count == 0)
+            {
+                AddFeedPlaceholder(emptyText);
+                return;
+            }
+
+            int start = Mathf.Max(0, entries.Count - 8);
+            for (int i = start; i < entries.Count; i++)
+                _socialContent.Add(CreateFeedRow(entries[i]));
+        }
+
+        void AddFeedPlaceholder(string text)
+        {
+            var empty = new Label(text);
+            empty.style.fontSize = 12;
+            empty.style.color = new Color(0.62f, 0.70f, 0.67f);
+            empty.style.unityTextAlign = TextAnchor.MiddleCenter;
+            empty.style.marginTop = 18;
+            _socialContent.Add(empty);
+        }
+
+        VisualElement CreateFeedRow(TableFeedEntry entry)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.FlexStart;
+            row.style.marginBottom = 7;
+            row.style.paddingLeft = 6;
+            row.style.paddingRight = 6;
+            row.style.paddingTop = 5;
+            row.style.paddingBottom = 5;
+            row.style.backgroundColor = new Color(0.035f, 0.16f, 0.135f);
+            row.style.borderTopLeftRadius = 6;
+            row.style.borderTopRightRadius = 6;
+            row.style.borderBottomLeftRadius = 6;
+            row.style.borderBottomRightRadius = 6;
+
+            if (!string.IsNullOrEmpty(entry.PlayerName))
+            {
+                var avatar = PlayerProfileStore.CreateAvatarVisual(entry.PlayerName, entry.AvatarPath, 28);
+                avatar.style.marginRight = 7;
+                row.Add(avatar);
+            }
+
+            var body = new VisualElement();
+            body.style.flexGrow = 1;
+            row.Add(body);
+
+            if (!string.IsNullOrEmpty(entry.PlayerName))
+            {
+                var name = new Label(entry.PlayerName);
+                name.style.fontSize = 11;
+                name.style.color = new Color(0.84f, 0.91f, 0.86f);
+                name.style.unityFontStyleAndWeight = FontStyle.Bold;
+                body.Add(name);
+            }
+
+            if (entry.IsSticker)
+            {
+                var sticker = PlayerProfileStore.CreateStickerVisual(entry.StickerPath, 48);
+                sticker.style.marginTop = 2;
+                body.Add(sticker);
+            }
+            else
+            {
+                var message = new Label(entry.Message);
+                message.style.fontSize = 12;
+                message.style.whiteSpace = WhiteSpace.Normal;
+                message.style.color = new Color(0.88f, 0.90f, 0.86f);
+                body.Add(message);
+            }
+
+            return row;
+        }
+
+#if false
+        void RenderStickerTray()
+        {
+            var stickers = PlayerProfileStore.GetStickerAssets();
+            if (stickers.Count == 0)
+            {
+                var none = new Label("暂无表情资源");
+                none.style.fontSize = 11;
+                none.style.color = new Color(0.62f, 0.70f, 0.67f);
+                none.style.unityTextAlign = TextAnchor.MiddleCenter;
+                _stickerTray.Add(none);
+                return;
+            }
+
+            int count = Mathf.Min(stickers.Count, 12);
+            for (int i = 0; i < count; i++)
+            {
+                var sticker = stickers[i];
+                var button = new Button(() => SendLocalSticker(sticker));
+                button.text = "";
+                button.style.width = 42;
+                button.style.height = 42;
+                button.style.minWidth = 42;
+                button.style.marginLeft = 2;
+                button.style.marginRight = 2;
+                button.style.marginTop = 2;
+                button.style.marginBottom = 2;
+                button.style.paddingLeft = 3;
+                button.style.paddingRight = 3;
+                button.style.paddingTop = 3;
+                button.style.paddingBottom = 3;
+                button.Add(PlayerProfileStore.CreateStickerVisual(sticker.AssetPath, 30));
+                _stickerTray.Add(button);
+            }
+        }
+
+        void SendLocalChat()
+        {
+            var text = _chatInput.value?.Trim();
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            var me = _flow.State.Players.Find(p => p.PlayerId == _flow.State.MyPlayerId);
+            var name = me?.Nickname ?? "你";
+            _chatEntries.Add(new TableFeedEntry
+            {
+                PlayerName = name,
+                AvatarPath = PlayerProfileStore.GetAvatarPathForPlayer(_flow.State.MyPlayerId, true),
+                Message = text
+            });
+            TrimFeed(_chatEntries, 40);
+            _chatInput.value = "";
+            _showChat = true;
+            RenderSocialPanel(_flow.State);
+        }
+
+        void SendLocalSticker(ArtAsset sticker)
+        {
+            var me = _flow.State.Players.Find(p => p.PlayerId == _flow.State.MyPlayerId);
+            var name = me?.Nickname ?? "你";
+            _chatEntries.Add(new TableFeedEntry
+            {
+                PlayerName = name,
+                AvatarPath = PlayerProfileStore.GetAvatarPathForPlayer(_flow.State.MyPlayerId, true),
+                Message = sticker.DisplayName,
+                StickerPath = sticker.AssetPath,
+                IsSticker = true
+            });
+            TrimFeed(_chatEntries, 40);
+            _showChat = true;
+            RenderSocialPanel(_flow.State);
+        }
+
+#endif
+        static void TrimFeed(List<TableFeedEntry> entries, int maxCount)
+        {
+            while (entries.Count > maxCount)
+                entries.RemoveAt(0);
         }
 
         VisualElement CreateDrawnCard(GameState state, int width, int height)
@@ -1725,6 +1987,28 @@ namespace Cabo.Client.UI
             element.style.borderLeftWidth = width;
         }
 
+        static void StyleSocialTab(Button button)
+        {
+            button.style.flexGrow = 1;
+            button.style.minWidth = 0;
+            button.style.height = 32;
+            button.style.marginLeft = 2;
+            button.style.marginRight = 2;
+            button.style.paddingLeft = 4;
+            button.style.paddingRight = 4;
+            button.style.fontSize = 12;
+        }
+
+        static void StyleSocialTabState(Button button, bool selected)
+        {
+            button.style.backgroundColor = selected ? new Color(0.16f, 0.35f, 0.27f) : new Color(0.06f, 0.16f, 0.14f);
+            var border = selected ? new Color(0.88f, 0.74f, 0.30f) : new Color(0.16f, 0.34f, 0.28f);
+            button.style.borderTopColor = border;
+            button.style.borderRightColor = border;
+            button.style.borderBottomColor = border;
+            button.style.borderLeftColor = border;
+        }
+
         static Vector2 CenterOf(Rect rect)
         {
             if (rect.width <= 1 || rect.height <= 1)
@@ -2235,6 +2519,7 @@ namespace Cabo.Client.UI
             readonly Label _name;
             readonly Label _score;
             readonly Label _tag;
+            readonly VisualElement _avatarSlot;
 
             public SeatView(string name, bool isSelf)
             {
@@ -2282,6 +2567,10 @@ namespace Cabo.Client.UI
                 header.style.justifyContent = Justify.Center;
                 Root.Add(header);
 
+                _avatarSlot = new VisualElement();
+                _avatarSlot.style.marginRight = 7;
+                header.Add(_avatarSlot);
+
                 _tag = new Label();
                 _tag.style.fontSize = 10;
                 _tag.style.color = new Color(0.82f, 0.76f, 0.52f);
@@ -2323,8 +2612,10 @@ namespace Cabo.Client.UI
                 CardRow.Clear();
             }
 
-            public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false)
+            public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false, string avatarPath = "")
             {
+                _avatarSlot.Clear();
+                _avatarSlot.Add(PlayerProfileStore.CreateAvatarVisual(name, avatarPath, 32));
                 _name.text = name;
                 _score.text = $"总分 {score}";
                 _tag.text = isCurrentTurn && isCaboCaller ? "CABO 回合" : isCurrentTurn ? "回合" : tag;
@@ -2342,6 +2633,15 @@ namespace Cabo.Client.UI
                 Root.style.borderBottomWidth = borderWidth;
                 Root.style.borderLeftWidth = borderWidth;
             }
+        }
+
+        sealed class TableFeedEntry
+        {
+            public string PlayerName;
+            public string AvatarPath;
+            public string Message;
+            public string StickerPath;
+            public bool IsSticker;
         }
 
         sealed class ActionAnimationSnapshot

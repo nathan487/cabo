@@ -45,13 +45,18 @@ namespace Cabo.Client
 
             // Create UIDocument
             var panelGO = new GameObject("UIDocument");
+            panelGO.SetActive(false);
             panelGO.transform.SetParent(transform);
             _uiDoc = panelGO.AddComponent<UIDocument>();
             _uiDoc.panelSettings = panelSettings != null ? panelSettings : LoadPanelSettings();
             _uiDoc.visualTreeAsset = uiAsset != null ? uiAsset : LoadVisualTree();
             var styleSheet = uiStyleSheet != null ? uiStyleSheet : LoadStyleSheet();
+            panelGO.SetActive(true);
             if (styleSheet != null)
+            {
                 _uiDoc.rootVisualElement.styleSheets.Add(styleSheet);
+                Debug.Log($"[GameBootstrap] Applied UI stylesheet '{styleSheet.name}', count={_uiDoc.rootVisualElement.styleSheets.count}.");
+            }
 
             _gateway = new NetworkGateway();
             _flow = new GameFlow(_gateway);
@@ -70,33 +75,68 @@ namespace Cabo.Client
             if (settings != null)
             {
                 EnsureThemeStyleSheet(settings);
+                EnsureTextSettings(settings);
                 return settings;
             }
 #endif
+            var resourceSettings = Resources.Load<PanelSettings>("GamePanelSettings");
+            if (resourceSettings != null)
+            {
+                EnsureThemeStyleSheet(resourceSettings);
+                EnsureTextSettings(resourceSettings);
+                Debug.Log("[GameBootstrap] Loaded GamePanelSettings from Resources.");
+                return resourceSettings;
+            }
+
             var fallback = ScriptableObject.CreateInstance<PanelSettings>();
             fallback.name = "RuntimePanelSettings";
-#if UNITY_EDITOR
             EnsureThemeStyleSheet(fallback);
-#endif
+            EnsureTextSettings(fallback);
             return fallback;
         }
 
-#if UNITY_EDITOR
         void EnsureThemeStyleSheet(PanelSettings settings)
         {
             if (settings == null || settings.themeStyleSheet != null) return;
+#if UNITY_EDITOR
             var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<ThemeStyleSheet>("Assets/UI/RuntimeTheme.tss");
             if (theme != null)
+            {
                 settings.themeStyleSheet = theme;
-        }
+                return;
+            }
 #endif
+            var runtimeTheme = Resources.Load<ThemeStyleSheet>("RuntimeTheme");
+            if (runtimeTheme != null)
+            {
+                settings.themeStyleSheet = runtimeTheme;
+                Debug.Log("[GameBootstrap] Loaded RuntimeTheme from Resources.");
+            }
+            else
+                Debug.LogWarning("[GameBootstrap] RuntimeTheme.tss not found in Resources; UI Toolkit may not render in builds.");
+        }
+
+        void EnsureTextSettings(PanelSettings settings)
+        {
+            if (settings == null || settings.textSettings != null)
+                return;
+
+            var textSettings = Resources.Load<PanelTextSettings>("CaboPanelTextSettings");
+            if (textSettings != null)
+            {
+                settings.textSettings = textSettings;
+                Debug.Log("[GameBootstrap] Loaded CaboPanelTextSettings from Resources.");
+            }
+            else
+                Debug.LogWarning("[GameBootstrap] CaboPanelTextSettings not found in Resources; non-ASCII UI text may not render in builds.");
+        }
 
         VisualTreeAsset LoadVisualTree()
         {
 #if UNITY_EDITOR
             return UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/GameScreen.uxml");
 #else
-            return null;
+            return Resources.Load<VisualTreeAsset>("GameScreen");
 #endif
         }
 
@@ -105,7 +145,12 @@ namespace Cabo.Client
 #if UNITY_EDITOR
             return UnityEditor.AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/UI/GameScreen.uss");
 #else
-            return null;
+            var style = Resources.Load<StyleSheet>("GameScreen");
+            if (style == null)
+                Debug.LogWarning("[GameBootstrap] GameScreen.uss not found in Resources; runtime UI will use fallback styling.");
+            else
+                Debug.Log("[GameBootstrap] Loaded GameScreen.uss from Resources.");
+            return style;
 #endif
         }
 

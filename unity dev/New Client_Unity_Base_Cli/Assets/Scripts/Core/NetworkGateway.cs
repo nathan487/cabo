@@ -160,6 +160,37 @@ namespace Cabo.Client
             });
         }
 
+        public void SendRoomChatText(long playerId, long roomId, string text)
+        {
+            Send(new ClientMessage
+            {
+                RoomChatReq = new Game.Room.RoomChatReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    RoomId = roomId,
+                    Type = RoomChatType.Text,
+                    Text = text ?? ""
+                }
+            });
+        }
+
+        public void SendRoomChatSticker(long playerId, long roomId, string stickerPack, string stickerName)
+        {
+            Send(new ClientMessage
+            {
+                RoomChatReq = new Game.Room.RoomChatReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    RoomId = roomId,
+                    Type = RoomChatType.Sticker,
+                    StickerPack = stickerPack ?? "",
+                    StickerName = stickerName ?? ""
+                }
+            });
+        }
+
         public void SendDrawCard(long playerId, long roomId)
         {
             Send(new ClientMessage

@@ -951,7 +951,7 @@ namespace Game.Sync {
     public const int PlayerIdFieldNumber = 3;
     private long playerId_;
     /// <summary>
-    /// 确认的PlayerID
+    /// 确认的玩家ID
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1712,7 +1712,7 @@ namespace Game.Sync {
     public const int CurrentTurnPlayerIdFieldNumber = 3;
     private long currentTurnPlayerId_;
     /// <summary>
-    /// CurrentTurnPlayer
+    /// 当前回合玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1727,7 +1727,7 @@ namespace Game.Sync {
     public const int SteadyCallerPlayerIdFieldNumber = 4;
     private long steadyCallerPlayerId_;
     /// <summary>
-    /// 喊Cabo的Player（如有）
+    /// 喊稳态的玩家（如有）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1742,7 +1742,7 @@ namespace Game.Sync {
     public const int FinalRoundRemainingFieldNumber = 5;
     private int finalRoundRemaining_;
     /// <summary>
-    /// 最终剩余Turn数
+    /// 最终轮剩余回合数
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1784,7 +1784,7 @@ namespace Game.Sync {
     public const int PlayerViewFieldNumber = 12;
     private global::Game.Game.PlayerGameView playerView_;
     /// <summary>
-    /// 该Player的个人视图（包含自己的Hand和Opponent的公开信息）
+    /// 该玩家的个人视图（包含自己的手牌和对手的公开信息）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1801,7 +1801,7 @@ namespace Game.Sync {
         = pb::FieldCodec.ForMessage(106, global::Game.Game.PlayerScoreInfo.Parser);
     private readonly pbc::RepeatedField<global::Game.Game.PlayerScoreInfo> scores_ = new pbc::RepeatedField<global::Game.Game.PlayerScoreInfo>();
     /// <summary>
-    /// 所有Player的Totalpts数
+    /// 所有玩家的累计分数
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1813,7 +1813,7 @@ namespace Game.Sync {
     public const int PendingStepFieldNumber = 14;
     private global::Game.Sync.TurnStepState pendingStep_;
     /// <summary>
-    /// CurrentTurn的两步操作状态（用于恢复中断的操作）
+    /// 当前回合的两步操作状态（用于恢复中断的操作）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2200,7 +2200,7 @@ namespace Game.Sync {
   }
 
   /// <summary>
-  /// CurrentTurn的挂起状态（用于重连时恢复两步操作）
+  /// 当前回合的挂起状态（用于重连时恢复两步操作）
   /// </summary>
   public sealed partial class TurnStepState : pb::IMessage<TurnStepState>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2266,7 +2266,7 @@ namespace Game.Sync {
     public const int WaitingPlayerIdFieldNumber = 2;
     private long waitingPlayerId_;
     /// <summary>
-    /// CurrentWaiting哪个Player的输入
+    /// 当前等待哪个玩家的输入
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2281,7 +2281,7 @@ namespace Game.Sync {
     public const int DrawnCardIdFieldNumber = 3;
     private int drawnCardId_;
     /// <summary>
-    /// 当 STEP_TYPE_WAITING_DRAW_DECISION 时，重连的Player需要知道刚Drew的牌
+    /// 当 STEP_TYPE_WAITING_DRAW_DECISION 时，重连的玩家需要知道刚抽到的牌
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2296,7 +2296,7 @@ namespace Game.Sync {
     public const int DrawnCardValueFieldNumber = 4;
     private int drawnCardValue_;
     /// <summary>
-    /// 刚Drew的牌数值（仅重连Player可见）
+    /// 刚抽到的牌数值（仅重连玩家可见）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2311,7 +2311,7 @@ namespace Game.Sync {
     public const int DrawnCardSkillFieldNumber = 5;
     private global::Game.Common.SkillType drawnCardSkill_ = global::Game.Common.SkillType.Unknown;
     /// <summary>
-    /// 刚Drew的牌Skill
+    /// 刚抽到的牌技能
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2557,11 +2557,11 @@ namespace Game.Sync {
       public enum StepType {
         [pbr::OriginalName("STEP_TYPE_UNKNOWN")] Unknown = 0,
         /// <summary>
-        /// 无挂起操作（正常Turn开始）
+        /// 无挂起操作（正常回合开始）
         /// </summary>
         [pbr::OriginalName("STEP_TYPE_NONE")] None = 1,
         /// <summary>
-        /// Player已Draw，Waiting决定（弃/换/Skill）
+        /// 玩家已抽牌，等待决定（弃/换/技能）
         /// </summary>
         [pbr::OriginalName("STEP_TYPE_WAITING_DRAW_DECISION")] WaitingDrawDecision = 2,
       }

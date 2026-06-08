@@ -76,7 +76,7 @@ namespace Game.Game {
             "YW1lLmNvbW1vbi5FcnJvckluZm8ifwoPR2FtZVN0YXJ0Tm90aWZ5Eg8KB3Jv",
             "b21faWQYASABKAMSFAoMcm91bmRfbnVtYmVyGAIgASgFEhcKD2ZpcnN0X3Bs",
             "YXllcl9pZBgDIAEoAxIsCgl5b3VyX3ZpZXcYBCABKAsyGS5nYW1lLmdhbWUu",
-            "UGxheWVyR2FtZVZpZXci0wMKEkFjdGlvblJlc3VsdE5vdGlmeRIPCgdyb29t",
+            "UGxheWVyR2FtZVZpZXciiQQKEkFjdGlvblJlc3VsdE5vdGlmeRIPCgdyb29t",
             "X2lkGAEgASgDEhIKCnNlcnZlcl9zZXEYAiABKAMSLAoLYWN0aW9uX3R5cGUY",
             "AyABKA4yFy5nYW1lLmNvbW1vbi5BY3Rpb25UeXBlEhgKEHNvdXJjZV9wbGF5",
             "ZXJfaWQYBCABKAMSGAoQdGFyZ2V0X3BsYXllcl9pZBgFIAEoAxIsCglkcmF3",
@@ -86,27 +86,28 @@ namespace Game.Game {
             "FQoNc3dhcF9vY2N1cnJlZBgJIAEoCBISCgp0dXJuX2VuZGVkGAogASgIEhYK",
             "Dm5leHRfcGxheWVyX2lkGAsgASgDEjsKD2V4Y2hhbmdlX3Jlc3VsdBgMIAEo",
             "CzIiLmdhbWUuY29tbW9uLkV4Y2hhbmdlQXR0ZW1wdFJlc3VsdBITCgtzb3Vy",
-            "Y2Vfc2xvdBgNIAEoBRITCgt0YXJnZXRfc2xvdBgOIAEoBSK4AQoRUm91bmRS",
-            "ZXZlYWxOb3RpZnkSDwoHcm9vbV9pZBgBIAEoAxIUCgxyb3VuZF9udW1iZXIY",
-            "AiABKAUSGAoQc3RlYWR5X2NhbGxlcl9pZBgDIAEoAxI1Cg5yZXZlYWxlZF9o",
-            "YW5kcxgEIAMoCzIdLmdhbWUuZ2FtZS5QbGF5ZXJSZXZlYWxlZEhhbmQSKwoG",
-            "c2NvcmVzGAUgAygLMhsuZ2FtZS5nYW1lLlJvdW5kU2NvcmVEZXRhaWwiSwoS",
-            "UGxheWVyUmV2ZWFsZWRIYW5kEhEKCXBsYXllcl9pZBgBIAEoAxITCgtjYXJk",
-            "X3ZhbHVlcxgCIAMoBRINCgV0b3RhbBgDIAEoBSK7AQoQUm91bmRTY29yZURl",
-            "dGFpbBIRCglwbGF5ZXJfaWQYASABKAMSEgoKaGFuZF90b3RhbBgCIAEoBRIP",
-            "CgdwZW5hbHR5GAMgASgFEhMKC3JvdW5kX3Njb3JlGAQgASgFEhgKEGN1bXVs",
-            "YXRpdmVfc2NvcmUYBSABKAUSGAoQaXNfc3RlYWR5X2NhbGxlchgGIAEoCBIR",
-            "Cglpc19sb3dlc3QYByABKAgSEwoLaXNfa2FtaWthemUYCCABKAgiNgoOSHVu",
-            "ZHJlZFRyaWdnZXISEQoJcGxheWVyX2lkGAEgASgDEhEKCW5ld19zY29yZRgC",
-            "IAEoBSKbAQoRU2NvcmVVcGRhdGVOb3RpZnkSDwoHcm9vbV9pZBgBIAEoAxIU",
-            "Cgxyb3VuZF9udW1iZXIYAiABKAUSKgoGc2NvcmVzGAMgAygLMhouZ2FtZS5n",
-            "YW1lLlBsYXllclNjb3JlSW5mbxIzChBodW5kcmVkX3RyaWdnZXJzGAQgAygL",
-            "MhkuZ2FtZS5nYW1lLkh1bmRyZWRUcmlnZ2VyImIKDkdhbWVPdmVyTm90aWZ5",
-            "Eg8KB3Jvb21faWQYASABKAMSFAoMdG90YWxfcm91bmRzGAIgASgFEikKCHJh",
-            "bmtpbmdzGAMgAygLMhcuZ2FtZS5nYW1lLkZpbmFsUmFua2luZyJpCgxGaW5h",
-            "bFJhbmtpbmcSDAoEcmFuaxgBIAEoBRIRCglwbGF5ZXJfaWQYAiABKAMSEAoI",
-            "bmlja25hbWUYAyABKAkSEwoLZmluYWxfc2NvcmUYBCABKAUSEQoJaXNfd2lu",
-            "bmVyGAUgASgIQgyqAglHYW1lLkdhbWViBnByb3RvMw=="));
+            "Y2Vfc2xvdBgNIAEoBRITCgt0YXJnZXRfc2xvdBgOIAEoBRI0CgxwbGF5ZXJf",
+            "aGFuZHMYDyADKAsyHi5nYW1lLmNvbW1vbi5PcHBvbmVudEhhbmRTdGF0ZSK4",
+            "AQoRUm91bmRSZXZlYWxOb3RpZnkSDwoHcm9vbV9pZBgBIAEoAxIUCgxyb3Vu",
+            "ZF9udW1iZXIYAiABKAUSGAoQc3RlYWR5X2NhbGxlcl9pZBgDIAEoAxI1Cg5y",
+            "ZXZlYWxlZF9oYW5kcxgEIAMoCzIdLmdhbWUuZ2FtZS5QbGF5ZXJSZXZlYWxl",
+            "ZEhhbmQSKwoGc2NvcmVzGAUgAygLMhsuZ2FtZS5nYW1lLlJvdW5kU2NvcmVE",
+            "ZXRhaWwiSwoSUGxheWVyUmV2ZWFsZWRIYW5kEhEKCXBsYXllcl9pZBgBIAEo",
+            "AxITCgtjYXJkX3ZhbHVlcxgCIAMoBRINCgV0b3RhbBgDIAEoBSK7AQoQUm91",
+            "bmRTY29yZURldGFpbBIRCglwbGF5ZXJfaWQYASABKAMSEgoKaGFuZF90b3Rh",
+            "bBgCIAEoBRIPCgdwZW5hbHR5GAMgASgFEhMKC3JvdW5kX3Njb3JlGAQgASgF",
+            "EhgKEGN1bXVsYXRpdmVfc2NvcmUYBSABKAUSGAoQaXNfc3RlYWR5X2NhbGxl",
+            "chgGIAEoCBIRCglpc19sb3dlc3QYByABKAgSEwoLaXNfa2FtaWthemUYCCAB",
+            "KAgiNgoOSHVuZHJlZFRyaWdnZXISEQoJcGxheWVyX2lkGAEgASgDEhEKCW5l",
+            "d19zY29yZRgCIAEoBSKbAQoRU2NvcmVVcGRhdGVOb3RpZnkSDwoHcm9vbV9p",
+            "ZBgBIAEoAxIUCgxyb3VuZF9udW1iZXIYAiABKAUSKgoGc2NvcmVzGAMgAygL",
+            "MhouZ2FtZS5nYW1lLlBsYXllclNjb3JlSW5mbxIzChBodW5kcmVkX3RyaWdn",
+            "ZXJzGAQgAygLMhkuZ2FtZS5nYW1lLkh1bmRyZWRUcmlnZ2VyImIKDkdhbWVP",
+            "dmVyTm90aWZ5Eg8KB3Jvb21faWQYASABKAMSFAoMdG90YWxfcm91bmRzGAIg",
+            "ASgFEikKCHJhbmtpbmdzGAMgAygLMhcuZ2FtZS5nYW1lLkZpbmFsUmFua2lu",
+            "ZyJpCgxGaW5hbFJhbmtpbmcSDAoEcmFuaxgBIAEoBRIRCglwbGF5ZXJfaWQY",
+            "AiABKAMSEAoIbmlja25hbWUYAyABKAkSEwoLZmluYWxfc2NvcmUYBCABKAUS",
+            "EQoJaXNfd2lubmVyGAUgASgIQgyqAglHYW1lLkdhbWViBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Game.Common.CommonReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -126,7 +127,7 @@ namespace Game.Game {
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.CallSteadyReq), global::Game.Game.CallSteadyReq.Parser, new[]{ "RequestId", "PlayerId", "RoomId", "ClientSeq" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.CallSteadyRsp), global::Game.Game.CallSteadyRsp.Parser, new[]{ "RequestId", "Error" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.GameStartNotify), global::Game.Game.GameStartNotify.Parser, new[]{ "RoomId", "RoundNumber", "FirstPlayerId", "YourView" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.ActionResultNotify), global::Game.Game.ActionResultNotify.Parser, new[]{ "RoomId", "ServerSeq", "ActionType", "SourcePlayerId", "TargetPlayerId", "DrawPile", "DiscardPile", "SkillUsed", "SwapOccurred", "TurnEnded", "NextPlayerId", "ExchangeResult", "SourceSlot", "TargetSlot" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.ActionResultNotify), global::Game.Game.ActionResultNotify.Parser, new[]{ "RoomId", "ServerSeq", "ActionType", "SourcePlayerId", "TargetPlayerId", "DrawPile", "DiscardPile", "SkillUsed", "SwapOccurred", "TurnEnded", "NextPlayerId", "ExchangeResult", "SourceSlot", "TargetSlot", "PlayerHands" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.RoundRevealNotify), global::Game.Game.RoundRevealNotify.Parser, new[]{ "RoomId", "RoundNumber", "SteadyCallerId", "RevealedHands", "Scores" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.PlayerRevealedHand), global::Game.Game.PlayerRevealedHand.Parser, new[]{ "PlayerId", "CardValues", "Total" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.RoundScoreDetail), global::Game.Game.RoundScoreDetail.Parser, new[]{ "PlayerId", "HandTotal", "Penalty", "RoundScore", "CumulativeScore", "IsSteadyCaller", "IsLowest", "IsKamikaze" }, null, null, null, null),
@@ -141,7 +142,7 @@ namespace Game.Game {
   }
   #region Messages
   /// <summary>
-  /// 单个Player的完整游戏状态（服务端为每个Player构造不同视图）
+  /// 单个玩家的完整游戏状态（服务端为每个玩家构造不同视图）
   /// </summary>
   public sealed partial class PlayerGameView : pb::IMessage<PlayerGameView>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -210,7 +211,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(18, global::Game.Common.OwnCardState.Parser);
     private readonly pbc::RepeatedField<global::Game.Common.OwnCardState> ownCards_ = new pbc::RepeatedField<global::Game.Common.OwnCardState>();
     /// <summary>
-    /// 自己的Hand（4张），is_known=true 的显示数值
+    /// 自己的手牌（4张），is_known=true 的显示数值
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -224,7 +225,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(26, global::Game.Common.OpponentHandState.Parser);
     private readonly pbc::RepeatedField<global::Game.Common.OpponentHandState> opponentHands_ = new pbc::RepeatedField<global::Game.Common.OpponentHandState>();
     /// <summary>
-    /// 其他Player的Hand（仅数量，不暴露数值）
+    /// 其他玩家的手牌（仅数量，不暴露数值）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -265,7 +266,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(50, global::Game.Game.PlayerScoreInfo.Parser);
     private readonly pbc::RepeatedField<global::Game.Game.PlayerScoreInfo> scores_ = new pbc::RepeatedField<global::Game.Game.PlayerScoreInfo>();
     /// <summary>
-    /// 各PlayerTotalpts
+    /// 各玩家累计分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -515,7 +516,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// PlayerTotalpts数
+  /// 玩家累计分数
   /// </summary>
   public sealed partial class PlayerScoreInfo : pb::IMessage<PlayerScoreInfo>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -579,7 +580,7 @@ namespace Game.Game {
     public const int TotalScoreFieldNumber = 2;
     private int totalScore_;
     /// <summary>
-    /// 跨Total总pts
+    /// 跨轮累计总分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -594,7 +595,7 @@ namespace Game.Game {
     public const int CurrentRoundScoreFieldNumber = 3;
     private int currentRoundScore_;
     /// <summary>
-    /// 本得pts（-1 表示尚未结算）
+    /// 本轮得分（-1 表示尚未结算）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -787,7 +788,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// Turn开始通知（广播给所有人）
+  /// 回合开始通知（广播给所有人）
   /// </summary>
   public sealed partial class TurnStartNotify : pb::IMessage<TurnStartNotify>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -856,7 +857,7 @@ namespace Game.Game {
     public const int CurrentPlayerIdFieldNumber = 2;
     private long currentPlayerId_;
     /// <summary>
-    /// CurrentTurnPlayer
+    /// 当前回合玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -871,7 +872,7 @@ namespace Game.Game {
     public const int TurnNumberFieldNumber = 3;
     private int turnNumber_;
     /// <summary>
-    /// Current次内的Turn编号
+    /// 当前轮次内的回合编号
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -886,7 +887,7 @@ namespace Game.Game {
     public const int RoundNumberFieldNumber = 4;
     private int roundNumber_;
     /// <summary>
-    /// Round几
+    /// 第几轮
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -940,7 +941,7 @@ namespace Game.Game {
     public const int FinalRoundRemainingFieldNumber = 8;
     private int finalRoundRemaining_;
     /// <summary>
-    /// 最终剩余Turn数（仅 phase=FINAL_ROUND 时有效）
+    /// 最终轮剩余回合数（仅 phase=FINAL_ROUND 时有效）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1271,7 +1272,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 步骤1：请求Draw
+  /// 步骤1：请求抽牌
   /// </summary>
   public sealed partial class DrawCardReq : pb::IMessage<DrawCardReq>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1574,7 +1575,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 步骤1响应：仅发给DrawPlayer本人（包含Drew的牌的信息）
+  /// 步骤1响应：仅发给抽牌玩家本人（包含抽到的牌的信息）
   /// </summary>
   public sealed partial class DrawCardRsp : pb::IMessage<DrawCardRsp>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -1682,7 +1683,7 @@ namespace Game.Game {
     public const int SkillFieldNumber = 5;
     private global::Game.Common.SkillType skill_ = global::Game.Common.SkillType.Unknown;
     /// <summary>
-    /// Skill类型（仅 7-12；13 无Skill）
+    /// 技能类型（仅 7-12；13 无技能）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -1932,7 +1933,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 步骤2a：Discard刚抽的牌
+  /// 步骤2a：弃掉刚抽的牌
   /// </summary>
   public sealed partial class DiscardDrawnReq : pb::IMessage<DiscardDrawnReq>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2470,7 +2471,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 步骤2b：用刚抽的牌Replace自己的一张或多张
+  /// 步骤2b：用刚抽的牌替换自己的一张或多张
   /// </summary>
   public sealed partial class ReplaceWithDrawnReq : pb::IMessage<ReplaceWithDrawnReq>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -2591,7 +2592,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForInt32(50);
     private readonly pbc::RepeatedField<int> slotIndices_ = new pbc::RepeatedField<int>();
     /// <summary>
-    /// 要被Replace的槽位；多张必须点数完全相同
+    /// 要被替换的槽位；多张必须点数完全相同
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2918,7 +2919,7 @@ namespace Game.Game {
     public const int ExchangeResultFieldNumber = 3;
     private global::Game.Common.ExchangeAttemptResult exchangeResult_;
     /// <summary>
-    /// Success时换入牌所在槽位变为已知；Failed时Drew的牌加入自己牌区
+    /// 成功时换入牌所在槽位变为已知；失败时抽到的牌加入自己牌区
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3247,7 +3248,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForInt32(50);
     private readonly pbc::RepeatedField<int> slotIndices_ = new pbc::RepeatedField<int>();
     /// <summary>
-    /// 要被Replace的槽位；多张必须点数完全相同
+    /// 要被替换的槽位；多张必须点数完全相同
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3782,7 +3783,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 统一的Skill请求（通过 oneof 区ptsSkill类型）
+  /// 统一的技能请求（通过 oneof 区分技能类型）
   /// </summary>
   public sealed partial class UseSkillReq : pb::IMessage<UseSkillReq>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -3896,7 +3897,7 @@ namespace Game.Game {
     public const int CardIdFieldNumber = 5;
     private int cardId_;
     /// <summary>
-    /// 用于Skill的那张牌ID（从 DrawCardRsp 获取）
+    /// 用于技能的那张牌ID（从 DrawCardRsp 获取）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4385,7 +4386,7 @@ namespace Game.Game {
     public const int PeekedValueFieldNumber = 3;
     private int peekedValue_;
     /// <summary>
-    /// 根据Skill类型返回不同信息（仅发给Skill发起者）：
+    /// 根据技能类型返回不同信息（仅发给技能发起者）：
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -4986,7 +4987,7 @@ namespace Game.Game {
     public const int ErrorFieldNumber = 2;
     private global::Game.Common.ErrorInfo error_;
     /// <summary>
-    /// 喊CaboSuccess后，进入最终
+    /// 喊稳态成功后，进入最终轮
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5229,7 +5230,7 @@ namespace Game.Game {
     public const int RoundNumberFieldNumber = 2;
     private int roundNumber_;
     /// <summary>
-    /// Round1
+    /// 第1轮
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5244,7 +5245,7 @@ namespace Game.Game {
     public const int FirstPlayerIdFieldNumber = 3;
     private long firstPlayerId_;
     /// <summary>
-    /// Round一个Turn的Player
+    /// 第一个回合的玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5259,7 +5260,7 @@ namespace Game.Game {
     public const int YourViewFieldNumber = 4;
     private global::Game.Game.PlayerGameView yourView_;
     /// <summary>
-    /// 每个Player收到此通知后，应从 PlayerGameView 构造本地初始状态
+    /// 每个玩家收到此通知后，应从 PlayerGameView 构造本地初始状态
     /// PlayerGameView 由后续的 StateSyncNotify 携带（或合并至此）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -5486,7 +5487,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 操作结果广播（告知所有Player发生了什么，不暴露隐藏信息）
+  /// 操作结果广播（告知所有玩家发生了什么，不暴露隐藏信息）
   /// </summary>
   public sealed partial class ActionResultNotify : pb::IMessage<ActionResultNotify>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -5586,7 +5587,7 @@ namespace Game.Game {
     public const int SourcePlayerIdFieldNumber = 4;
     private long sourcePlayerId_;
     /// <summary>
-    /// 执行操作的Player
+    /// 执行操作的玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5601,7 +5602,7 @@ namespace Game.Game {
     public const int TargetPlayerIdFieldNumber = 5;
     private long targetPlayerId_;
     /// <summary>
-    /// 目标Player（如有）
+    /// 目标玩家（如有）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5631,7 +5632,7 @@ namespace Game.Game {
     public const int DiscardPileFieldNumber = 7;
     private global::Game.Common.DiscardPileInfo discardPile_;
     /// <summary>
-    /// 更新后的Discard堆
+    /// 更新后的弃牌堆
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5646,7 +5647,7 @@ namespace Game.Game {
     public const int SkillUsedFieldNumber = 8;
     private global::Game.Common.SkillType skillUsed_ = global::Game.Common.SkillType.Unknown;
     /// <summary>
-    /// 使用的Skill类型（如有）
+    /// 使用的技能类型（如有）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5676,7 +5677,7 @@ namespace Game.Game {
     public const int TurnEndedFieldNumber = 10;
     private bool turnEnded_;
     /// <summary>
-    /// Turn是否结束
+    /// 回合是否结束
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5691,7 +5692,7 @@ namespace Game.Game {
     public const int NextPlayerIdFieldNumber = 11;
     private long nextPlayerId_;
     /// <summary>
-    /// 下一位TurnPlayer（turn_ended=true时有效）
+    /// 下一位回合玩家（turn_ended=true时有效）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5706,7 +5707,7 @@ namespace Game.Game {
     public const int ExchangeResultFieldNumber = 12;
     private global::Game.Common.ExchangeAttemptResult exchangeResult_;
     /// <summary>
-    /// Replace/多张Replace结果（如有）
+    /// 替换/多张替换结果（如有）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5753,7 +5754,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(122, global::Game.Common.OpponentHandState.Parser);
     private readonly pbc::RepeatedField<global::Game.Common.OpponentHandState> playerHands_ = new pbc::RepeatedField<global::Game.Common.OpponentHandState>();
     /// <summary>
-    /// Current public hand counts after this action.
+    /// BUG-4 Fix: 各玩家当前手牌数量（失败交换后可能超过4张）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6248,7 +6249,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 亮牌计pts通知（最终结束后广播）
+  /// 亮牌计分通知（最终轮结束后广播）
   /// </summary>
   public sealed partial class RoundRevealNotify : pb::IMessage<RoundRevealNotify>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -6326,7 +6327,7 @@ namespace Game.Game {
     public const int SteadyCallerIdFieldNumber = 3;
     private long steadyCallerId_;
     /// <summary>
-    /// 喊Cabo的Player
+    /// 喊稳态的玩家
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6343,7 +6344,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(34, global::Game.Game.PlayerRevealedHand.Parser);
     private readonly pbc::RepeatedField<global::Game.Game.PlayerRevealedHand> revealedHands_ = new pbc::RepeatedField<global::Game.Game.PlayerRevealedHand>();
     /// <summary>
-    /// 所有Player的最终Hand（本结束，全部公开）
+    /// 所有玩家的最终手牌（本轮结束，全部公开）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6357,7 +6358,7 @@ namespace Game.Game {
         = pb::FieldCodec.ForMessage(42, global::Game.Game.RoundScoreDetail.Parser);
     private readonly pbc::RepeatedField<global::Game.Game.RoundScoreDetail> scores_ = new pbc::RepeatedField<global::Game.Game.RoundScoreDetail>();
     /// <summary>
-    /// 本得pts
+    /// 本轮得分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6575,7 +6576,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 亮牌后的PlayerHand（该结束时公开）
+  /// 亮牌后的玩家手牌（该轮结束时公开）
   /// </summary>
   public sealed partial class PlayerRevealedHand : pb::IMessage<PlayerRevealedHand>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -6838,7 +6839,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 单得pts详情
+  /// 单轮得分详情
   /// </summary>
   public sealed partial class RoundScoreDetail : pb::IMessage<RoundScoreDetail>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -6907,7 +6908,7 @@ namespace Game.Game {
     public const int HandTotalFieldNumber = 2;
     private int handTotal_;
     /// <summary>
-    /// Hand总和
+    /// 手牌总和
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6922,7 +6923,7 @@ namespace Game.Game {
     public const int PenaltyFieldNumber = 3;
     private int penalty_;
     /// <summary>
-    /// Penaltypts（0或10）
+    /// 罚分（0或10）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6937,7 +6938,7 @@ namespace Game.Game {
     public const int RoundScoreFieldNumber = 4;
     private int roundScore_;
     /// <summary>
-    /// 本最终得pts
+    /// 本轮最终得分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6952,7 +6953,7 @@ namespace Game.Game {
     public const int CumulativeScoreFieldNumber = 5;
     private int cumulativeScore_;
     /// <summary>
-    /// Total总pts
+    /// 累计总分
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6979,7 +6980,7 @@ namespace Game.Game {
     public const int IsLowestFieldNumber = 7;
     private bool isLowest_;
     /// <summary>
-    /// 是否本最低
+    /// 是否本轮最低
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6994,7 +6995,7 @@ namespace Game.Game {
     public const int IsKamikazeFieldNumber = 8;
     private bool isKamikaze_;
     /// <summary>
-    /// 是否触发KAMIKAZE特攻队（两张12和两张13）
+    /// 是否触发神风特攻队（两张12和两张13）
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -7307,7 +7308,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// 100 pts减半触发记录（同可能多人触发）
+  /// 100 分减半触发记录（同轮可能多人触发）
   /// </summary>
   public sealed partial class HundredTrigger : pb::IMessage<HundredTrigger>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -7536,7 +7537,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// pts数更新通知（每计pts后广播）
+  /// 分数更新通知（每轮计分后广播）
   /// </summary>
   public sealed partial class ScoreUpdateNotify : pb::IMessage<ScoreUpdateNotify>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -7820,7 +7821,7 @@ namespace Game.Game {
   }
 
   /// <summary>
-  /// GAME OVER通知
+  /// 游戏结束通知
   /// </summary>
   public sealed partial class GameOverNotify : pb::IMessage<GameOverNotify>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
