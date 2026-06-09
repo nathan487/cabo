@@ -20,6 +20,14 @@ Copy this into the next Codex session:
 - 目前网络传输还是 raw TCP，格式是 `[4 bytes big-endian length][protobuf payload]`。
 - 下一步目标是把传输层改成 WebSocket，然后通过 Cloudflare Tunnel 暴露一个临时公网域名，让公网玩家的 Unity 客户端可以连接我的本地服务器。
 - 只改传输层和必要的连接地址输入/配置，不改游戏规则、不改 protobuf schema、不改房间/对局状态机、不重构 UI 布局。
+- 注意：现有 WebSocket/Cloudflare plan 是草案，不是绝对正确的执行脚本。必须先审查 `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md` 顶部的 2026-06-09 review notes，再结合当前代码修正实施方式。
+
+先做 Plan 审查，不要直接开始大规模改代码：
+
+- 检查服务端 CMake、现有 `MessageCodec`、`MessageDispatcher`、`GameServer`、`RoomService`、`GameService` 的真实接口。
+- 检查 Unity 当前 `NetworkGateway`、`TcpNetworkClient`、`MessageCodec`、`GameFlow.ConnectToServerAddress` 的真实实现。
+- 明确哪些代码可以复用，哪些旧 plan 示例会导致编译错误或行为错误。
+- 先给出简短修正方案，再分阶段实现。
 
 本次新任务目标：
 
@@ -54,9 +62,14 @@ Copy this into the next Codex session:
 
 - 服务端 WebSocketCodec 单元测试：
   - handshake returns 101
+  - mixed/lower-case handshake headers
+  - `Connection: keep-alive, Upgrade`
+  - missing/invalid key/version failure path
   - encode small/medium/large binary payload
   - decode masked binary payload
+  - reject unmasked client binary payload
   - partial frame reassembly
+  - fragmented binary message reassembly, or explicit protocol-error rejection with a documented reason
   - ping -> pong
   - close frame handling
 - 服务端编译通过。
@@ -78,6 +91,10 @@ Copy this into the next Codex session:
 - 不要提交或保留 Unity MCP 截图产物，除非我明确要求。
 - 当前工作树可能有历史未提交文件，不要 revert 不属于本任务的改动。
 - 优先做小步提交/小步验证。不要一次性大改所有网络文件。
+- 不要盲目把 `MessageCodec.Encode` 全局改成纯 protobuf，除非确认没有任何旧 TCP 路径/测试还依赖长度前缀。更稳妥的做法是拆出 protobuf serialization helper，让 TCP codec 和 WebSocket transport 各管自己的 framing。
+- 不要从 WebSocket 后台接收线程直接操作 Unity UI 或渲染状态，只能入队消息，继续由主线程 drain 后刷新 UI。
+- 不要硬编码 OpenSSL 链接方式；先检查当前 CMake/toolchain，优先使用 `find_package(OpenSSL REQUIRED)` 和 imported targets，或确认项目环境已有可用 SHA1/Base64 方案。
+- Cloudflare `https://...trycloudflare.com` 到 Unity `wss://...trycloudflare.com` 的转换必须实测，不要只靠推断。
 
 当前最新 UI 状态：
 - 等待房间输入框黑框/右侧白边问题已优化。
@@ -86,13 +103,14 @@ Copy this into the next Codex session:
 
 建议实施顺序：
 
-1. 先审查现有 `MessageCodec`、`NetworkGateway`、`TcpNetworkClient`、服务端 `GameServer` / `RoomService` / `GameService` 的网络边界。
-2. 实现并测试服务端 `WebSocketCodec`。
-3. 把服务端发送/接收切到 WebSocket binary payload，但保持 protobuf dispatcher 不变。
-4. 实现 Unity `ClientWebSocket` transport。
-5. 改 Unity 连接 UI/缓存，让用户输入完整 WebSocket URL。
-6. 本地 ws:// 测通后，再处理 Cloudflare wss://。
-7. 更新文档，记录实际命令、坑点和最终验证结果。
+1. 审查并修正现有 plan，特别是 handshake 解析、mask enforcement、fragmentation、OpenSSL/CMake、Unity threading、MessageCodec 分层。
+2. 先实现服务端 `WebSocketCodec` 单元测试，测试失败时不要继续集成。
+3. 实现服务端 `WebSocketCodec`，通过单元测试。
+4. 集成服务端 WebSocket 接收/发送，但保持 protobuf dispatcher 和业务服务不变。
+5. 实现 Unity `ClientWebSocket` transport，只在后台线程入队消息，不碰 UI。
+6. 改 Unity 连接 UI/缓存，让用户输入完整 WebSocket URL，并兼容 `https://` 自动转 `wss://`。
+7. 本地 `ws://127.0.0.1:8888` 测通后，再处理 Cloudflare `wss://`。
+8. 更新文档，记录实际命令、坑点和最终验证结果。
 ```
 
 Asset note:

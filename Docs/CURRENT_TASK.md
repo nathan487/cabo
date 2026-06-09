@@ -57,9 +57,10 @@ Important constraint:
 
 - The user owns server build/start unless they explicitly ask Codex to run it.
 - Do not change network protobuf schemas, game rules, or UI layout as part of this task unless required for entering a WebSocket URL.
-- Read the existing WebSocket docs first:
+- Read and review the existing WebSocket docs first. They are planning artifacts and may contain implementation gaps:
   - `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`
   - `Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md`
+- The plan now has `2026-06-09 Plan Review Notes` at the top. The next session must treat those notes as mandatory corrections before implementation.
 
 ## 2026-06-09 Update: Light Warm Theme Infrastructure and First Visual Pass
 

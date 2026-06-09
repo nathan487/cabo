@@ -43,6 +43,12 @@ Detailed implementation docs:
 - `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`
 - `Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md`
 
+Important review warning:
+
+- The existing WebSocket plan/spec were written before implementation and may contain inaccuracies.
+- Always read the `2026-06-09 Plan Review Notes` at the top of `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`.
+- In particular, verify handshake parsing, client masking enforcement, WebSocket fragmentation, OpenSSL/CMake integration, Unity receive-thread behavior, and whether `MessageCodec` can safely be split before coding.
+
 ## Transport
 
 - TCP long connection

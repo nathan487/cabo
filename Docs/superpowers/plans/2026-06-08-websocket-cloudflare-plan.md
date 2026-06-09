@@ -2,6 +2,65 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## 2026-06-09 Plan Review Notes: Do Not Execute Blindly
+
+This plan is a starting point, not a verified implementation script. Before coding, the next agent must inspect the current server/client code and correct the plan where it conflicts with the real codebase.
+
+Known risks and required corrections:
+
+- **HTTP/WebSocket handshake parsing is too idealized in the sample code.**
+  - Header names must be parsed case-insensitively.
+  - `Connection` may contain comma-separated tokens such as `keep-alive, Upgrade`.
+  - `Upgrade: websocket`, `Sec-WebSocket-Version: 13`, and `Sec-WebSocket-Key` should be validated.
+  - Cloudflare may add extra headers; the parser must tolerate unknown headers.
+- **Client-to-server masking must be enforced.**
+  - RFC 6455 requires clients to mask frames.
+  - The sample decoder currently tolerates unmasked frames because the mask key defaults to zero. That should be fixed: unmasked client data frames should close with a protocol error.
+- **WebSocket fragmentation is under-specified.**
+  - The current test plan covers TCP partial reads, not WebSocket continuation frames.
+  - Either implement continuation opcode `0x0` for fragmented binary messages or explicitly reject fragmented messages with a protocol error after verifying `ClientWebSocket` and Cloudflare never fragment the expected payloads.
+  - Prefer implementing minimal binary continuation support; protobuf messages may grow and proxies are allowed to fragment.
+- **Control-frame rules need stricter handling.**
+  - Ping/pong/close payload length must be `<= 125`.
+  - Control frames must not be fragmented.
+  - Close frames should include an RFC status code when possible, especially `1002` for protocol errors.
+- **OpenSSL/CMake details are environment-sensitive.**
+  - Do not blindly add `ssl crypto` to `target_link_libraries`.
+  - First inspect the current `MuduoBaseGameServer/CMakeLists.txt`.
+  - Prefer `find_package(OpenSSL REQUIRED)` and `OpenSSL::SSL` / `OpenSSL::Crypto` if the project/toolchain supports it.
+  - If OpenSSL is not available in the target environment, consider a small self-contained SHA1 + Base64 implementation or an existing project dependency.
+- **Unity threading must be handled carefully.**
+  - `ClientWebSocket.ReceiveAsync` runs off the Unity main thread.
+  - Only enqueue decoded messages or raw payloads from the background receive loop.
+  - Do not touch Unity UI, `GameFlow` rendering, or Unity objects from the receive thread.
+  - Preserve the existing drain-then-render behavior.
+- **Do not redefine an existing enum without checking current code.**
+  - The sample `WebSocketNetworkClient` includes `NetworkClientState`; the project already has network state types. Reuse or rename carefully to avoid duplicate-type compile errors.
+- **Do not globally break the legacy TCP codec until WebSocket is verified.**
+  - The sample suggests simplifying `MessageCodec.Encode` to pure protobuf. That may break any remaining TCP tests/tools.
+  - Prefer a clear split:
+    - protobuf serializer/deserializer for message bytes.
+    - TCP length-prefix codec kept for legacy/reference paths.
+    - WebSocket transport sends/receives pure protobuf payloads.
+- **Cloudflare tunnel command must be validated end to end.**
+  - `cloudflared tunnel --url http://localhost:8888` should forward HTTP Upgrade requests to the custom WebSocket server, but this must be verified with a real `ClientWebSocket` or `websocat`.
+  - The Unity client should accept both `https://...trycloudflare.com` and `wss://...trycloudflare.com`, normalizing `https` to `wss` only for connection.
+- **Server lifetime remains user-owned.**
+  - Do not start long-running GameServer/cloudflared processes unless explicitly requested by the user.
+
+Additional tests to add before integration is considered complete:
+
+- Handshake with lower/mixed-case headers.
+- Handshake with `Connection: keep-alive, Upgrade`.
+- Invalid version/key/missing upgrade returns a clean failure.
+- Unmasked client binary frame is rejected.
+- Fragmented binary message is either correctly reassembled or explicitly rejected with `1002`.
+- Ping with payload receives Pong with the same payload.
+- Close frame returns Close and cleans up the connection codec map.
+- Unity WebSocket receive loop can handle fragmented `ClientWebSocket` receives by accumulating until `EndOfMessage`.
+- Local `ws://127.0.0.1:8888` works before attempting Cloudflare.
+- Public `wss://...trycloudflare.com` works with at least two clients in the same room.
+
 **Goal:** 将 Cabo 游戏从 raw TCP 自定义帧升级为 WebSocket 协议，并通过 Cloudflare Tunnel 实现公网访问。
 
 **Architecture:** 在 muduo 网络库之上新增 WebSocketCodec（握手+帧编解码），Unity 端用 ClientWebSocket 替换 TcpClient，protobuf 消息层完全不动。
