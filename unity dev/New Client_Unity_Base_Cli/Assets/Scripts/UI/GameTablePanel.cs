@@ -89,7 +89,7 @@ namespace Cabo.Client.UI
             _container.style.paddingRight = 22;
             _container.style.paddingTop = 16;
             _container.style.paddingBottom = 16;
-            _container.style.backgroundColor = new Color(0.035f, 0.10f, 0.085f);
+            _container.style.backgroundColor = UITheme.AppBackground;
             root.Add(_container);
 
             _animationLayer = new VisualElement { name = "CardAnimationLayer" };
@@ -138,7 +138,7 @@ namespace Cabo.Client.UI
             _centerTable.style.marginRight = 16;
             _centerTable.style.alignItems = Align.Center;
             _centerTable.style.justifyContent = Justify.Center;
-            _centerTable.style.backgroundColor = new Color(0.02f, 0.22f, 0.16f);
+            _centerTable.style.backgroundColor = UITheme.TableSurface;
             _centerTable.style.borderTopLeftRadius = 22;
             _centerTable.style.borderTopRightRadius = 22;
             _centerTable.style.borderBottomLeftRadius = 22;
@@ -147,10 +147,10 @@ namespace Cabo.Client.UI
             _centerTable.style.borderRightWidth = 2;
             _centerTable.style.borderBottomWidth = 2;
             _centerTable.style.borderLeftWidth = 2;
-            _centerTable.style.borderTopColor = new Color(0.12f, 0.45f, 0.33f);
-            _centerTable.style.borderRightColor = new Color(0.12f, 0.45f, 0.33f);
-            _centerTable.style.borderBottomColor = new Color(0.12f, 0.45f, 0.33f);
-            _centerTable.style.borderLeftColor = new Color(0.12f, 0.45f, 0.33f);
+            _centerTable.style.borderTopColor = UITheme.TableBorder;
+            _centerTable.style.borderRightColor = UITheme.TableBorder;
+            _centerTable.style.borderBottomColor = UITheme.TableBorder;
+            _centerTable.style.borderLeftColor = UITheme.TableBorder;
             middle.Add(_centerTable);
 
             _roundLabel = new Label();
@@ -187,7 +187,7 @@ namespace Cabo.Client.UI
             _inspectionZone.style.marginBottom = 8;
             _inspectionZone.style.alignItems = Align.Center;
             _inspectionZone.style.justifyContent = Justify.Center;
-            _inspectionZone.style.backgroundColor = new Color(0.035f, 0.18f, 0.15f);
+            _inspectionZone.style.backgroundColor = UITheme.PanelSurface;
             _inspectionZone.style.borderTopLeftRadius = 8;
             _inspectionZone.style.borderTopRightRadius = 8;
             _inspectionZone.style.borderBottomLeftRadius = 8;
@@ -196,7 +196,7 @@ namespace Cabo.Client.UI
             _inspectionZone.style.borderRightWidth = 1;
             _inspectionZone.style.borderBottomWidth = 1;
             _inspectionZone.style.borderLeftWidth = 1;
-            SetBorderColor(_inspectionZone, new Color(0.14f, 0.40f, 0.34f));
+            SetBorderColor(_inspectionZone, UITheme.PanelBorder);
             _inspectionZone.style.display = DisplayStyle.None;
             _centerTable.Add(_inspectionZone);
 
@@ -215,7 +215,7 @@ namespace Cabo.Client.UI
             _actionPanel.style.paddingBottom = 8;
             _actionPanel.style.flexShrink = 0;
             _actionPanel.style.marginTop = 10;
-            _actionPanel.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
+            _actionPanel.style.backgroundColor = UITheme.PanelSurface;
             _actionPanel.style.borderTopLeftRadius = 8;
             _actionPanel.style.borderTopRightRadius = 8;
             _actionPanel.style.borderBottomLeftRadius = 8;
@@ -251,7 +251,7 @@ namespace Cabo.Client.UI
             _statusLine.style.fontSize = 12;
             _statusLine.style.unityTextAlign = TextAnchor.MiddleCenter;
             _statusLine.style.marginTop = 6;
-            _statusLine.style.color = new Color(0.86f, 0.78f, 0.48f);
+            _statusLine.style.color = UITheme.TextSecondary;
             _centerTable.Add(_statusLine);
 
             middle.Add(_rightSeat.Root);
@@ -271,14 +271,14 @@ namespace Cabo.Client.UI
             _socialPanel.style.paddingRight = 10;
             _socialPanel.style.paddingTop = 10;
             _socialPanel.style.paddingBottom = 10;
-            _socialPanel.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
+            _socialPanel.style.backgroundColor = UITheme.PanelSurface;
             _socialPanel.style.borderTopLeftRadius = 8;
             _socialPanel.style.borderTopRightRadius = 8;
             _socialPanel.style.borderBottomLeftRadius = 8;
             _socialPanel.style.borderBottomRightRadius = 8;
             _socialPanel.style.overflow = Overflow.Hidden;
             SetBorderWidth(_socialPanel, 1);
-            SetBorderColor(_socialPanel, new Color(0.12f, 0.32f, 0.27f));
+            SetBorderColor(_socialPanel, UITheme.PanelBorder);
             _container.Add(_socialPanel);
 
             var socialTabs = new VisualElement();
@@ -766,7 +766,7 @@ namespace Cabo.Client.UI
         {
             var empty = new Label(text);
             empty.style.fontSize = 12;
-            empty.style.color = new Color(0.62f, 0.70f, 0.67f);
+            empty.style.color = UITheme.TextMuted;
             empty.style.unityTextAlign = TextAnchor.MiddleCenter;
             empty.style.marginTop = 18;
             _socialContent.Add(empty);
@@ -782,7 +782,7 @@ namespace Cabo.Client.UI
             row.style.paddingRight = 6;
             row.style.paddingTop = 5;
             row.style.paddingBottom = 5;
-            row.style.backgroundColor = new Color(0.035f, 0.16f, 0.135f);
+            row.style.backgroundColor = UITheme.FeedBubble;
             row.style.borderTopLeftRadius = 6;
             row.style.borderTopRightRadius = 6;
             row.style.borderBottomLeftRadius = 6;
@@ -803,7 +803,7 @@ namespace Cabo.Client.UI
             {
                 var name = new Label(entry.PlayerName);
                 name.style.fontSize = 11;
-                name.style.color = new Color(0.84f, 0.91f, 0.86f);
+                name.style.color = UITheme.TextSecondary;
                 name.style.unityFontStyleAndWeight = FontStyle.Bold;
                 body.Add(name);
             }
@@ -819,7 +819,7 @@ namespace Cabo.Client.UI
                 var message = new Label(entry.Message);
                 message.style.fontSize = 12;
                 message.style.whiteSpace = WhiteSpace.Normal;
-                message.style.color = new Color(0.88f, 0.90f, 0.86f);
+                message.style.color = UITheme.TextPrimary;
                 body.Add(message);
             }
 
@@ -915,7 +915,7 @@ namespace Cabo.Client.UI
             var label = new Label(GetSkillName(state.DrawnCardSkill));
             label.style.fontSize = 12;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
-            label.style.color = new Color(0.95f, 0.82f, 0.42f);
+            label.style.color = UITheme.TextSecondary;
             label.style.marginTop = 4;
             wrap.Add(label);
             return wrap;
@@ -1074,7 +1074,7 @@ namespace Cabo.Client.UI
 
         void PlayDrawAction(ActionAnimationSnapshot action)
         {
-            var color = new Color(0.30f, 0.55f, 1f);
+            var color = UITheme.SkillPeek;
             var start = CenterOf(action.DrawPileBounds);
             if (start == Vector2.zero)
                 start = CenterOf(_drawPile.worldBound);
@@ -1103,7 +1103,7 @@ namespace Cabo.Client.UI
 
         void PlayReplaceWithDrawnAction(ActionAnimationSnapshot action)
         {
-            var color = action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : new Color(1f, 0.72f, 0.30f);
+            var color = action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : UITheme.SkillSwap;
             if (!action.ExchangeSucceeded)
             {
                 PlayFailedExchangeAction(action, color);
@@ -1145,7 +1145,7 @@ namespace Cabo.Client.UI
 
         void PlayTakeFromDiscardAction(ActionAnimationSnapshot action)
         {
-            var color = new Color(1f, 0.85f, 0.42f);
+            var color = UITheme.TurnHighlight;
             if (!action.ExchangeSucceeded)
             {
                 PlayFailedExchangeAction(action, color);
@@ -1202,7 +1202,7 @@ namespace Cabo.Client.UI
             {
                 var deck = CenterOf(action.DrawPileBounds);
                 ScheduleAfter(0.70f, () =>
-                    PlayMovingCard(deck, end + new Vector2(18f, 0f), false, 0, new Color(0.30f, 0.55f, 1f), QuickMoveDuration, true, null));
+                    PlayMovingCard(deck, end + new Vector2(18f, 0f), false, 0, UITheme.SkillPeek, QuickMoveDuration, true, null));
             }
             PulsePlayer(action.SourcePlayerId, color, total);
         }
@@ -1434,7 +1434,7 @@ namespace Cabo.Client.UI
 
         void PlayCaboCallAnimation(long sourcePlayerId)
         {
-            var color = new Color(1f, 0.82f, 0.22f);
+            var color = UITheme.TurnHighlight;
             PulsePlayer(sourcePlayerId, color, 1.65f);
 
             var bounds = GetPlayerBounds(sourcePlayerId);
@@ -1449,7 +1449,7 @@ namespace Cabo.Client.UI
             banner.style.unityTextAlign = TextAnchor.MiddleCenter;
             banner.style.unityFontStyleAndWeight = FontStyle.Bold;
             banner.style.fontSize = 22;
-            banner.style.color = new Color(0.12f, 0.08f, 0.02f);
+            banner.style.color = UITheme.TextOnAccent;
             banner.style.backgroundColor = color;
             banner.style.borderTopLeftRadius = 6;
             banner.style.borderTopRightRadius = 6;
@@ -1613,7 +1613,7 @@ namespace Cabo.Client.UI
         {
             _inspectionZone.Clear();
             _inspectionZone.style.display = DisplayStyle.None;
-            SetBorderColor(_inspectionZone, new Color(0.14f, 0.40f, 0.34f));
+            SetBorderColor(_inspectionZone, UITheme.PanelBorder);
         }
 
         void SetTemporaryCardVisibility(VisualElement card, bool visible)
@@ -1758,7 +1758,7 @@ namespace Cabo.Client.UI
             blank.style.marginRight = 0;
             blank.style.marginTop = 0;
             blank.style.marginBottom = 0;
-            blank.style.backgroundColor = new Color(0.015f, 0.08f, 0.07f, 0.88f);
+            blank.style.backgroundColor = UITheme.WithAlpha(UITheme.PanelSurfaceAlt, 0.88f);
             blank.style.borderTopLeftRadius = 7;
             blank.style.borderTopRightRadius = 7;
             blank.style.borderBottomLeftRadius = 7;
@@ -1796,7 +1796,7 @@ namespace Cabo.Client.UI
             card.style.marginRight = 0;
             card.style.marginTop = 0;
             card.style.marginBottom = 0;
-            SetBorderColor(card, new Color(color.r, color.g, color.b, 0.82f));
+            SetBorderColor(card, UITheme.WithAlpha(color, 0.82f));
             PositionAbsolute(card, center, bounds.width, bounds.height);
             _animationLayer.BringToFront();
             _animationLayer.Add(card);
@@ -2094,10 +2094,10 @@ namespace Cabo.Client.UI
         {
             return skill switch
             {
-                SkillType.PeekSelf => new Color(0.45f, 0.90f, 1f),
-                SkillType.Spy => new Color(0.95f, 0.72f, 1f),
-                SkillType.Swap => new Color(1f, 0.74f, 0.28f),
-                _ => new Color(0.86f, 0.78f, 0.48f)
+                SkillType.PeekSelf => UITheme.SkillPeek,
+                SkillType.Spy => UITheme.SkillSpy,
+                SkillType.Swap => UITheme.SkillSwap,
+                _ => UITheme.TurnHighlight
             };
         }
 
@@ -2131,8 +2131,9 @@ namespace Cabo.Client.UI
 
         static void StyleSocialTabState(Button button, bool selected)
         {
-            button.style.backgroundColor = selected ? new Color(0.16f, 0.35f, 0.27f) : new Color(0.06f, 0.16f, 0.14f);
-            var border = selected ? new Color(0.88f, 0.74f, 0.30f) : new Color(0.16f, 0.34f, 0.28f);
+            button.style.backgroundColor = selected ? UITheme.SelectedSurface : UITheme.PanelSurfaceAlt;
+            button.style.color = UITheme.TextPrimary;
+            var border = selected ? UITheme.SelectedBorder : UITheme.PanelBorder;
             button.style.borderTopColor = border;
             button.style.borderRightColor = border;
             button.style.borderBottomColor = border;
@@ -2172,18 +2173,18 @@ namespace Cabo.Client.UI
             card.style.borderRightWidth = selected ? 4 : 2;
             card.style.borderBottomWidth = selected ? 4 : 2;
             card.style.borderLeftWidth = selected ? 4 : 2;
-            card.style.borderTopColor = selected ? new Color(1f, 0.82f, 0.22f) : new Color(0.78f, 0.78f, 0.72f);
+            card.style.borderTopColor = selected ? UITheme.SelectedBorder : UITheme.CardBorder;
             card.style.borderRightColor = card.style.borderTopColor.value;
             card.style.borderBottomColor = card.style.borderTopColor.value;
             card.style.borderLeftColor = card.style.borderTopColor.value;
-            card.style.backgroundColor = faceUp ? GetFaceColor(value) : new Color(0.10f, 0.20f, 0.42f);
+            card.style.backgroundColor = faceUp ? GetFaceColor(value) : UITheme.CardBack;
             card.style.opacity = clickable ? 1f : 0.96f;
 
             var valueLabel = new Label(faceUp ? value.ToString() : "CABO");
             valueLabel.style.fontSize = faceUp ? Mathf.RoundToInt(height * 0.34f) : Mathf.RoundToInt(height * 0.16f);
             valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             valueLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            valueLabel.style.color = faceUp ? new Color(0.10f, 0.10f, 0.12f) : new Color(0.88f, 0.92f, 1f);
+            valueLabel.style.color = faceUp ? UITheme.TextPrimary : Color.white;
             card.Add(valueLabel);
 
             if (showSkillBadge && faceUp && value >= 7 && value <= 12)
@@ -2191,7 +2192,7 @@ namespace Cabo.Client.UI
                 var badge = new Label(GetSkillShortName(value));
                 badge.style.fontSize = 10;
                 badge.style.unityTextAlign = TextAnchor.MiddleCenter;
-                badge.style.color = new Color(0.22f, 0.15f, 0.08f);
+                badge.style.color = UITheme.TextOnAccent;
                 card.Add(badge);
             }
 
@@ -2222,16 +2223,16 @@ namespace Cabo.Client.UI
             card.style.borderRightWidth = 2;
             card.style.borderBottomWidth = 2;
             card.style.borderLeftWidth = 2;
-            card.style.borderTopColor = new Color(0.82f, 0.82f, 0.78f);
-            card.style.borderRightColor = new Color(0.82f, 0.82f, 0.78f);
-            card.style.borderBottomColor = new Color(0.82f, 0.82f, 0.78f);
-            card.style.borderLeftColor = new Color(0.82f, 0.82f, 0.78f);
-            card.style.backgroundColor = faceUp ? new Color(0.92f, 0.90f, 0.80f) : new Color(0.08f, 0.14f, 0.34f);
+            card.style.borderTopColor = UITheme.CardBorder;
+            card.style.borderRightColor = UITheme.CardBorder;
+            card.style.borderBottomColor = UITheme.CardBorder;
+            card.style.borderLeftColor = UITheme.CardBorder;
+            card.style.backgroundColor = faceUp ? UITheme.CardMid : UITheme.CardBack;
 
             var label = new Label(face);
             label.style.fontSize = compact ? faceUp ? 22 : 11 : faceUp ? 26 : 14;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            label.style.color = faceUp ? new Color(0.10f, 0.10f, 0.12f) : Color.white;
+            label.style.color = faceUp ? UITheme.TextPrimary : Color.white;
             card.Add(label);
             stack.Add(card);
 
@@ -2254,7 +2255,7 @@ namespace Cabo.Client.UI
             row.style.paddingTop = 3;
             row.style.paddingBottom = 3;
             row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = new Color(0.20f, 0.36f, 0.31f);
+            row.style.borderBottomColor = UITheme.PanelBorder;
 
             var name = new Label(result.Nickname + (result.IsSteadyCaller ? "  CABO" : "") + (result.IsLowest ? "  最低" : ""));
             name.style.width = 150;
@@ -2309,7 +2310,7 @@ namespace Cabo.Client.UI
             divider.style.marginTop = 4;
             divider.style.marginBottom = 6;
             divider.style.flexShrink = 0;
-            divider.style.backgroundColor = new Color(0.22f, 0.42f, 0.36f);
+            divider.style.backgroundColor = UITheme.PanelBorder;
             _actionPanel.Add(divider);
 
             var readyTitle = new Label("下一轮准备");
@@ -2349,7 +2350,7 @@ namespace Cabo.Client.UI
                 wait.style.unityTextAlign = TextAnchor.MiddleCenter;
                 wait.style.marginTop = 4;
                 wait.style.marginLeft = 8;
-                wait.style.color = new Color(0.78f, 0.88f, 0.82f);
+                wait.style.color = UITheme.TextSecondary;
                 wait.style.whiteSpace = WhiteSpace.Normal;
                 controls.Add(wait);
             }
@@ -2378,9 +2379,9 @@ namespace Cabo.Client.UI
             badge.style.borderTopRightRadius = 6;
             badge.style.borderBottomLeftRadius = 6;
             badge.style.borderBottomRightRadius = 6;
-            badge.style.backgroundColor = player.IsReady ? new Color(0.10f, 0.32f, 0.22f) : new Color(0.12f, 0.18f, 0.17f);
+            badge.style.backgroundColor = player.IsReady ? UITheme.ReadySurface : UITheme.WaitingSurface;
             SetBorderWidth(badge, 1);
-            SetBorderColor(badge, player.IsReady ? new Color(0.42f, 0.86f, 0.56f) : new Color(0.30f, 0.42f, 0.38f));
+            SetBorderColor(badge, player.IsReady ? UITheme.ReadyBorder : UITheme.WaitingBorder);
 
             var dot = new VisualElement();
             dot.style.width = 9;
@@ -2391,7 +2392,7 @@ namespace Cabo.Client.UI
             dot.style.borderTopRightRadius = 5;
             dot.style.borderBottomLeftRadius = 5;
             dot.style.borderBottomRightRadius = 5;
-            dot.style.backgroundColor = player.IsReady ? new Color(0.50f, 1f, 0.58f) : new Color(0.50f, 0.56f, 0.54f);
+            dot.style.backgroundColor = player.IsReady ? UITheme.ReadyBorder : UITheme.TextMuted;
             badge.Add(dot);
 
             var name = new Label((isSelf ? "你 " : "") + player.Nickname);
@@ -2399,13 +2400,13 @@ namespace Cabo.Client.UI
             name.style.minWidth = 0;
             name.style.fontSize = 11;
             name.style.unityTextAlign = TextAnchor.MiddleLeft;
-            name.style.color = Color.white;
+            name.style.color = UITheme.TextPrimary;
             badge.Add(name);
 
             var readyState = new Label(player.IsReady ? "已准备" : "...");
             readyState.style.fontSize = 11;
             readyState.style.unityTextAlign = TextAnchor.MiddleRight;
-            readyState.style.color = player.IsReady ? new Color(0.72f, 1f, 0.75f) : new Color(0.76f, 0.80f, 0.78f);
+            readyState.style.color = player.IsReady ? UITheme.ReadyBorder : UITheme.TextSecondary;
             badge.Add(readyState);
             return badge;
         }
@@ -2720,10 +2721,7 @@ namespace Cabo.Client.UI
 
         static Color GetFaceColor(int value)
         {
-            if (value <= 3) return new Color(0.86f, 0.96f, 0.82f);
-            if (value >= 10) return new Color(0.98f, 0.82f, 0.78f);
-            if (value >= 7) return new Color(0.98f, 0.92f, 0.72f);
-            return new Color(0.94f, 0.92f, 0.84f);
+            return UITheme.CardFace(value);
         }
 
         void HideSeatsForOverlay()
@@ -2761,7 +2759,7 @@ namespace Cabo.Client.UI
             public SeatView(string name, bool isSelf)
             {
                 Root = new VisualElement { name = $"Seat-{name}" };
-                Root.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
+                Root.style.backgroundColor = UITheme.PanelSurface;
                 Root.style.borderTopLeftRadius = 8;
                 Root.style.borderTopRightRadius = 8;
                 Root.style.borderBottomLeftRadius = 8;
@@ -2770,10 +2768,10 @@ namespace Cabo.Client.UI
                 Root.style.borderRightWidth = 1;
                 Root.style.borderBottomWidth = 1;
                 Root.style.borderLeftWidth = 1;
-                Root.style.borderTopColor = new Color(0.10f, 0.28f, 0.23f);
-                Root.style.borderRightColor = new Color(0.10f, 0.28f, 0.23f);
-                Root.style.borderBottomColor = new Color(0.10f, 0.28f, 0.23f);
-                Root.style.borderLeftColor = new Color(0.10f, 0.28f, 0.23f);
+                Root.style.borderTopColor = UITheme.PanelBorder;
+                Root.style.borderRightColor = UITheme.PanelBorder;
+                Root.style.borderBottomColor = UITheme.PanelBorder;
+                Root.style.borderLeftColor = UITheme.PanelBorder;
                 Root.style.paddingLeft = 12;
                 Root.style.paddingRight = 12;
                 Root.style.paddingTop = 8;
@@ -2810,7 +2808,7 @@ namespace Cabo.Client.UI
 
                 _tag = new Label();
                 _tag.style.fontSize = 10;
-                _tag.style.color = new Color(0.82f, 0.76f, 0.52f);
+                _tag.style.color = UITheme.TextSecondary;
                 _tag.style.marginRight = 8;
                 _tag.style.paddingLeft = 5;
                 _tag.style.paddingRight = 5;
@@ -2830,7 +2828,7 @@ namespace Cabo.Client.UI
 
                 _score = new Label();
                 _score.style.fontSize = 12;
-                _score.style.color = new Color(0.76f, 0.82f, 0.76f);
+                _score.style.color = UITheme.TextSecondary;
                 _score.style.unityTextAlign = TextAnchor.MiddleCenter;
                 _score.style.marginTop = 2;
                 Root.Add(_score);
@@ -2856,10 +2854,10 @@ namespace Cabo.Client.UI
                 _name.text = name;
                 _score.text = $"总分 {score}";
                 _tag.text = isCurrentTurn && isCaboCaller ? "CABO 回合" : isCurrentTurn ? "回合" : tag;
-                _tag.style.color = isCaboCaller ? Color.white : isCurrentTurn ? new Color(0.12f, 0.09f, 0.02f) : new Color(0.82f, 0.76f, 0.52f);
-                _tag.style.backgroundColor = isCaboCaller ? new Color(0.74f, 0.10f, 0.18f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : Color.clear;
-                Root.style.backgroundColor = isCaboCaller ? new Color(0.20f, 0.055f, 0.075f) : new Color(0.025f, 0.13f, 0.11f);
-                var borderColor = isCaboCaller ? new Color(1f, 0.18f, 0.28f) : isCurrentTurn ? new Color(1f, 0.78f, 0.22f) : new Color(0.10f, 0.28f, 0.23f);
+                _tag.style.color = isCaboCaller ? UITheme.TextOnDanger : isCurrentTurn ? UITheme.TextOnAccent : UITheme.TextSecondary;
+                _tag.style.backgroundColor = isCaboCaller ? UITheme.CaboDanger : isCurrentTurn ? UITheme.TurnHighlight : Color.clear;
+                Root.style.backgroundColor = isCaboCaller ? UITheme.CaboSurface : UITheme.PanelSurface;
+                var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnHighlight : UITheme.PanelBorder;
                 Root.style.borderTopColor = borderColor;
                 Root.style.borderRightColor = Root.style.borderTopColor.value;
                 Root.style.borderBottomColor = Root.style.borderTopColor.value;

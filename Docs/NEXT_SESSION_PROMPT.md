@@ -10,6 +10,15 @@ Use Unity MCP for Unity Editor verification. Follow the handoff instructions for
 Important server rule: I will build/start the server myself. Do not build or start MuduoBaseGameServer unless I explicitly ask.
 
 Current latest local state:
+- The latest visual pass adds `Assets/Scripts/UI/UITheme.cs` as the central C# theme entry and moves the client toward a cream green + peach palette: light, warm, cute, and still readable for strategy states.
+- Both USS copies are synced with the same theme variables and default control styles:
+  - `Assets/UI/GameScreen.uss`
+  - `Assets/Resources/GameScreen.uss`
+- `UIManager` runtime fallback now applies `UITheme` for root, buttons, and TextFields instead of the old dark theme.
+- Home/waiting room, room chat, game table, chat/log sidebar, card faces, skill colors, current-turn/selected/CABO states, ready badges, reveal rows, and GameOver-related shared controls have received a first warm-theme color pass.
+- The theme work intentionally does not change network logic, state machine, game rules, layout structure, or VisualElement hierarchy.
+- Important: continue future color work through `UITheme` semantic colors/helpers. Avoid adding new scattered `new Color(...)` calls in UI classes unless the color is genuinely data/avatar/art specific.
+- Validation caveat for the theme pass: Unity batchmode returned exit code 0, but the log contained `Access token is unavailable; failed to update`. The current session did not expose active Unity MCP tools, so visual screenshot validation still needs to be repeated in a logged-in Unity Editor/MCP session.
 - The room/chat/avatar feature exists.
 - The latest local gameplay/UI fix adds pre-send confirmation/return flow for replace/take/peek/spy/swap decisions, clearer game logs with exact slot numbers, and a polished round reveal panel.
 - Round reveal now waits for queued player action animations to finish before showing settlement. The UI no longer jumps from settlement back to the game panel because an action animation fires late.
@@ -69,9 +78,9 @@ Unity MCP verification already performed:
 - Verification screenshots may exist in Assets/Screenshots; treat them as temporary artifacts unless I say to keep them.
 
 Recommended next action:
-Run a real live verification with my server/bots when I tell you the server is ready. Check waiting room and game scene with 2/3/4 players, overflow chat history, confirm every new message scrolls to the bottom without resizing the panel or deforming the game table, and play through a final action into round reveal to confirm the last action animation completes before settlement appears. Rebuild the Windows exe/player when asked and specifically verify the waiting-room input row, Emoji/Send controls, sticker popup, and round reveal panel match Play Mode.
+First run Unity MCP compile/Console verification for the warm theme pass, then capture Play Mode screenshots for home, 4-player waiting room + emoji popup, 4-player game chat/log tabs, selected/target skill state, round reveal, and GameOver. After that, run a real live verification with my server/bots when I tell you the server is ready. Check waiting room and game scene with 2/3/4 players, overflow chat history, confirm every new message scrolls to the bottom without resizing the panel or deforming the game table, and play through a final action into round reveal to confirm the last action animation completes before settlement appears. Rebuild the Windows exe/player when asked and specifically verify the waiting-room input row, Emoji/Send controls, sticker popup, round reveal panel, and light-theme text contrast match Play Mode.
 
-If any issue remains, inspect RoomChatPanel.cs layout and UIManager fallback first.
+If any issue remains, inspect UITheme.cs, RoomChatPanel.cs layout, and UIManager fallback first.
 ```
 
 Asset recommendation:

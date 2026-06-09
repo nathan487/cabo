@@ -1,5 +1,58 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: Light Warm Theme Infrastructure and First Visual Pass
+
+Latest local Unity client visual work in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/Scripts/UI/UITheme.cs`
+  - Added a centralized runtime theme entry for C# UI Toolkit styling.
+  - Uses semantic colors instead of ad hoc raw colors:
+    - app/panel/table surfaces
+    - primary/secondary/muted text
+    - peach buttons
+    - current-turn and selected-card highlights
+    - CABO danger state
+    - ready/waiting states
+    - chat/log bubbles
+    - card face categories
+    - Peek/Spy/Swap skill colors
+  - Added helpers for panels, buttons, inputs, borders, alpha colors, card colors, skill colors, and contrast ratio calculation.
+- `Assets/UI/GameScreen.uss` and `Assets/Resources/GameScreen.uss`
+  - Updated both copies to the same cream green + peach USS variables and default Label/Button/TextField styles.
+  - This keeps Editor/Play Mode and player-build stylesheet fallback aligned.
+- `Assets/Scripts/UI/UIManager.cs`
+  - Runtime fallback now applies `UITheme` root, button, and TextField styles.
+  - Global fallback no longer returns the client to the old dark theme.
+- `Assets/Scripts/UI/RoomPanel.cs`
+  - Home/waiting-room title, room code, status, avatar picker, player rows, ready state, host tag, and chat container now use warm readable theme colors.
+- `Assets/Scripts/UI/RoomChatPanel.cs`
+  - Chat bubbles, sticker popup, empty state, error text, and active emoji button now use the theme palette.
+  - Existing chat layout, popup positioning, and auto-scroll behavior were not changed.
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - Main game background, table surface, center/action panels, side social panel, tab state, logs, cards, skill animation colors, ready badges, and seat/CABO/current-turn states now use the warm theme.
+  - Layout, VisualElement hierarchy, network logic, state machine, and game rules were not changed.
+
+Validation status:
+
+- Attempted Unity `2022.3.62f3c1` batchmode import/compile with:
+  - `Unity.exe -batchmode -quit -projectPath unity dev/New Client_Unity_Base_Cli`
+- The process returned exit code 0, but the log contained a Unity Licensing message: `Access token is unavailable; failed to update`.
+- Because the current session does not expose active Unity MCP tools and batchmode did not provide a clean Editor Console readback, final visual screenshot validation still needs to be done in a logged-in Unity Editor/MCP session.
+- No server build/start was performed.
+
+Known follow-up:
+
+- In Unity MCP, run AssetDatabase refresh / script compilation and confirm Console `0 errors / 0 warnings`.
+- Capture Play Mode screenshots for:
+  - home page
+  - 4-player waiting room with emoji popup
+  - 4-player game table chat tab
+  - game log tab
+  - selected/target card skill states
+  - round reveal
+  - GameOver
+- Do a real Windows player build check when requested, especially waiting-room controls and text contrast.
+
 ## 2026-06-09 Update: Skill Confirm Flow, Clear Logs, and Round Reveal Polish
 
 Latest verified Unity client work in `unity dev/New Client_Unity_Base_Cli`:

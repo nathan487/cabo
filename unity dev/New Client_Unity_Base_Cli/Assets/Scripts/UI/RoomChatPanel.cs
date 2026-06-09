@@ -80,10 +80,10 @@ namespace Cabo.Client.UI
             _stickerPopup.style.left = 4;
             _stickerPopup.style.right = 4;
             _stickerPopup.style.maxHeight = _compact ? 124 : 172;
-            _stickerPopup.style.backgroundColor = new Color(0.02f, 0.11f, 0.095f);
+            _stickerPopup.style.backgroundColor = UITheme.StickerPopupSurface;
             SetRadius(_stickerPopup, 6);
             SetBorderWidth(_stickerPopup, 1);
-            SetBorderColor(_stickerPopup, new Color(0.14f, 0.38f, 0.32f));
+            SetBorderColor(_stickerPopup, UITheme.PanelBorder);
             _stickerPopup.style.paddingLeft = 8;
             _stickerPopup.style.paddingRight = 8;
             _stickerPopup.style.paddingTop = 8;
@@ -167,7 +167,7 @@ namespace Cabo.Client.UI
             _status.style.fontSize = 11;
             _status.style.marginTop = 5;
             _status.style.flexShrink = 0;
-            _status.style.color = new Color(0.86f, 0.72f, 0.42f);
+            _status.style.color = UITheme.CaboDanger;
             _status.style.whiteSpace = WhiteSpace.Normal;
             Root.Add(_status);
         }
@@ -258,7 +258,8 @@ namespace Cabo.Client.UI
             if (_stickerPopupVisible)
             {
                 PositionStickerPopup();
-                _emojiButton.style.backgroundColor = new Color(0.12f, 0.32f, 0.27f);
+                _emojiButton.style.backgroundColor = UITheme.SelectedSurface;
+                _emojiButton.style.color = UITheme.TextPrimary;
                 _emojiButton.text = _compact ? "X" : "Close";
                 Root.schedule.Execute(PositionStickerPopup).ExecuteLater(0);
                 Root.schedule.Execute(PositionStickerPopup).ExecuteLater(80);
@@ -359,8 +360,8 @@ namespace Cabo.Client.UI
             row.style.paddingTop = 5;
             row.style.paddingBottom = 5;
             row.style.backgroundColor = message.SenderPlayerId == _flow.State.MyPlayerId
-                ? new Color(0.055f, 0.19f, 0.145f)
-                : new Color(0.035f, 0.16f, 0.135f);
+                ? UITheme.ChatSelfBubble
+                : UITheme.ChatOtherBubble;
             SetRadius(row, 6);
             row.style.overflow = Overflow.Hidden;
 
@@ -380,7 +381,7 @@ namespace Cabo.Client.UI
 
             var name = new Label(senderName + (message.SenderPlayerId == _flow.State.MyPlayerId ? " (You)" : ""));
             name.style.fontSize = 11;
-            name.style.color = new Color(0.84f, 0.91f, 0.86f);
+            name.style.color = UITheme.TextSecondary;
             name.style.unityFontStyleAndWeight = FontStyle.Bold;
             body.Add(name);
 
@@ -414,7 +415,7 @@ namespace Cabo.Client.UI
             var label = new Label(text ?? "");
             label.style.fontSize = 12;
             label.style.whiteSpace = WhiteSpace.Normal;
-            label.style.color = new Color(0.88f, 0.90f, 0.86f);
+            label.style.color = UITheme.TextPrimary;
             label.style.flexShrink = 1;
             label.style.minWidth = 0;
             parent.Add(label);
@@ -424,7 +425,7 @@ namespace Cabo.Client.UI
         {
             var empty = new Label(text);
             empty.style.fontSize = 12;
-            empty.style.color = new Color(0.62f, 0.70f, 0.67f);
+            empty.style.color = UITheme.TextMuted;
             empty.style.unityTextAlign = TextAnchor.MiddleCenter;
             empty.style.marginTop = 18;
             _messages.Add(empty);
@@ -439,7 +440,7 @@ namespace Cabo.Client.UI
             {
                 var none = new Label("No sticker assets");
                 none.style.fontSize = 11;
-                none.style.color = new Color(0.62f, 0.70f, 0.67f);
+                none.style.color = UITheme.TextMuted;
                 none.style.unityTextAlign = TextAnchor.MiddleCenter;
                 none.style.marginTop = 10;
                 _stickerTray.Add(none);

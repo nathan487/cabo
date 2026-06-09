@@ -37,12 +37,14 @@ namespace Cabo.Client.UI
             _title.style.fontSize = 28;
             _title.style.unityFontStyleAndWeight = FontStyle.Bold;
             _title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _title.style.color = UITheme.TextPrimary;
             _container.Add(_title);
 
             _roomCode = new Label();
             _roomCode.style.fontSize = 18;
             _roomCode.style.marginTop = 10;
             _roomCode.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _roomCode.style.color = UITheme.TextSecondary;
             _container.Add(_roomCode);
 
             _btnCopyRoomCode = new Button(() =>
@@ -121,7 +123,7 @@ namespace Cabo.Client.UI
             _status.style.fontSize = 14;
             _status.style.marginTop = 10;
             _status.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _status.style.color = new Color(0.5f, 0.5f, 0.5f);
+            _status.style.color = UITheme.TextMuted;
             _container.Add(_status);
 
             _nicknameInput = new TextField("昵称");
@@ -141,11 +143,7 @@ namespace Cabo.Client.UI
             _avatarSection.style.paddingRight = 12;
             _avatarSection.style.paddingTop = 10;
             _avatarSection.style.paddingBottom = 10;
-            _avatarSection.style.backgroundColor = new Color(0.06f, 0.12f, 0.13f);
-            _avatarSection.style.borderTopLeftRadius = 8;
-            _avatarSection.style.borderTopRightRadius = 8;
-            _avatarSection.style.borderBottomLeftRadius = 8;
-            _avatarSection.style.borderBottomRightRadius = 8;
+            UITheme.ApplyPanel(_avatarSection, UITheme.PanelSurface, UITheme.PanelBorder);
             _container.Add(_avatarSection);
 
             var avatarTitle = new Label("头像");
@@ -170,7 +168,7 @@ namespace Cabo.Client.UI
             _avatarStatus.style.fontSize = 11;
             _avatarStatus.style.unityTextAlign = TextAnchor.MiddleCenter;
             _avatarStatus.style.marginTop = 5;
-            _avatarStatus.style.color = new Color(0.74f, 0.82f, 0.78f);
+            _avatarStatus.style.color = UITheme.TextSecondary;
             _avatarSection.Add(_avatarStatus);
 
             _homeButtonRow = new VisualElement();
@@ -282,19 +280,7 @@ namespace Cabo.Client.UI
             _chatPanel.Root.style.paddingRight = 12;
             _chatPanel.Root.style.paddingTop = 10;
             _chatPanel.Root.style.paddingBottom = 10;
-            _chatPanel.Root.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
-            _chatPanel.Root.style.borderTopLeftRadius = 8;
-            _chatPanel.Root.style.borderTopRightRadius = 8;
-            _chatPanel.Root.style.borderBottomLeftRadius = 8;
-            _chatPanel.Root.style.borderBottomRightRadius = 8;
-            _chatPanel.Root.style.borderTopWidth = 1;
-            _chatPanel.Root.style.borderRightWidth = 1;
-            _chatPanel.Root.style.borderBottomWidth = 1;
-            _chatPanel.Root.style.borderLeftWidth = 1;
-            _chatPanel.Root.style.borderTopColor = new Color(0.12f, 0.32f, 0.27f);
-            _chatPanel.Root.style.borderRightColor = new Color(0.12f, 0.32f, 0.27f);
-            _chatPanel.Root.style.borderBottomColor = new Color(0.12f, 0.32f, 0.27f);
-            _chatPanel.Root.style.borderLeftColor = new Color(0.12f, 0.32f, 0.27f);
+            UITheme.ApplyPanel(_chatPanel.Root, UITheme.PanelSurface, UITheme.PanelBorder);
             _roomContent.Add(_chatPanel.Root);
         }
 
@@ -430,7 +416,7 @@ namespace Cabo.Client.UI
             choice.style.paddingRight = 4;
             choice.style.paddingTop = 4;
             choice.style.paddingBottom = 4;
-            choice.style.backgroundColor = selected ? new Color(0.12f, 0.26f, 0.20f) : new Color(0.05f, 0.13f, 0.12f);
+            choice.style.backgroundColor = selected ? UITheme.SelectedSurface : UITheme.PanelSurfaceAlt;
             choice.style.borderTopLeftRadius = 7;
             choice.style.borderTopRightRadius = 7;
             choice.style.borderBottomLeftRadius = 7;
@@ -439,7 +425,7 @@ namespace Cabo.Client.UI
             choice.style.borderRightWidth = selected ? 2 : 1;
             choice.style.borderBottomWidth = selected ? 2 : 1;
             choice.style.borderLeftWidth = selected ? 2 : 1;
-            var border = selected ? new Color(1f, 0.78f, 0.22f) : new Color(0.24f, 0.38f, 0.36f);
+            var border = selected ? UITheme.SelectedBorder : UITheme.PanelBorder;
             choice.style.borderTopColor = border;
             choice.style.borderRightColor = border;
             choice.style.borderBottomColor = border;
@@ -450,7 +436,7 @@ namespace Cabo.Client.UI
             text.style.fontSize = 10;
             text.style.unityTextAlign = TextAnchor.MiddleCenter;
             text.style.marginTop = 3;
-            text.style.color = new Color(0.86f, 0.90f, 0.86f);
+            text.style.color = UITheme.TextPrimary;
             choice.Add(text);
 
             choice.RegisterCallback<ClickEvent>(_ =>
@@ -472,7 +458,7 @@ namespace Cabo.Client.UI
             row.style.paddingRight = 10;
             row.style.paddingTop = 5;
             row.style.paddingBottom = 5;
-            row.style.backgroundColor = player.IsReady ? new Color(0.08f, 0.20f, 0.15f) : new Color(0.07f, 0.11f, 0.12f);
+            row.style.backgroundColor = player.IsReady ? UITheme.ReadySurface : UITheme.WaitingSurface;
             row.style.borderTopLeftRadius = 6;
             row.style.borderTopRightRadius = 6;
             row.style.borderBottomLeftRadius = 6;
@@ -481,7 +467,7 @@ namespace Cabo.Client.UI
             row.style.borderRightWidth = 1;
             row.style.borderBottomWidth = 1;
             row.style.borderLeftWidth = 1;
-            var border = player.IsReady ? new Color(0.34f, 0.62f, 0.43f) : new Color(0.22f, 0.34f, 0.32f);
+            var border = player.IsReady ? UITheme.ReadyBorder : UITheme.WaitingBorder;
             row.style.borderTopColor = border;
             row.style.borderRightColor = border;
             row.style.borderBottomColor = border;
@@ -501,14 +487,14 @@ namespace Cabo.Client.UI
             var tag = new Label(player.IsHost ? "房主" : "");
             tag.style.width = 44;
             tag.style.fontSize = 12;
-            tag.style.color = new Color(0.90f, 0.78f, 0.44f);
+            tag.style.color = UITheme.TurnHighlight;
             tag.style.unityTextAlign = TextAnchor.MiddleCenter;
             row.Add(tag);
 
             var ready = new Label(player.IsReady ? "已准备" : "未准备");
             ready.style.width = 62;
             ready.style.fontSize = 12;
-            ready.style.color = player.IsReady ? new Color(0.68f, 1f, 0.72f) : new Color(0.76f, 0.80f, 0.78f);
+            ready.style.color = player.IsReady ? UITheme.ReadyBorder : UITheme.TextSecondary;
             ready.style.unityTextAlign = TextAnchor.MiddleRight;
             row.Add(ready);
             return row;

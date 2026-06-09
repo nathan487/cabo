@@ -39,8 +39,7 @@ namespace Cabo.Client.UI
                 Root.style.right = 0;
                 Root.style.top = 0;
                 Root.style.bottom = 0;
-                Root.style.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 1f);
-                Root.style.color = new Color(0.86f, 0.86f, 0.90f);
+                UITheme.ApplyRoot(Root);
                 Debug.Log($"[UIManager] Root ready: {Root != null}, childCount={Root?.childCount}, panelSettings={uiDocument.panelSettings != null}");
             }
             if (Root == null) Debug.LogError("[UIManager] Cannot find UIDocument!");
@@ -99,14 +98,13 @@ namespace Cabo.Client.UI
             if (Root == null)
                 return;
 
-            Root.style.color = new Color(0.86f, 0.86f, 0.90f);
-            Root.style.backgroundColor = new Color(0.08f, 0.08f, 0.12f, 1f);
+            UITheme.ApplyRoot(Root);
 
             Root.Query<Label>().ForEach(label =>
             {
                 if (IsOnBrightSurface(label))
                     return;
-                label.style.color = new Color(0.86f, 0.86f, 0.90f);
+                label.style.color = UITheme.TextPrimary;
             });
 
             Root.Query<Button>().ForEach(button =>
@@ -117,13 +115,12 @@ namespace Cabo.Client.UI
             Root.Query<TextField>().ForEach(field =>
             {
                 EnsureImeSupport(field);
-                field.style.color = new Color(0.12f, 0.12f, 0.16f);
+                UITheme.ApplyInput(field);
             });
 
             Root.Query<VisualElement>(className: "unity-text-field__input").ForEach(input =>
             {
-                input.style.color = new Color(0.12f, 0.12f, 0.16f);
-                input.style.backgroundColor = new Color(0.96f, 0.96f, 0.98f);
+                UITheme.ApplyInputElement(input);
             });
         }
 
@@ -132,23 +129,7 @@ namespace Cabo.Client.UI
             if (button == null)
                 return;
 
-            button.style.color = enabled ? new Color(0.94f, 0.94f, 0.98f) : new Color(0.68f, 0.70f, 0.76f);
-            button.style.backgroundColor = enabled ? new Color(0.20f, 0.20f, 0.32f) : new Color(0.12f, 0.13f, 0.18f);
-            button.style.borderTopLeftRadius = 6;
-            button.style.borderTopRightRadius = 6;
-            button.style.borderBottomLeftRadius = 6;
-            button.style.borderBottomRightRadius = 6;
-            button.style.borderTopWidth = 1;
-            button.style.borderRightWidth = 1;
-            button.style.borderBottomWidth = 1;
-            button.style.borderLeftWidth = 1;
-
-            var border = enabled ? new Color(0.39f, 0.39f, 0.59f) : new Color(0.25f, 0.26f, 0.33f);
-            button.style.borderTopColor = border;
-            button.style.borderRightColor = border;
-            button.style.borderBottomColor = border;
-            button.style.borderLeftColor = border;
-            button.style.unityTextAlign = TextAnchor.MiddleCenter;
+            UITheme.ApplyButton(button, enabled);
         }
 
         static bool IsOnBrightSurface(VisualElement element)

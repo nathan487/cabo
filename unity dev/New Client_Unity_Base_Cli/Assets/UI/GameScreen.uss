@@ -1,14 +1,35 @@
+:root {
+    --cabo-bg-app: rgb(250, 240, 219);
+    --cabo-bg-soft: rgb(255, 247, 230);
+    --cabo-panel: rgb(255, 250, 232);
+    --cabo-panel-alt: rgb(245, 232, 204);
+    --cabo-panel-border: rgb(191, 158, 110);
+    --cabo-table: rgb(191, 224, 189);
+    --cabo-table-border: rgb(87, 140, 99);
+    --cabo-text-primary: rgb(36, 51, 41);
+    --cabo-text-secondary: rgb(89, 110, 87);
+    --cabo-text-muted: rgb(120, 135, 112);
+    --cabo-accent-peach: rgb(237, 140, 92);
+    --cabo-accent-peach-hover: rgb(255, 168, 112);
+    --cabo-accent-peach-border: rgb(191, 87, 51);
+    --cabo-button-disabled: rgb(219, 209, 189);
+    --cabo-button-disabled-border: rgb(173, 158, 138);
+    --cabo-text-disabled: rgb(128, 120, 105);
+    --cabo-input-bg: rgb(255, 252, 242);
+    --cabo-input-border: rgb(184, 156, 115);
+}
+
 Label {
-    color: rgb(220, 220, 220);
+    color: var(--cabo-text-primary);
     white-space: normal;
 }
 
 Button {
-    color: rgb(235, 235, 245);
-    background-color: rgb(50, 50, 80);
+    color: rgb(61, 38, 23);
+    background-color: var(--cabo-accent-peach);
     border-radius: 6px;
     border-width: 1px;
-    border-color: rgb(100, 100, 150);
+    border-color: var(--cabo-accent-peach-border);
     padding-top: 8px;
     padding-bottom: 8px;
     padding-left: 14px;
@@ -18,26 +39,28 @@ Button {
     -unity-text-align: middle-center;
 }
 
+Button:hover {
+    background-color: var(--cabo-accent-peach-hover);
+}
+
+Button:disabled {
+    background-color: var(--cabo-button-disabled);
+    border-color: var(--cabo-button-disabled-border);
+    color: var(--cabo-text-disabled);
+}
+
 TextField {
-    color: rgb(25, 25, 35);
+    color: var(--cabo-text-primary);
     white-space: normal;
 }
 
 TextField .unity-text-field__input {
-    color: rgb(25, 25, 35);
-    background-color: rgb(245, 245, 250);
+    color: var(--cabo-text-primary);
+    background-color: var(--cabo-input-bg);
+    border-color: var(--cabo-input-border);
 }
 
 TextField Label {
-    color: rgb(220, 220, 220);
+    color: var(--cabo-text-secondary);
     white-space: normal;
-}
-
-Button:hover {
-    background-color: rgb(70, 70, 110);
-}
-
-Button:disabled {
-    background-color: rgb(40, 40, 50);
-    color: rgb(100, 100, 100);
 }
