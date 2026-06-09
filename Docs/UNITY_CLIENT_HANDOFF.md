@@ -1,5 +1,57 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-09 Fast Resume: Center Table Cleanup + Readable Buttons
+
+Most recent local work reduced the in-game center panel noise and fixed unreadable button states.
+
+Files changed in the latest patch:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+
+What changed:
+
+- Normal active gameplay hides `_roundLabel`, `_turnLabel`, and `_statusLine`.
+- The center table now shows only draw pile and discard pile unless the local player has a meaningful decision.
+- `_actionPanel` defaults hidden and is only shown for decision substates:
+  - `AwaitingMainInput`
+  - `AwaitingDrawnDecision`
+  - `AwaitingReplaceSlots`
+  - `AwaitingTakeSlots`
+  - skill selection substates
+- `_actionTitle` and `_actionBody` remain hidden in ordinary action states so the action UI is a compact button row.
+- `RenderReveal()` and `RenderGameOver()` explicitly re-show the round/turn labels for settlement screens.
+- Added `UIManager.ApplyReadableButtonStyle(Button button, bool enabled)`.
+- Runtime fallback button styling now honors enabled/disabled state.
+- Enabled buttons use a dark readable background and light text.
+- Disabled buttons use a darker background and muted readable text, avoiding white text on light/default buttons in Play Mode or player builds.
+- `GameTablePanel` action/panel buttons now call the shared readable style helper.
+
+Latest Unity MCP verification:
+
+1. Triggered `AssetDatabase.Refresh()` and script compilation; Unity Console returned 0 errors/warnings.
+2. Entered Play Mode through MCP without starting the server.
+3. Injected a synthetic 4-player active game state.
+4. Verified idle/normal center table showed only draw pile and discard pile:
+   - `Assets/Screenshots/game_center_minimal_idle_clean.png`
+5. Verified action state showed only a compact action button row:
+   - `Assets/Screenshots/game_center_minimal_action_buttons_only.png`
+6. Verified enabled and disabled buttons were readable at the same time:
+   - `Assets/Screenshots/game_center_buttons_readable-2.png`
+   - Example measured style: disabled `拿弃牌` background `0.12,0.13,0.18`, text `0.68,0.70,0.76`.
+7. Exited Play Mode cleanly.
+8. Final Unity Console check returned 0 errors/warnings.
+
+Recommended next verification:
+
+- User starts server and bots.
+- Run live 2/3/4 player gameplay.
+- Confirm the center table remains visually quiet during ordinary turns.
+- Confirm decision buttons remain readable in all enabled/disabled states.
+- Rebuild Windows player when asked and compare against Play Mode.
+
+Server note: the user builds and starts the server. Do not run server build/start unless explicitly requested.
+
 ## 2026-06-09 Fast Resume: In-Game Two-Column Social Layout
 
 Most recent local work completed the comfortable two-column game-table layout requested by the user.

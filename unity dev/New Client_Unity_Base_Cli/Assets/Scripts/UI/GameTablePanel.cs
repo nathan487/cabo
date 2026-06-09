@@ -168,7 +168,9 @@ namespace Cabo.Client.UI
             _pileRow.style.flexDirection = FlexDirection.Row;
             _pileRow.style.justifyContent = Justify.Center;
             _pileRow.style.alignItems = Align.Center;
-            _pileRow.style.marginBottom = 8;
+            _pileRow.style.flexShrink = 0;
+            _pileRow.style.marginTop = 2;
+            _pileRow.style.marginBottom = 0;
             _centerTable.Add(_pileRow);
 
             _drawPile = new VisualElement();
@@ -210,17 +212,20 @@ namespace Cabo.Client.UI
             _actionPanel.style.paddingTop = 8;
             _actionPanel.style.paddingBottom = 8;
             _actionPanel.style.flexShrink = 0;
+            _actionPanel.style.marginTop = 10;
             _actionPanel.style.backgroundColor = new Color(0.025f, 0.13f, 0.11f);
             _actionPanel.style.borderTopLeftRadius = 8;
             _actionPanel.style.borderTopRightRadius = 8;
             _actionPanel.style.borderBottomLeftRadius = 8;
             _actionPanel.style.borderBottomRightRadius = 8;
+            _actionPanel.style.display = DisplayStyle.None;
             _centerTable.Add(_actionPanel);
 
             _actionTitle = new Label();
             _actionTitle.style.fontSize = 16;
             _actionTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             _actionTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _actionTitle.style.display = DisplayStyle.None;
             _actionPanel.Add(_actionTitle);
 
             _actionBody = new Label();
@@ -229,6 +234,7 @@ namespace Cabo.Client.UI
             _actionBody.style.unityTextAlign = TextAnchor.MiddleCenter;
             _actionBody.style.marginTop = 4;
             _actionBody.style.marginBottom = 6;
+            _actionBody.style.display = DisplayStyle.None;
             _actionPanel.Add(_actionBody);
             _actionPanel.Add(_drawnCardSlot);
 
@@ -350,8 +356,10 @@ namespace Cabo.Client.UI
             long visualCurrentPlayerId = holdingPreviousAction ? _heldActionSourcePlayerId : state.CurrentPlayerId;
             bool deferNewTurnActions = holdingPreviousAction && visualCurrentPlayerId != state.CurrentPlayerId;
 
-            _roundLabel.text = $"第 {state.RoundNumber} 轮  第 {state.TurnNumber} 回合";
-            _turnLabel.text = BuildTurnText(state, visualCurrentPlayerId, holdingPreviousAction);
+            _roundLabel.text = "";
+            _roundLabel.style.display = DisplayStyle.None;
+            _turnLabel.text = "";
+            _turnLabel.style.display = DisplayStyle.None;
 
             RenderSeats(state, visualCurrentPlayerId);
             RenderPiles(state);
@@ -359,8 +367,8 @@ namespace Cabo.Client.UI
             UpdateGameLogFromState(state);
             RenderSocialPanel(state);
 
-            _statusLine.text = ShouldShowActionStatus(_flow.SubState) ? BuildStatusText(state) : "";
-            _statusLine.style.display = string.IsNullOrWhiteSpace(_statusLine.text) ? DisplayStyle.None : DisplayStyle.Flex;
+            _statusLine.text = "";
+            _statusLine.style.display = DisplayStyle.None;
 
             if (pendingAction != null)
                 EnqueueActionAnimation(pendingAction);
@@ -371,6 +379,8 @@ namespace Cabo.Client.UI
         public void RenderReveal()
         {
             var state = _flow.State;
+            _roundLabel.style.display = DisplayStyle.Flex;
+            _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = $"第 {state.RoundNumber} 轮结算";
             _turnLabel.text = "所有手牌已翻开计分";
             HideSeatsForOverlay();
@@ -393,6 +403,8 @@ namespace Cabo.Client.UI
 
         public void RenderGameOver()
         {
+            _roundLabel.style.display = DisplayStyle.Flex;
+            _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = "游戏结束";
             _turnLabel.text = "最终排名";
             HideSeatsForOverlay();
@@ -513,7 +525,9 @@ namespace Cabo.Client.UI
             _drawnCardSlot.Clear();
             _drawnCardSlot.style.display = DisplayStyle.None;
             _buttonRow.Clear();
-            _actionPanel.style.display = DisplayStyle.Flex;
+            _actionPanel.style.display = ShouldShowActionPanel(_flow.SubState) && !deferNewTurnActions
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
 
             if (deferNewTurnActions)
             {
@@ -603,6 +617,20 @@ namespace Cabo.Client.UI
                     _actionBody.text = "请求已发送。";
                     break;
             }
+        }
+
+        static bool ShouldShowActionPanel(GameSubState subState)
+        {
+            return subState == GameSubState.AwaitingMainInput
+                || subState == GameSubState.AwaitingDrawnDecision
+                || subState == GameSubState.AwaitingReplaceSlots
+                || subState == GameSubState.AwaitingTakeSlots
+                || subState == GameSubState.SkillPeekSlot
+                || subState == GameSubState.SkillSpyTarget
+                || subState == GameSubState.SkillSpySlot
+                || subState == GameSubState.SkillSwapMySlot
+                || subState == GameSubState.SkillSwapTargetPlayer
+                || subState == GameSubState.SkillSwapTargetSlot;
         }
 
         void UpdateGameLogFromState(GameState state)
@@ -2291,6 +2319,7 @@ namespace Cabo.Client.UI
             button.style.marginRight = 5;
             button.style.marginTop = 4;
             button.style.marginBottom = 4;
+            StyleTableButton(button, enabled);
             button.SetEnabled(enabled);
             return button;
         }
@@ -2319,8 +2348,14 @@ namespace Cabo.Client.UI
             button.style.marginRight = 5;
             button.style.marginTop = 4;
             button.style.marginBottom = 4;
+            StyleTableButton(button, enabled);
             button.SetEnabled(enabled);
             _buttonRow.Add(button);
+        }
+
+        static void StyleTableButton(Button button, bool enabled)
+        {
+            UIManager.ApplyReadableButtonStyle(button, enabled);
         }
 
         void OnOwnSlotClicked(int slot)

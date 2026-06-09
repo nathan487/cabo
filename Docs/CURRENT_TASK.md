@@ -1,5 +1,48 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: Center Table Cleanup + Readable Buttons
+
+Latest local client UI work in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - Normal in-game center table now stays minimal: only draw pile and discard pile are shown when no player decision is needed.
+  - `_roundLabel`, `_turnLabel`, and `_statusLine` are hidden during ordinary gameplay so nonessential text no longer competes with the card table.
+  - `_actionPanel` is hidden by default and only appears for real decision substates:
+    - `AwaitingMainInput`
+    - `AwaitingDrawnDecision`
+    - `AwaitingReplaceSlots`
+    - `AwaitingTakeSlots`
+    - skill selection substates
+  - Action panel title/body copy is hidden in normal action states, leaving a compact button row.
+  - Reveal and GameOver screens explicitly re-enable round/turn labels so settlement screens still have context.
+  - Table action buttons and panel buttons now use a shared readable dark-button style.
+- `Assets/Scripts/UI/UIManager.cs`
+  - Added `ApplyReadableButtonStyle(Button button, bool enabled)`.
+  - Runtime UI fallback now styles enabled and disabled buttons differently instead of applying one generic style to all buttons.
+  - Enabled buttons use dark background plus light text.
+  - Disabled buttons use darker background plus muted readable text, preventing white-on-white or invisible button labels in Play Mode/player builds.
+
+Verified with Unity MCP:
+
+- Triggered `AssetDatabase.Refresh()` and script compilation; Unity Console returned 0 errors/warnings.
+- Entered Play Mode without starting the server.
+- Injected a synthetic 4-player active game state.
+- Verified normal/idle center table only showed draw pile and discard pile:
+  - `Assets/Screenshots/game_center_minimal_idle_clean.png`
+- Verified action state showed only a compact action button row:
+  - `Assets/Screenshots/game_center_minimal_action_buttons_only.png`
+- Verified button readability with enabled and disabled buttons visible at the same time:
+  - `Assets/Screenshots/game_center_buttons_readable-2.png`
+  - Example measured style: disabled `拿弃牌` resolved to dark background `0.12,0.13,0.18` and muted readable text `0.68,0.70,0.76`.
+- Exited Play Mode cleanly.
+- Final Unity Console check returned 0 errors/warnings.
+
+Known follow-up:
+
+- The user should still do a real Windows player build verification with live server/bots when ready.
+- Server build/start remains user-owned. Do not build or start the server unless explicitly asked.
+- MCP screenshots under `Assets/Screenshots/` are verification artifacts and should not be committed unless the user explicitly asks to keep them.
+
 ## 2026-06-09 Update: In-Game Two-Column Social Layout Completed
 
 Latest committed-ready client UI work in `unity dev/New Client_Unity_Base_Cli`:

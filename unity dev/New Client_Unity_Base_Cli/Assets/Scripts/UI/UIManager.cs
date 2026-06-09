@@ -106,21 +106,7 @@ namespace Cabo.Client.UI
 
             Root.Query<Button>().ForEach(button =>
             {
-                button.style.color = new Color(0.92f, 0.92f, 0.96f);
-                button.style.backgroundColor = new Color(0.20f, 0.20f, 0.32f);
-                button.style.borderTopLeftRadius = 6;
-                button.style.borderTopRightRadius = 6;
-                button.style.borderBottomLeftRadius = 6;
-                button.style.borderBottomRightRadius = 6;
-                button.style.borderTopWidth = 1;
-                button.style.borderRightWidth = 1;
-                button.style.borderBottomWidth = 1;
-                button.style.borderLeftWidth = 1;
-                button.style.borderTopColor = new Color(0.39f, 0.39f, 0.59f);
-                button.style.borderRightColor = new Color(0.39f, 0.39f, 0.59f);
-                button.style.borderBottomColor = new Color(0.39f, 0.39f, 0.59f);
-                button.style.borderLeftColor = new Color(0.39f, 0.39f, 0.59f);
-                button.style.unityTextAlign = TextAnchor.MiddleCenter;
+                ApplyReadableButtonStyle(button, button.enabledSelf);
             });
 
             Root.Query<TextField>().ForEach(field =>
@@ -134,6 +120,30 @@ namespace Cabo.Client.UI
                 input.style.color = new Color(0.12f, 0.12f, 0.16f);
                 input.style.backgroundColor = new Color(0.96f, 0.96f, 0.98f);
             });
+        }
+
+        public static void ApplyReadableButtonStyle(Button button, bool enabled)
+        {
+            if (button == null)
+                return;
+
+            button.style.color = enabled ? new Color(0.94f, 0.94f, 0.98f) : new Color(0.68f, 0.70f, 0.76f);
+            button.style.backgroundColor = enabled ? new Color(0.20f, 0.20f, 0.32f) : new Color(0.12f, 0.13f, 0.18f);
+            button.style.borderTopLeftRadius = 6;
+            button.style.borderTopRightRadius = 6;
+            button.style.borderBottomLeftRadius = 6;
+            button.style.borderBottomRightRadius = 6;
+            button.style.borderTopWidth = 1;
+            button.style.borderRightWidth = 1;
+            button.style.borderBottomWidth = 1;
+            button.style.borderLeftWidth = 1;
+
+            var border = enabled ? new Color(0.39f, 0.39f, 0.59f) : new Color(0.25f, 0.26f, 0.33f);
+            button.style.borderTopColor = border;
+            button.style.borderRightColor = border;
+            button.style.borderBottomColor = border;
+            button.style.borderLeftColor = border;
+            button.style.unityTextAlign = TextAnchor.MiddleCenter;
         }
 
         static bool IsOnBrightSurface(VisualElement element)

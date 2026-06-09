@@ -12,11 +12,18 @@ Important server rule: I will build/start the server myself. Do not build or sta
 Current latest local state:
 - The room/chat/avatar feature exists.
 - The latest local UI fix completes the in-game comfortable two-column layout.
-- Key files touched: Assets/Scripts/UI/RoomChatPanel.cs, RoomPanel.cs, GameTablePanel.cs, UIManager.cs.
+- The latest follow-up also simplifies the in-game center table and fixes unreadable button states.
+- Key files touched across recent UI work: Assets/Scripts/UI/RoomChatPanel.cs, RoomPanel.cs, GameTablePanel.cs, UIManager.cs.
 - In-game `GameTablePanel` now uses two columns:
   - Left `TablePlayArea`: full card table, all seats, center table, and self hand.
   - Right `TableSocialPanel`: fixed 300px chat/log sidebar.
 - `TableSocialPanel` was moved out of `TableMiddle`; chat/log content no longer squeezes the center table or changes opponent/self card layout.
+- Normal in-game center table is intentionally quiet now: ordinary gameplay shows only draw pile and discard pile until the player has an actual decision to make.
+- `_actionPanel` appears only for decision substates such as AwaitingMainInput, draw decision, replace/take selection, and skill selection.
+- Action panel title/body text is hidden in ordinary action states, leaving compact action buttons.
+- Reveal and GameOver screens still re-enable the round/turn labels for context.
+- `UIManager.ApplyReadableButtonStyle` is the shared button readability helper.
+- Runtime fallback now distinguishes enabled and disabled buttons; disabled buttons are dark with muted readable text, preventing white-on-white labels.
 - Game chat uses `RoomChatPanel(flow, compact: true, fillHeight: true)`, so message history flex-fills the sidebar and the input row stays pinned near the bottom.
 - Chat message history is now fixed-size and scrollable in both waiting room and in-game chat.
 - New messages auto-scroll to bottom with an immediate scroll plus delayed fallback after UI Toolkit layout settles.
@@ -29,6 +36,11 @@ Current latest local state:
 
 Unity MCP verification already performed:
 - AssetDatabase.Refresh + compile completed with 0 console errors/warnings.
+- Synthetic 4-player Play Mode idle game state showed only draw pile/discard pile in the center table.
+- Synthetic 4-player Play Mode action state showed compact action buttons only.
+- Button readability was verified in Play Mode with enabled and disabled buttons visible at the same time.
+- Disabled `拿弃牌` measured as dark background with muted readable text, not white-on-white.
+- Button readability screenshot artifact: Assets/Screenshots/game_center_buttons_readable-2.png.
 - Synthetic 4-player Play Mode state with 80 long chat messages kept the in-game chat panel fixed.
 - Auto-scroll test: rendered 79 messages, forced the game chat scroll offset to 0, appended message 80, re-rendered, waited 450ms, measured offsetY=maxY and atBottom=True.
 - Exact auto-scroll measurement: offsetY=8116.8; maxY=8116.8; delta=0.0; atBottom=True; childCount=80.
