@@ -85,6 +85,12 @@ namespace Cabo.Client.Network
                 case ServerMessage.PayloadOneofCase.RoomStartNotify:
                     InvokeHandler(message.RoomStartNotify);
                     break;
+                case ServerMessage.PayloadOneofCase.RoomChatRsp:
+                    InvokeHandler(message.RoomChatRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.RoomChatNotify:
+                    InvokeHandler(message.RoomChatNotify);
+                    break;
 
                 // Game
                 case ServerMessage.PayloadOneofCase.GameStartNotify:

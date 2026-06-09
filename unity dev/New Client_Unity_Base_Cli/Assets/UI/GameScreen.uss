@@ -55,6 +55,7 @@ TextField {
     border-radius: 6px;
     border-width: 1px;
     border-color: var(--cabo-input-border);
+    picking-mode: position;
     white-space: normal;
 }
 

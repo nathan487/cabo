@@ -101,6 +101,7 @@ namespace Cabo.Client.UI
         public static void ApplyInput(TextField field)
         {
             if (field == null) return;
+            field.pickingMode = PickingMode.Position;
             field.style.color = TextPrimary;
             field.style.backgroundColor = InputBackground;
             SetRadius(field, 6f);
@@ -111,6 +112,7 @@ namespace Cabo.Client.UI
         public static void ApplyInputElement(VisualElement input)
         {
             if (input == null) return;
+            input.pickingMode = PickingMode.Position;
             input.style.color = TextPrimary;
             input.style.backgroundColor = InputBackground;
             SetRadius(input, 6f);
