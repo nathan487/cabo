@@ -53,6 +53,42 @@ Known follow-up:
   - GameOver
 - Do a real Windows player build check when requested, especially waiting-room controls and text contrast.
 
+### 2026-06-09 Follow-up: Contrast Fixes Verified With Unity MCP
+
+The first warm theme pass was visually too low-contrast in several small state labels. Follow-up fixes:
+
+- `Assets/Scripts/UI/UITheme.cs`
+  - Deepened the cream/green/peach theme values while keeping the same visual direction.
+  - Added separate `TurnBorder` so current-turn borders are darker than the warm turn fill.
+  - Deepened selected-card and swap-skill border colors.
+- `Assets/Scripts/UI/RoomPanel.cs`
+  - Waiting-room `房主` and `已准备` labels now use primary text color instead of low-contrast status colors.
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - Round-reveal ready badges now use primary text for `已准备`, preventing green-on-green low contrast.
+- `Assets/Scripts/UI/PlayerProfileStore.cs`
+  - Fallback avatar initials now choose dark or white text based on avatar background luminance.
+
+Unity MCP verification:
+
+- Refreshed Unity and requested compilation through MCP; final Console after verification was `0 errors / 0 warnings`.
+- Play Mode synthetic checks were run for:
+  - 4-player waiting room
+  - 4-player game table with CABO caller, current turn, skill selection, chat/log sidebar
+  - 4-player round reveal
+  - GameOver
+- Runtime contrast detector checked visible `Label` and `Button` resolved styles:
+  - Waiting room: `labelContrastChecked=33; lowLabelCount=0; buttonVisibleCount=8; lowButtonCount=0`
+  - Game table: `labelContrastChecked=55; lowLabelCount=0; buttonVisibleCount=8; lowButtonCount=0`
+  - Round reveal: `labelContrastChecked=69; lowLabelCount=0; buttonVisibleCount=4; lowButtonCount=0`
+  - GameOver: `labelContrastChecked=9; lowLabelCount=0; buttonVisibleCount=5; lowButtonCount=0`
+- Screenshot artifacts generated under `Assets/Screenshots/`:
+  - `theme_waiting_room_final.png`
+  - `theme_game_table_final.png`
+  - `theme_round_reveal_final.png`
+  - `theme_gameover_final.png`
+
+These screenshot artifacts are verification output and should not be committed unless explicitly requested.
+
 ## 2026-06-09 Update: Skill Confirm Flow, Clear Logs, and Round Reveal Polish
 
 Latest verified Unity client work in `unity dev/New Client_Unity_Base_Cli`:

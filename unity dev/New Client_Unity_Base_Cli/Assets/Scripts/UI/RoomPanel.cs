@@ -487,14 +487,14 @@ namespace Cabo.Client.UI
             var tag = new Label(player.IsHost ? "房主" : "");
             tag.style.width = 44;
             tag.style.fontSize = 12;
-            tag.style.color = UITheme.TurnHighlight;
+            tag.style.color = UITheme.TextPrimary;
             tag.style.unityTextAlign = TextAnchor.MiddleCenter;
             row.Add(tag);
 
             var ready = new Label(player.IsReady ? "已准备" : "未准备");
             ready.style.width = 62;
             ready.style.fontSize = 12;
-            ready.style.color = player.IsReady ? UITheme.ReadyBorder : UITheme.TextSecondary;
+            ready.style.color = UITheme.TextPrimary;
             ready.style.unityTextAlign = TextAnchor.MiddleRight;
             row.Add(ready);
             return row;

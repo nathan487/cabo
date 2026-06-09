@@ -168,7 +168,8 @@ namespace Cabo.Client.UI
             avatar.style.borderRightColor = new Color(0.58f, 0.78f, 0.70f);
             avatar.style.borderBottomColor = new Color(0.58f, 0.78f, 0.70f);
             avatar.style.borderLeftColor = new Color(0.58f, 0.78f, 0.70f);
-            avatar.style.backgroundColor = GetFallbackColor(playerName);
+            var fallbackColor = GetFallbackColor(playerName);
+            avatar.style.backgroundColor = fallbackColor;
             avatar.style.alignItems = Align.Center;
             avatar.style.justifyContent = Justify.Center;
 
@@ -186,7 +187,7 @@ namespace Cabo.Client.UI
             initial.style.fontSize = Mathf.Max(12, size / 3);
             initial.style.unityFontStyleAndWeight = FontStyle.Bold;
             initial.style.unityTextAlign = TextAnchor.MiddleCenter;
-            initial.style.color = Color.white;
+            initial.style.color = GetReadableTextColor(fallbackColor);
             avatar.Add(initial);
             return avatar;
         }
@@ -317,6 +318,20 @@ namespace Cabo.Client.UI
                 new Color(0.28f, 0.50f, 0.56f)
             };
             return palette[Mathf.Abs(hash % palette.Length)];
+        }
+
+        static Color GetReadableTextColor(Color background)
+        {
+            var luminance = 0.2126f * ToLinear(background.r)
+                + 0.7152f * ToLinear(background.g)
+                + 0.0722f * ToLinear(background.b);
+            return luminance > 0.22f ? new Color(0.08f, 0.10f, 0.08f) : Color.white;
+        }
+
+        static float ToLinear(float value)
+        {
+            value = Mathf.Clamp01(value);
+            return value <= 0.03928f ? value / 12.92f : Mathf.Pow((value + 0.055f) / 1.055f, 2.4f);
         }
 
         [Serializable]

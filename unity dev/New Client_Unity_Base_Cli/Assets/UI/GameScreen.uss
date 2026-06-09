@@ -1,22 +1,22 @@
 :root {
-    --cabo-bg-app: rgb(250, 240, 219);
-    --cabo-bg-soft: rgb(255, 247, 230);
-    --cabo-panel: rgb(255, 250, 232);
-    --cabo-panel-alt: rgb(245, 232, 204);
-    --cabo-panel-border: rgb(191, 158, 110);
-    --cabo-table: rgb(191, 224, 189);
-    --cabo-table-border: rgb(87, 140, 99);
-    --cabo-text-primary: rgb(36, 51, 41);
-    --cabo-text-secondary: rgb(89, 110, 87);
-    --cabo-text-muted: rgb(120, 135, 112);
-    --cabo-accent-peach: rgb(237, 140, 92);
-    --cabo-accent-peach-hover: rgb(255, 168, 112);
-    --cabo-accent-peach-border: rgb(191, 87, 51);
-    --cabo-button-disabled: rgb(219, 209, 189);
-    --cabo-button-disabled-border: rgb(173, 158, 138);
-    --cabo-text-disabled: rgb(128, 120, 105);
+    --cabo-bg-app: rgb(245, 230, 199);
+    --cabo-bg-soft: rgb(252, 240, 212);
+    --cabo-panel: rgb(255, 247, 222);
+    --cabo-panel-alt: rgb(232, 212, 171);
+    --cabo-panel-border: rgb(120, 89, 51);
+    --cabo-table: rgb(158, 199, 145);
+    --cabo-table-border: rgb(41, 87, 51);
+    --cabo-text-primary: rgb(20, 31, 23);
+    --cabo-text-secondary: rgb(56, 79, 59);
+    --cabo-text-muted: rgb(92, 107, 87);
+    --cabo-accent-peach: rgb(224, 107, 61);
+    --cabo-accent-peach-hover: rgb(245, 138, 82);
+    --cabo-accent-peach-border: rgb(120, 46, 23);
+    --cabo-button-disabled: rgb(186, 176, 156);
+    --cabo-button-disabled-border: rgb(110, 97, 79);
+    --cabo-text-disabled: rgb(61, 56, 46);
     --cabo-input-bg: rgb(255, 252, 242);
-    --cabo-input-border: rgb(184, 156, 115);
+    --cabo-input-border: rgb(97, 71, 41);
 }
 
 Label {

@@ -2406,7 +2406,7 @@ namespace Cabo.Client.UI
             var readyState = new Label(player.IsReady ? "已准备" : "...");
             readyState.style.fontSize = 11;
             readyState.style.unityTextAlign = TextAnchor.MiddleRight;
-            readyState.style.color = player.IsReady ? UITheme.ReadyBorder : UITheme.TextSecondary;
+            readyState.style.color = UITheme.TextPrimary;
             badge.Add(readyState);
             return badge;
         }
@@ -2857,7 +2857,7 @@ namespace Cabo.Client.UI
                 _tag.style.color = isCaboCaller ? UITheme.TextOnDanger : isCurrentTurn ? UITheme.TextOnAccent : UITheme.TextSecondary;
                 _tag.style.backgroundColor = isCaboCaller ? UITheme.CaboDanger : isCurrentTurn ? UITheme.TurnHighlight : Color.clear;
                 Root.style.backgroundColor = isCaboCaller ? UITheme.CaboSurface : UITheme.PanelSurface;
-                var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnHighlight : UITheme.PanelBorder;
+                var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnBorder : UITheme.PanelBorder;
                 Root.style.borderTopColor = borderColor;
                 Root.style.borderRightColor = Root.style.borderTopColor.value;
                 Root.style.borderBottomColor = Root.style.borderTopColor.value;

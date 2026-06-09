@@ -10,61 +10,62 @@ namespace Cabo.Client.UI
     /// </summary>
     public static class UITheme
     {
-        public static readonly Color AppBackground = new(0.98f, 0.94f, 0.86f, 1f);
-        public static readonly Color AppBackgroundSoft = new(1.00f, 0.97f, 0.90f, 1f);
-        public static readonly Color PanelSurface = new(1.00f, 0.98f, 0.91f, 1f);
-        public static readonly Color PanelSurfaceAlt = new(0.96f, 0.91f, 0.80f, 1f);
-        public static readonly Color PanelBorder = new(0.75f, 0.62f, 0.43f, 1f);
+        public static readonly Color AppBackground = new(0.96f, 0.90f, 0.78f, 1f);
+        public static readonly Color AppBackgroundSoft = new(0.99f, 0.94f, 0.83f, 1f);
+        public static readonly Color PanelSurface = new(1.00f, 0.97f, 0.87f, 1f);
+        public static readonly Color PanelSurfaceAlt = new(0.91f, 0.83f, 0.67f, 1f);
+        public static readonly Color PanelBorder = new(0.47f, 0.35f, 0.20f, 1f);
 
-        public static readonly Color TableSurface = new(0.75f, 0.88f, 0.74f, 1f);
-        public static readonly Color TableSurfaceAlt = new(0.66f, 0.82f, 0.68f, 1f);
-        public static readonly Color TableBorder = new(0.34f, 0.55f, 0.39f, 1f);
+        public static readonly Color TableSurface = new(0.62f, 0.78f, 0.57f, 1f);
+        public static readonly Color TableSurfaceAlt = new(0.48f, 0.68f, 0.50f, 1f);
+        public static readonly Color TableBorder = new(0.16f, 0.34f, 0.20f, 1f);
 
-        public static readonly Color TextPrimary = new(0.14f, 0.20f, 0.16f, 1f);
-        public static readonly Color TextSecondary = new(0.35f, 0.43f, 0.34f, 1f);
-        public static readonly Color TextMuted = new(0.47f, 0.53f, 0.44f, 1f);
-        public static readonly Color TextOnAccent = new(0.24f, 0.15f, 0.09f, 1f);
+        public static readonly Color TextPrimary = new(0.08f, 0.12f, 0.09f, 1f);
+        public static readonly Color TextSecondary = new(0.22f, 0.31f, 0.23f, 1f);
+        public static readonly Color TextMuted = new(0.36f, 0.42f, 0.34f, 1f);
+        public static readonly Color TextOnAccent = new(0.16f, 0.08f, 0.03f, 1f);
         public static readonly Color TextOnDanger = Color.white;
 
-        public static readonly Color AccentPeach = new(0.93f, 0.55f, 0.36f, 1f);
-        public static readonly Color AccentPeachHover = new(1.00f, 0.66f, 0.44f, 1f);
-        public static readonly Color AccentPeachBorder = new(0.75f, 0.34f, 0.20f, 1f);
+        public static readonly Color AccentPeach = new(0.88f, 0.42f, 0.24f, 1f);
+        public static readonly Color AccentPeachHover = new(0.96f, 0.54f, 0.32f, 1f);
+        public static readonly Color AccentPeachBorder = new(0.47f, 0.18f, 0.09f, 1f);
 
-        public static readonly Color ButtonDisabled = new(0.86f, 0.82f, 0.74f, 1f);
-        public static readonly Color ButtonDisabledBorder = new(0.68f, 0.62f, 0.54f, 1f);
-        public static readonly Color TextDisabled = new(0.50f, 0.47f, 0.41f, 1f);
+        public static readonly Color ButtonDisabled = new(0.73f, 0.69f, 0.61f, 1f);
+        public static readonly Color ButtonDisabledBorder = new(0.43f, 0.38f, 0.31f, 1f);
+        public static readonly Color TextDisabled = new(0.24f, 0.22f, 0.18f, 1f);
 
-        public static readonly Color InputBackground = new(1.00f, 0.99f, 0.95f, 1f);
-        public static readonly Color InputBorder = new(0.72f, 0.61f, 0.45f, 1f);
+        public static readonly Color InputBackground = new(1.00f, 0.99f, 0.94f, 1f);
+        public static readonly Color InputBorder = new(0.38f, 0.28f, 0.16f, 1f);
 
-        public static readonly Color TurnHighlight = new(0.95f, 0.73f, 0.25f, 1f);
-        public static readonly Color SelectedBorder = new(1.00f, 0.70f, 0.16f, 1f);
-        public static readonly Color SelectedSurface = new(1.00f, 0.93f, 0.67f, 1f);
+        public static readonly Color TurnHighlight = new(0.93f, 0.61f, 0.09f, 1f);
+        public static readonly Color TurnBorder = new(0.52f, 0.25f, 0.00f, 1f);
+        public static readonly Color SelectedBorder = new(0.58f, 0.20f, 0.00f, 1f);
+        public static readonly Color SelectedSurface = new(1.00f, 0.86f, 0.45f, 1f);
 
-        public static readonly Color CaboDanger = new(0.80f, 0.22f, 0.25f, 1f);
-        public static readonly Color CaboSurface = new(1.00f, 0.86f, 0.82f, 1f);
-        public static readonly Color CaboBorder = new(0.87f, 0.25f, 0.29f, 1f);
+        public static readonly Color CaboDanger = new(0.68f, 0.08f, 0.13f, 1f);
+        public static readonly Color CaboSurface = new(0.98f, 0.76f, 0.70f, 1f);
+        public static readonly Color CaboBorder = new(0.55f, 0.03f, 0.08f, 1f);
 
-        public static readonly Color ReadySurface = new(0.78f, 0.91f, 0.72f, 1f);
-        public static readonly Color ReadyBorder = new(0.36f, 0.68f, 0.36f, 1f);
-        public static readonly Color WaitingSurface = new(0.95f, 0.90f, 0.80f, 1f);
-        public static readonly Color WaitingBorder = new(0.72f, 0.61f, 0.45f, 1f);
+        public static readonly Color ReadySurface = new(0.68f, 0.86f, 0.59f, 1f);
+        public static readonly Color ReadyBorder = new(0.17f, 0.48f, 0.19f, 1f);
+        public static readonly Color WaitingSurface = new(0.90f, 0.82f, 0.66f, 1f);
+        public static readonly Color WaitingBorder = new(0.46f, 0.35f, 0.20f, 1f);
 
-        public static readonly Color ChatSelfBubble = new(0.86f, 0.94f, 0.80f, 1f);
-        public static readonly Color ChatOtherBubble = new(1.00f, 0.94f, 0.84f, 1f);
-        public static readonly Color FeedBubble = new(0.94f, 0.90f, 0.80f, 1f);
-        public static readonly Color StickerPopupSurface = new(1.00f, 0.96f, 0.86f, 1f);
+        public static readonly Color ChatSelfBubble = new(0.76f, 0.91f, 0.67f, 1f);
+        public static readonly Color ChatOtherBubble = new(0.98f, 0.88f, 0.70f, 1f);
+        public static readonly Color FeedBubble = new(0.88f, 0.80f, 0.63f, 1f);
+        public static readonly Color StickerPopupSurface = new(0.99f, 0.91f, 0.73f, 1f);
 
-        public static readonly Color CardLow = new(0.84f, 0.95f, 0.78f, 1f);
-        public static readonly Color CardMid = new(0.98f, 0.95f, 0.85f, 1f);
-        public static readonly Color CardSkill = new(1.00f, 0.88f, 0.62f, 1f);
-        public static readonly Color CardHigh = new(1.00f, 0.80f, 0.74f, 1f);
-        public static readonly Color CardBack = new(0.42f, 0.55f, 0.78f, 1f);
-        public static readonly Color CardBorder = new(0.67f, 0.58f, 0.44f, 1f);
+        public static readonly Color CardLow = new(0.74f, 0.91f, 0.63f, 1f);
+        public static readonly Color CardMid = new(0.99f, 0.93f, 0.76f, 1f);
+        public static readonly Color CardSkill = new(1.00f, 0.75f, 0.39f, 1f);
+        public static readonly Color CardHigh = new(0.98f, 0.63f, 0.56f, 1f);
+        public static readonly Color CardBack = new(0.13f, 0.30f, 0.50f, 1f);
+        public static readonly Color CardBorder = new(0.31f, 0.23f, 0.14f, 1f);
 
-        public static readonly Color SkillPeek = new(0.20f, 0.64f, 0.72f, 1f);
-        public static readonly Color SkillSpy = new(0.70f, 0.45f, 0.78f, 1f);
-        public static readonly Color SkillSwap = new(0.95f, 0.55f, 0.16f, 1f);
+        public static readonly Color SkillPeek = new(0.00f, 0.47f, 0.57f, 1f);
+        public static readonly Color SkillSpy = new(0.54f, 0.20f, 0.66f, 1f);
+        public static readonly Color SkillSwap = new(0.68f, 0.22f, 0.00f, 1f);
 
         public static void ApplyRoot(VisualElement root)
         {
