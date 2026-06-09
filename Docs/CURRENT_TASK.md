@@ -1,5 +1,46 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: Room Chat Panel Layout Stabilized
+
+Latest uncommitted client UI work in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/Scripts/UI/RoomChatPanel.cs`
+  - Room chat messages now live inside a fixed-height `ScrollView` named `RoomChatMessageScroll`.
+  - Waiting-room chat and in-game chat keep stable size/position even when many messages arrive.
+  - Sticker tray is popup-based and no longer permanently consumes vertical space.
+  - Waiting-room controls now use build-safe ASCII labels (`Emoji`, `Close`, `Send`) to avoid player-build text resource/font fallback differences hiding the input row controls.
+  - Waiting-room sticker popup is enlarged (`72x72` buttons, `58px` images) and opens above the input row, so stickers remain readable and do not cover the text field.
+  - New messages auto-scroll to the bottom. Implementation schedules an immediate scroll plus an 80 ms delayed fallback after UI Toolkit layout settles.
+  - Incremental rendering now rebuilds correctly when the server-side 50-message cap removes older messages while appending a new one.
+- `Assets/Scripts/UI/RoomPanel.cs`
+  - Waiting-room player list is a fixed-height vertical `ScrollView`, so 3-4 players do not push buttons/chat out of place.
+  - Waiting room content now uses a fixed-height horizontal layout: player list on the left and room chat on the right. This matches the Windows player build better than the old vertical stacking and prevents the chat input / Emoji / Send controls from being clipped.
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - In-game right social/chat panel has fixed width and hidden overflow, preventing player count or chat content from stretching the card table.
+- `Assets/Scripts/UI/UIManager.cs`
+  - Runtime fallback styling no longer forces all buttons to `minWidth=104` or all text fields to `minWidth=180`, preserving compact chat controls.
+
+Verified with Unity MCP:
+
+- Triggered `AssetDatabase.Refresh()` and waited for compilation: Unity Console returned 0 errors/warnings.
+- Entered Play Mode without starting the server.
+- Injected a synthetic 4-player game state with long room chat history.
+- Stress case: 4 players + 80 long chat messages. The in-game chat panel remained fixed at about `245x271` inside the social panel.
+- Auto-scroll verification: render 79 messages, force `RoomChatMessageScroll.scrollOffset.y = 0`, append message 80, re-render, wait 450 ms.
+  - Measured result: `offsetY=8116.8; maxY=8116.8; delta=0.0; atBottom=True; childCount=80`.
+- Captured screenshots under `Assets/Screenshots/` during verification. These are test artifacts and should not be committed unless intentionally needed.
+- Rechecked the waiting-room exe-specific case in Play Mode by injecting a synthetic 4-player waiting-room state and opening the sticker popup:
+  - Input field, `Close`, and `Send` were visible.
+  - Sticker buttons measured about `72x72`, with larger readable sticker art.
+  - Popup rendered above the input row instead of covering it.
+  - Screenshot artifact: `Assets/Screenshots/waiting_room_chat_popup_above_input.png`.
+- Final Unity Console check after the waiting-room popup verification returned 0 errors/warnings.
+
+Known follow-up:
+
+- The user should still verify the same behavior in the real Windows player build with live server/bots.
+- Server build/start remains user-owned. Do not build or start the server unless explicitly asked.
+
 ## 2026-06-08 Update: Room Chat / Avatars / Build Text Baseline
 
 Latest committed work:

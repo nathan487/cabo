@@ -1,5 +1,63 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-09 Fast Resume: Chat Panel Layout Fix
+
+Most recent local work focuses on the room communication panel in both the waiting room and in-game table.
+
+Files changed:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/RoomChatPanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/RoomPanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+
+What changed:
+
+- Room chat message display is now a fixed-height scroll area (`RoomChatMessageScroll`), so chat history never stretches the panel or the game table.
+- New room-chat messages auto-scroll to the bottom. The code does an immediate `ScrollTo(last)` and a delayed 80 ms retry after UI Toolkit layout settles.
+- Waiting-room player list is fixed-height and scrollable; 3-4 players should not deform the buttons/chat area.
+- Waiting-room content now uses a fixed-height horizontal layout: player list on the left, room chat on the right. This was added because the Windows exe/player build clipped the old vertically stacked chat input row differently from Play Mode.
+- Waiting-room chat controls use build-safe ASCII labels (`Emoji`, `Close`, `Send`) instead of Chinese control text, avoiding player-build font/text-resource fallback issues that made the text field, emoji, and send controls appear missing.
+- Waiting-room sticker popup is larger and easier to read: sticker buttons are about `72x72`, sticker images are about `58px`, and the popup opens above the input row instead of covering it.
+- In-game social panel width is fixed; chat/log content cannot stretch the main card table.
+- Global runtime fallback styling no longer overwrites compact button/text-field widths.
+
+Unity MCP verification already performed:
+
+1. `AssetDatabase.Refresh()` via `execute_code`, waited for compilation.
+2. `read_console` returned 0 errors/warnings.
+3. Entered Play Mode through `manage_editor`.
+4. Injected a synthetic 4-player game state with room chat messages directly into `GameFlow.State`.
+5. Rendered the in-game chat tab with 80 long messages.
+6. Verified fixed layout: in-game chat panel measured about `245.0x271.0`.
+7. Verified auto-scroll:
+   - Render 79 messages.
+   - Force `RoomChatMessageScroll.scrollOffset.y = 0`.
+   - Append message 80.
+   - Re-render and wait 450 ms.
+   - Measurement: `offsetY=8116.8; maxY=8116.8; delta=0.0; atBottom=True; childCount=80`.
+8. Injected a synthetic 4-player waiting-room state and toggled the sticker popup.
+9. Verified the waiting-room input field, `Close`, `Send`, and enlarged sticker popup are visible and stable.
+10. Screenshot artifact: `Assets/Screenshots/waiting_room_chat_popup_above_input.png`.
+11. `read_console` again returned 0 errors/warnings.
+
+Temporary screenshot artifacts may exist at:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots/`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots.meta`
+
+These screenshots were created by MCP verification and are not part of the gameplay feature unless the user explicitly wants to keep them.
+
+Recommended next live verification:
+
+- User starts server and bots.
+- Test waiting room with 2, 3, and 4 players.
+- Send enough room chat messages to overflow the panel.
+- Rebuild the Windows exe/player and specifically confirm the waiting-room input row, Emoji/Send controls, and sticker popup match Play Mode.
+- Confirm the message panel stays fixed and each new message scrolls to the bottom in both waiting room and game scene.
+
+Server note: the user builds and starts the server. Do not run server build/start unless explicitly requested.
+
 ## 2026-06-08 Latest Stable Commit
 
 Latest committed baseline:

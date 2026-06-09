@@ -3,13 +3,38 @@
 Copy this into the next Codex session:
 
 ```text
-请先阅读 Docs/UNITY_CLIENT_HANDOFF.md、Docs/CURRENT_TASK.md、Docs/UNITY_GAME_SCENE_TASK.md、Docs/UNITY_ANIMATION_NOTES.md，然后继续开发 unity dev/New Client_Unity_Base_Cli。需要用 Unity MCP，请按 handoff 文档快速启动/连接 MCP，不要重新摸索。服务端 build 和启动由我负责，除非我明确要求，否则不要自行 build/start 服务端。
+Please first read Docs/UNITY_CLIENT_HANDOFF.md, Docs/CURRENT_TASK.md, Docs/UNITY_GAME_SCENE_TASK.md, and Docs/UNITY_ANIMATION_NOTES.md, then continue development in unity dev/New Client_Unity_Base_Cli.
 
-当前项目状态：Unity 客户端已经完成首页服务器地址输入/缓存/连接状态、创建房间、加入房间、退出游戏、房间页退出房间、GameOver 回到房间/回首页/退出游戏，以及最新卡牌动作动画修复。动画修复已通过我测试，提交为 78958c9 Improve card action animation clarity。
+Use Unity MCP for Unity Editor verification. Follow the handoff instructions for connecting MCP; do not rediscover from scratch unless the connection is broken.
 
-下一个任务：1. 在牌桌界面加入一个合适位置的框，支持点击切换“游戏日志”和“房间交流”；房间交流需要支持玩家间文字对话和表情包。请预留/使用表情资源路径 unity dev/New Client_Unity_Base_Cli/Assets/Art/Stickers/<pack-name>/*.png。2. 在玩家首页增加头像选择，头像资源路径 unity dev/New Client_Unity_Base_Cli/Assets/Art/Avatars/*.png；选择后的头像要在房间页和对局中一直显示。
+Important server rule: I will build/start the server myself. Do not build or start MuduoBaseGameServer unless I explicitly ask.
 
-请先分析现有 RoomPanel、GameTablePanel、GameFlow、GameState、GameScreen.uss，再给出小步实现方案并开始开发。完成后告诉我需要我如何测试；服务端相关 build/start 我来操作。
+Current latest local state:
+- The room/chat/avatar feature exists.
+- The latest local UI fix stabilizes the room communication panel.
+- Key files touched: Assets/Scripts/UI/RoomChatPanel.cs, RoomPanel.cs, GameTablePanel.cs, UIManager.cs.
+- Chat message history is now fixed-size and scrollable in both waiting room and in-game chat.
+- New messages auto-scroll to bottom with an immediate scroll plus delayed fallback after UI Toolkit layout settles.
+- Waiting-room content is now fixed-height and horizontal: player list on the left, room chat on the right. This avoids the Windows exe/player build clipping the chat input row differently from Play Mode.
+- Waiting-room player list is fixed-height scrollable, so 3-4 players should not deform buttons/chat.
+- Waiting-room chat controls use build-safe ASCII labels: Emoji, Close, Send.
+- Waiting-room sticker popup is larger and easier to read: about 72x72 buttons with about 58px sticker images, shown above the input row.
+- In-game social panel has fixed width, so chat/log content should not stretch the table.
+- Runtime UI fallback no longer overrides compact button/TextField widths.
+
+Unity MCP verification already performed:
+- AssetDatabase.Refresh + compile completed with 0 console errors/warnings.
+- Synthetic 4-player Play Mode state with 80 long chat messages kept the in-game chat panel fixed.
+- Auto-scroll test: rendered 79 messages, forced the game chat scroll offset to 0, appended message 80, re-rendered, waited 450ms, measured offsetY=maxY and atBottom=True.
+- Exact auto-scroll measurement: offsetY=8116.8; maxY=8116.8; delta=0.0; atBottom=True; childCount=80.
+- Synthetic 4-player waiting-room state with sticker popup open showed the input field, Close, Send, and enlarged stickers visible.
+- Waiting-room popup screenshot artifact: Assets/Screenshots/waiting_room_chat_popup_above_input.png.
+- Verification screenshots may exist in Assets/Screenshots; treat them as temporary artifacts unless I say to keep them.
+
+Recommended next action:
+Run a real live verification with my server/bots when I tell you the server is ready. Check waiting room and game scene with 2/3/4 players, overflow chat history, and confirm every new message scrolls to the bottom without resizing the panel or deforming the game table. Rebuild the Windows exe/player when asked and specifically verify the waiting-room input row, Emoji/Send controls, and sticker popup match Play Mode.
+
+If any issue remains, inspect RoomChatPanel.cs layout and UIManager fallback first.
 ```
 
 Asset recommendation:

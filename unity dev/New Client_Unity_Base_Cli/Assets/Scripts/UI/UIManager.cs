@@ -120,19 +120,12 @@ namespace Cabo.Client.UI
                 button.style.borderRightColor = new Color(0.39f, 0.39f, 0.59f);
                 button.style.borderBottomColor = new Color(0.39f, 0.39f, 0.59f);
                 button.style.borderLeftColor = new Color(0.39f, 0.39f, 0.59f);
-                button.style.paddingTop = 8;
-                button.style.paddingBottom = 8;
-                button.style.paddingLeft = 14;
-                button.style.paddingRight = 14;
-                button.style.minWidth = 104;
-                button.style.minHeight = 34;
                 button.style.unityTextAlign = TextAnchor.MiddleCenter;
             });
 
             Root.Query<TextField>().ForEach(field =>
             {
                 EnsureImeSupport(field);
-                field.style.minWidth = 180;
                 field.style.color = new Color(0.12f, 0.12f, 0.16f);
             });
 

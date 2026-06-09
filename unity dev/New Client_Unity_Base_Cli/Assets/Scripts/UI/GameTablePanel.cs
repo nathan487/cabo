@@ -235,8 +235,12 @@ namespace Cabo.Client.UI
             middle.Add(_rightSeat.Root);
 
             _socialPanel = new VisualElement { name = "TableSocialPanel" };
-            _socialPanel.style.width = 286;
+            _socialPanel.style.width = 268;
+            _socialPanel.style.minWidth = 268;
+            _socialPanel.style.maxWidth = 268;
+            _socialPanel.style.flexGrow = 0;
             _socialPanel.style.flexShrink = 0;
+            _socialPanel.style.minHeight = 0;
             _socialPanel.style.marginLeft = 12;
             _socialPanel.style.paddingLeft = 10;
             _socialPanel.style.paddingRight = 10;
@@ -247,6 +251,7 @@ namespace Cabo.Client.UI
             _socialPanel.style.borderTopRightRadius = 8;
             _socialPanel.style.borderBottomLeftRadius = 8;
             _socialPanel.style.borderBottomRightRadius = 8;
+            _socialPanel.style.overflow = Overflow.Hidden;
             SetBorderWidth(_socialPanel, 1);
             SetBorderColor(_socialPanel, new Color(0.12f, 0.32f, 0.27f));
             middle.Add(_socialPanel);
@@ -274,13 +279,18 @@ namespace Cabo.Client.UI
 
             _socialContent = new VisualElement();
             _socialContent.style.flexGrow = 1;
-            _socialContent.style.minHeight = 160;
-            _socialContent.style.maxHeight = 250;
+            _socialContent.style.flexShrink = 1;
+            _socialContent.style.minHeight = 0;
             _socialContent.style.paddingLeft = 2;
             _socialContent.style.paddingRight = 2;
+            _socialContent.style.overflow = Overflow.Hidden;
             _socialPanel.Add(_socialContent);
 
             _roomChatPanel = new RoomChatPanel(_flow, true);
+            _roomChatPanel.Root.style.flexGrow = 1;
+            _roomChatPanel.Root.style.flexShrink = 1;
+            _roomChatPanel.Root.style.minHeight = 0;
+            _roomChatPanel.Root.style.height = Length.Percent(100);
             _socialPanel.Add(_roomChatPanel.Root);
 
             _container.Add(_selfSeat.Root);

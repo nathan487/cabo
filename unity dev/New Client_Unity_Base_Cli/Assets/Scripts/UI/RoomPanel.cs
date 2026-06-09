@@ -10,7 +10,8 @@ namespace Cabo.Client.UI
     {
         VisualElement _root, _container;
         VisualElement _serverRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
-        VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView;
+        VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView, _roomContent;
+        ScrollView _playerListScroll;
         RoomChatPanel _chatPanel;
         Label _title, _roomCode, _playerList, _avatarStatus, _status;
         TextField _serverAddressInput, _nicknameInput, _joinCodeInput;
@@ -87,12 +88,34 @@ namespace Cabo.Client.UI
             _playerList.style.whiteSpace = WhiteSpace.Normal;
             _container.Add(_playerList);
 
-            _playerListView = new VisualElement();
-            _playerListView.style.marginTop = 18;
-            _playerListView.style.alignSelf = Align.Center;
-            _playerListView.style.width = 420;
-            _playerListView.style.maxWidth = Length.Percent(100);
-            _container.Add(_playerListView);
+            _roomContent = new VisualElement { name = "WaitingRoomContent" };
+            _roomContent.style.flexDirection = FlexDirection.Row;
+            _roomContent.style.justifyContent = Justify.Center;
+            _roomContent.style.alignItems = Align.Stretch;
+            _roomContent.style.alignSelf = Align.Center;
+            _roomContent.style.width = 980;
+            _roomContent.style.maxWidth = Length.Percent(100);
+            _roomContent.style.height = 392;
+            _roomContent.style.minHeight = 392;
+            _roomContent.style.maxHeight = 392;
+            _roomContent.style.marginTop = 12;
+            _roomContent.style.overflow = Overflow.Hidden;
+            _container.Add(_roomContent);
+
+            _playerListScroll = new ScrollView(ScrollViewMode.Vertical);
+            _playerListScroll.style.flexShrink = 0;
+            _playerListScroll.style.width = 360;
+            _playerListScroll.style.maxWidth = Length.Percent(100);
+            _playerListScroll.style.height = 360;
+            _playerListScroll.style.minHeight = 360;
+            _playerListScroll.style.maxHeight = 360;
+            _playerListScroll.style.marginRight = 16;
+            _playerListScroll.style.overflow = Overflow.Hidden;
+            _playerListScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+            _playerListScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            _roomContent.Add(_playerListScroll);
+
+            _playerListView = _playerListScroll.contentContainer;
 
             _status = new Label();
             _status.style.fontSize = 14;
@@ -251,10 +274,10 @@ namespace Cabo.Client.UI
             _roomButtonRow.Add(_btnLeaveRoom);
 
             _chatPanel = new RoomChatPanel(_flow);
-            _chatPanel.Root.style.alignSelf = Align.Center;
-            _chatPanel.Root.style.width = 540;
+            _chatPanel.Root.style.flexGrow = 1;
+            _chatPanel.Root.style.flexShrink = 1;
+            _chatPanel.Root.style.width = 600;
             _chatPanel.Root.style.maxWidth = Length.Percent(100);
-            _chatPanel.Root.style.marginTop = 14;
             _chatPanel.Root.style.paddingLeft = 12;
             _chatPanel.Root.style.paddingRight = 12;
             _chatPanel.Root.style.paddingTop = 10;
@@ -272,7 +295,7 @@ namespace Cabo.Client.UI
             _chatPanel.Root.style.borderRightColor = new Color(0.12f, 0.32f, 0.27f);
             _chatPanel.Root.style.borderBottomColor = new Color(0.12f, 0.32f, 0.27f);
             _chatPanel.Root.style.borderLeftColor = new Color(0.12f, 0.32f, 0.27f);
-            _container.Add(_chatPanel.Root);
+            _roomContent.Add(_chatPanel.Root);
         }
 
         public void SetVisible(bool visible)
@@ -315,6 +338,8 @@ namespace Cabo.Client.UI
             _joinFormRow.style.display = (!inRoom && connected && _joinFormVisible) ? DisplayStyle.Flex : DisplayStyle.None;
             _roomButtonRow.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
             _chatPanel.Root.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _playerListScroll.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
+            _roomContent.style.display = inRoom ? DisplayStyle.Flex : DisplayStyle.None;
             _playerList.style.display = DisplayStyle.None;
 
             _btnConnect.SetEnabled(!connecting);
@@ -441,12 +466,12 @@ namespace Cabo.Client.UI
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
-            row.style.marginTop = 5;
-            row.style.marginBottom = 5;
+            row.style.marginTop = 4;
+            row.style.marginBottom = 4;
             row.style.paddingLeft = 10;
             row.style.paddingRight = 10;
-            row.style.paddingTop = 7;
-            row.style.paddingBottom = 7;
+            row.style.paddingTop = 5;
+            row.style.paddingBottom = 5;
             row.style.backgroundColor = player.IsReady ? new Color(0.08f, 0.20f, 0.15f) : new Color(0.07f, 0.11f, 0.12f);
             row.style.borderTopLeftRadius = 6;
             row.style.borderTopRightRadius = 6;
