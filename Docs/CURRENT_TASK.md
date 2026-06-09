@@ -1,5 +1,66 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: Waiting-Room Input Cleanup + Host Crown Badge
+
+Latest local Unity client UI polish in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/UI/GameScreen.uss` and `Assets/Resources/GameScreen.uss`
+  - TextField container and inner UI Toolkit input elements are now styled consistently.
+  - Added explicit input background, border, radius, zero inner border width, and right padding for:
+    - `.unity-base-field__input`
+    - `.unity-base-text-field__input`
+    - `.unity-text-field__input`
+  - This targets the player-build style mismatch where a server-address/input field could show a dark frame plus a small white strip on the right.
+- `Assets/Scripts/UI/UIManager.cs`
+  - Runtime fallback now applies `UITheme.ApplyInputElement` to all known TextField inner input class variants, reducing Play Mode vs Build differences.
+- `Assets/Scripts/UI/UITheme.cs`
+  - Added host badge theme colors.
+  - Added a generated bitmap crown icon (`HostCrownIcon`) so the waiting-room host marker uses an actual image/icon rather than relying on a font glyph or text-only label.
+- `Assets/Scripts/UI/RoomPanel.cs`
+  - Waiting-room host marker is now a gold badge containing a crown image plus `房主`.
+  - Non-host rows keep the same reserved badge width, preserving row alignment.
+
+Unity MCP verification:
+
+- Exited Play Mode, forced `AssetDatabase.Refresh(UnityEditor.ImportAssetOptions.ForceSynchronousImport)`, and re-entered Play Mode.
+- Console after refresh/compile returned `0` log entries in the verification readback, and subsequent Play Mode reads showed only normal startup logs.
+- Injected a synthetic 4-player waiting room and captured:
+  - `Assets/Screenshots/waiting_room_host_badge_icon.png`
+- Screenshot confirmed:
+  - the host marker displays a real crown icon inside the badge.
+  - the badge is visually clear.
+  - the waiting-room TextField no longer shows the previous obvious right-side white strip / black-frame artifact.
+
+Screenshot artifacts under `Assets/Screenshots/` are verification output and should not be committed unless explicitly requested.
+
+## Next Major Task: WebSocket + Cloudflare Temporary Public Access
+
+The next session should focus on changing the transport protocol, not UI:
+
+- Replace raw TCP custom `[4-byte big-endian length][protobuf]` framing with WebSocket binary messages.
+- Keep protobuf message schemas, game rules, room logic, and Unity gameplay state machine unchanged.
+- Server target:
+  - add a per-connection WebSocket codec for RFC 6455 handshake and binary frame encode/decode.
+  - route decoded binary payloads into the existing protobuf dispatcher.
+  - send protobuf payloads as WebSocket binary frames.
+- Unity target:
+  - add a `ClientWebSocket`-based transport.
+  - adapt `NetworkGateway` and connection UI to accept full URLs such as:
+    - `ws://127.0.0.1:8888`
+    - `wss://xxxx.trycloudflare.com`
+  - after WebSocket migration, WebSocket message boundaries replace the old 4-byte length prefix in Unity.
+- Cloudflare target:
+  - use `cloudflared tunnel --url http://localhost:8888` or the equivalent local service path to expose a temporary `trycloudflare.com` URL.
+  - Unity clients should connect with `wss://...trycloudflare.com`.
+
+Important constraint:
+
+- The user owns server build/start unless they explicitly ask Codex to run it.
+- Do not change network protobuf schemas, game rules, or UI layout as part of this task unless required for entering a WebSocket URL.
+- Read the existing WebSocket docs first:
+  - `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`
+  - `Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md`
+
 ## 2026-06-09 Update: Light Warm Theme Infrastructure and First Visual Pass
 
 Latest local Unity client visual work in `unity dev/New Client_Unity_Base_Cli`:

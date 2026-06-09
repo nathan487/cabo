@@ -122,6 +122,16 @@ namespace Cabo.Client.UI
             {
                 UITheme.ApplyInputElement(input);
             });
+
+            Root.Query<VisualElement>(className: "unity-base-field__input").ForEach(input =>
+            {
+                UITheme.ApplyInputElement(input);
+            });
+
+            Root.Query<VisualElement>(className: "unity-base-text-field__input").ForEach(input =>
+            {
+                UITheme.ApplyInputElement(input);
+            });
         }
 
         public static void ApplyReadableButtonStyle(Button button, bool enabled)

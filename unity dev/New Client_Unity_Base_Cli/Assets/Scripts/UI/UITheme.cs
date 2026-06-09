@@ -10,6 +10,8 @@ namespace Cabo.Client.UI
     /// </summary>
     public static class UITheme
     {
+        static Texture2D _hostCrownIcon;
+
         public static readonly Color AppBackground = new(0.96f, 0.90f, 0.78f, 1f);
         public static readonly Color AppBackgroundSoft = new(0.99f, 0.94f, 0.83f, 1f);
         public static readonly Color PanelSurface = new(1.00f, 0.97f, 0.87f, 1f);
@@ -36,6 +38,8 @@ namespace Cabo.Client.UI
 
         public static readonly Color InputBackground = new(1.00f, 0.99f, 0.94f, 1f);
         public static readonly Color InputBorder = new(0.38f, 0.28f, 0.16f, 1f);
+        public static readonly Color HostBadgeSurface = new(1.00f, 0.86f, 0.45f, 1f);
+        public static readonly Color HostBadgeBorder = new(0.52f, 0.25f, 0.00f, 1f);
 
         public static readonly Color TurnHighlight = new(0.93f, 0.61f, 0.09f, 1f);
         public static readonly Color TurnBorder = new(0.52f, 0.25f, 0.00f, 1f);
@@ -99,6 +103,9 @@ namespace Cabo.Client.UI
             if (field == null) return;
             field.style.color = TextPrimary;
             field.style.backgroundColor = InputBackground;
+            SetRadius(field, 6f);
+            SetBorderWidth(field, 1f);
+            SetBorderColor(field, InputBorder);
         }
 
         public static void ApplyInputElement(VisualElement input)
@@ -106,6 +113,11 @@ namespace Cabo.Client.UI
             if (input == null) return;
             input.style.color = TextPrimary;
             input.style.backgroundColor = InputBackground;
+            SetRadius(input, 6f);
+            SetBorderWidth(input, 0f);
+            SetBorderColor(input, InputBorder);
+            input.style.marginRight = 0;
+            input.style.paddingRight = 8;
         }
 
         public static void SetBorderColor(VisualElement element, Color color)
@@ -151,6 +163,16 @@ namespace Cabo.Client.UI
             return new Color(color.r, color.g, color.b, alpha);
         }
 
+        public static Texture2D HostCrownIcon
+        {
+            get
+            {
+                if (_hostCrownIcon == null)
+                    _hostCrownIcon = CreateHostCrownIcon();
+                return _hostCrownIcon;
+            }
+        }
+
         public static Color CardFace(int value)
         {
             if (value <= 3) return CardLow;
@@ -177,6 +199,72 @@ namespace Cabo.Client.UI
         {
             value = Mathf.Clamp01(value);
             return value <= 0.03928f ? value / 12.92f : Mathf.Pow((value + 0.055f) / 1.055f, 2.4f);
+        }
+
+        static Texture2D CreateHostCrownIcon()
+        {
+            const int size = 32;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            var pixels = new Color[size * size];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = Color.clear;
+            texture.SetPixels(pixels);
+
+            var fill = TextPrimary;
+            FillTriangle(texture, new Vector2Int(3, 10), new Vector2Int(8, 24), new Vector2Int(13, 10), fill);
+            FillTriangle(texture, new Vector2Int(10, 10), new Vector2Int(16, 28), new Vector2Int(22, 10), fill);
+            FillTriangle(texture, new Vector2Int(19, 10), new Vector2Int(24, 24), new Vector2Int(29, 10), fill);
+            FillRect(texture, 4, 6, 28, 13, fill);
+            FillRect(texture, 3, 4, 29, 8, fill);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        static void FillRect(Texture2D texture, int minX, int minY, int maxX, int maxY, Color color)
+        {
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                    texture.SetPixel(x, y, color);
+            }
+        }
+
+        static void FillTriangle(Texture2D texture, Vector2Int a, Vector2Int b, Vector2Int c, Color color)
+        {
+            int minX = Mathf.Max(0, Mathf.Min(a.x, Mathf.Min(b.x, c.x)));
+            int maxX = Mathf.Min(texture.width - 1, Mathf.Max(a.x, Mathf.Max(b.x, c.x)));
+            int minY = Mathf.Max(0, Mathf.Min(a.y, Mathf.Min(b.y, c.y)));
+            int maxY = Mathf.Min(texture.height - 1, Mathf.Max(a.y, Mathf.Max(b.y, c.y)));
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (PointInTriangle(new Vector2(x, y), a, b, c))
+                        texture.SetPixel(x, y, color);
+                }
+            }
+        }
+
+        static bool PointInTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+        {
+            float d1 = Sign(p, a, b);
+            float d2 = Sign(p, b, c);
+            float d3 = Sign(p, c, a);
+            bool hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+            bool hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+            return !(hasNeg && hasPos);
+        }
+
+        static float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
+        {
+            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
         }
     }
 }

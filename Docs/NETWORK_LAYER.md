@@ -1,5 +1,48 @@
 # Network Layer Reference (for Unity Client)
 
+## 2026-06-09 Next Transport Migration Target
+
+Current transport is still raw TCP with a custom 4-byte length prefix. The next major task is to migrate the transport to WebSocket so the game can be reached through Cloudflare Tunnel and a temporary public domain.
+
+Target transport:
+
+- Local development URL: `ws://127.0.0.1:8888`
+- Cloudflare temporary public URL: `wss://<random>.trycloudflare.com`
+- Payload format inside each WebSocket binary message: pure serialized protobuf bytes.
+- WebSocket message boundaries replace the current `[4 bytes big-endian length]` frame in the Unity client.
+- Protobuf schemas and all `ClientMessage` / `ServerMessage` payloads should stay unchanged.
+
+Server migration boundary:
+
+- Add `WebSocketCodec` beside the existing `MessageCodec`.
+- `WebSocketCodec` owns:
+  - HTTP upgrade handshake.
+  - `Sec-WebSocket-Accept` generation.
+  - masked client-to-server binary frame decoding.
+  - unmasked server-to-client binary frame encoding.
+  - ping/pong/close control frames.
+- Existing dispatcher and services should continue to receive/send protobuf payload bytes.
+- Replace `MessageCodec::encode(payload)` calls in room/game services with `WebSocketCodec::encode(payload)` after server integration.
+
+Unity migration boundary:
+
+- Add a `ClientWebSocket` transport layer.
+- Adapt `NetworkGateway` to receive complete binary WebSocket messages and call protobuf decode directly.
+- Adapt the home/server-address UI to accept a full WebSocket URL.
+- Keep reconnect/game state behavior and drain-then-render rules intact.
+
+Cloudflare Tunnel boundary:
+
+- Start the local server on `localhost:8888`.
+- Start a tunnel such as `cloudflared tunnel --url http://localhost:8888`.
+- Convert the generated `https://...trycloudflare.com` URL to `wss://...trycloudflare.com` in the Unity client.
+- Verify public access with at least two clients before considering the task done.
+
+Detailed implementation docs:
+
+- `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`
+- `Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md`
+
 ## Transport
 
 - TCP long connection

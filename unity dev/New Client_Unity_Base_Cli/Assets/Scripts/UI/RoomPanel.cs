@@ -484,11 +484,35 @@ namespace Cabo.Client.UI
             name.style.unityFontStyleAndWeight = FontStyle.Bold;
             row.Add(name);
 
-            var tag = new Label(player.IsHost ? "房主" : "");
-            tag.style.width = 44;
-            tag.style.fontSize = 12;
-            tag.style.color = UITheme.TextPrimary;
-            tag.style.unityTextAlign = TextAnchor.MiddleCenter;
+            var tag = new VisualElement();
+            tag.style.width = 78;
+            tag.style.height = 24;
+            tag.style.flexDirection = FlexDirection.Row;
+            tag.style.alignItems = Align.Center;
+            tag.style.justifyContent = Justify.Center;
+            tag.style.backgroundColor = player.IsHost ? UITheme.HostBadgeSurface : Color.clear;
+            UITheme.SetRadius(tag, 6f);
+            UITheme.SetBorderWidth(tag, player.IsHost ? 1f : 0f);
+            UITheme.SetBorderColor(tag, UITheme.HostBadgeBorder);
+            if (player.IsHost)
+            {
+                var crown = new Image
+                {
+                    image = UITheme.HostCrownIcon,
+                    scaleMode = ScaleMode.ScaleToFit
+                };
+                crown.style.width = 15;
+                crown.style.height = 15;
+                crown.style.marginRight = 4;
+                tag.Add(crown);
+
+                var tagText = new Label("房主");
+                tagText.style.fontSize = 12;
+                tagText.style.unityFontStyleAndWeight = FontStyle.Bold;
+                tagText.style.color = UITheme.TextPrimary;
+                tagText.style.unityTextAlign = TextAnchor.MiddleCenter;
+                tag.Add(tagText);
+            }
             row.Add(tag);
 
             var ready = new Label(player.IsReady ? "已准备" : "未准备");
