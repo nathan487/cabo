@@ -1,5 +1,26 @@
 # Unity Animation Notes
 
+## 2026-06-09 Update: Round Reveal Waits for Action Queue
+
+Latest behavior:
+
+- `GameTablePanel` exposes `HasPendingActionAnimation`, based on the queued action animation end time.
+- `UIManager` delays `RoundReveal` rendering while a public action animation is still pending.
+- When the action queue drains, `GameTablePanel` invokes the callback registered by `UIManager`, causing UI routing to re-evaluate and render the settlement panel automatically.
+- `ReleaseTurnDisplay(...)` no longer calls `RenderGame()` directly. This prevents a late animation callback from pulling the user back from settlement into the game panel.
+- Round reveal uses a compact settlement layout:
+  - compact pile cards,
+  - internal score-list scrolling,
+  - fixed bottom ready controls,
+  - reveal-only numeric card faces without skill badges.
+
+Verified with Unity MCP:
+
+- Synthetic state: action animation queued, then round reveal state injected before the queue finished.
+- Immediate check: `pending_after_reveal=True`, so reveal was deferred and game table remained visible for the final animation.
+- Delayed check after the queue drained: `phase=RoundReveal`, `pending=False`, and reveal labels including `本轮得分` / `第 3 轮结算` were present.
+- Final clean compile/Console check returned 0 errors/warnings.
+
 ## 2026-06-08 Latest Animation Fix
 
 Committed in `78958c9 Improve card action animation clarity`.

@@ -1,5 +1,61 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: Skill Confirm Flow, Clear Logs, and Round Reveal Polish
+
+Latest verified Unity client work in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/Scripts/Core/GameFlow.cs`
+  - Added reversible local flow helpers:
+    - `ReturnToMainInput()`
+    - `ReturnToDrawnDecision()`
+    - `ReturnToSkillStart()`
+    - `ReturnToSkillTargetSelection()`
+  - These keep the player able to return to the previous decision before a request is sent to the server.
+- `Assets/Scripts/Core/GameState.cs`
+  - Game-log messages now include player-facing 1-based slot numbers when the protocol provides them.
+  - Examples:
+    - `p14（你）用抽到的牌替换了第 1、3 张牌`
+    - `p14（你）拿弃牌替换了第 2 张牌`
+    - `p14（你）将自己的第 2 张牌与 p12 的第 4 张牌交换`
+  - Failed multi-card exchanges now explain that the incoming card joined the hand and when an extra penalty card was drawn.
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - Skill and exchange selections no longer immediately send every choice to the server.
+  - Replace/take/peek/spy/swap flows now expose confirmation and return buttons where appropriate.
+  - Skill card action button text now supports `改为使用xxx`.
+  - Swap skill keeps the selected own card highlighted while selecting the opponent card.
+  - Swap prompt now reads: `请点击您想换的对手的牌。`
+  - Round reveal waits for the current queued action animation to finish before the UI switches to the settlement panel.
+  - Round reveal layout was tightened so 4 players, score rows, next-round ready badges, ready button, and waiting text fit inside the green table area.
+  - Settlement cards use a reveal-specific numeric-only display so skill labels no longer crowd or deform small cards.
+- `Assets/Scripts/UI/UIManager.cs`
+  - Checks `GameTablePanel.HasPendingActionAnimation` before showing `RoundReveal`.
+  - Registers a callback so the UI re-evaluates state as soon as the animation queue drains.
+
+Verified with Unity MCP:
+
+- Triggered `AssetDatabase.Refresh()` and script compilation; final clean Unity Console check returned 0 errors/warnings.
+- Play Mode synthetic swap flow verified:
+  - selected own card remained highlighted across the swap target steps.
+  - prompt showed `请点击您想换的对手的牌。`
+- Reflection/sample log verification checked:
+  - multi-slot replace logs include `第 1、3 张牌`.
+  - take-from-discard logs include the selected slot.
+  - peek/spy/swap logs include exact slots.
+- Play Mode synthetic round reveal verification checked:
+  - 4-player settlement layout stays inside the table area.
+  - bottom ready button and `等待所有玩家准备` are visible.
+  - reveal cards show clean numeric values without compressed skill labels.
+  - action animation pending state delays the reveal panel; after the queue drains, `RoundReveal` renders automatically.
+- Screenshot artifacts were generated under `Assets/Screenshots/`, including:
+  - `round_reveal_layout_after_card_fix.png`
+  - `round_reveal_after_animation_wait_probe.png`
+  - These are MCP verification artifacts and should not be committed unless explicitly requested.
+
+Known follow-up:
+
+- Do a real Windows player build verification with the live server/bots when ready.
+- Server build/start remains user-owned. Do not build or start the server unless explicitly asked.
+
 ## 2026-06-09 Update: Center Table Cleanup + Readable Buttons
 
 Latest local client UI work in `unity dev/New Client_Unity_Base_Cli`:

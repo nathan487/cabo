@@ -52,10 +52,12 @@ namespace Cabo.Client.UI
         readonly Button _logTabButton;
         readonly Button _chatTabButton;
         readonly VisualElement _animationLayer;
+        Action _animationQueueDrained;
 
         readonly HashSet<int> _selectedOwnSlots = new();
         readonly List<TableFeedEntry> _gameLogEntries = new();
         long _selectedOpponentPlayerId;
+        int _selectedOpponentSlot = -1;
         long _lastLoggedActionSequence;
         GameSubState _lastSubState = GameSubState.Idle;
         GameSubState _lastRenderedSubState = GameSubState.Idle;
@@ -324,6 +326,13 @@ namespace Cabo.Client.UI
             _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
+        public bool HasPendingActionAnimation => Time.realtimeSinceStartup < _animationQueueUntil;
+
+        public void SetAnimationQueueDrainedCallback(Action callback)
+        {
+            _animationQueueDrained = callback;
+        }
+
         public void Tick()
         {
             if (!_inspectionActive || Time.realtimeSinceStartup < _inspectionEndsAt)
@@ -341,6 +350,7 @@ namespace Cabo.Client.UI
         public void RenderGame()
         {
             var state = _flow.State;
+            ConfigureActionPanelForGame();
             ActionAnimationSnapshot pendingAction = null;
             if (state.LastActionSequence > _lastAnimatedActionSequence)
             {
@@ -379,6 +389,7 @@ namespace Cabo.Client.UI
         public void RenderReveal()
         {
             var state = _flow.State;
+            ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
             _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = $"第 {state.RoundNumber} 轮结算";
@@ -390,19 +401,30 @@ namespace Cabo.Client.UI
             _drawnCardSlot.Clear();
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
+            _actionPanel.style.marginTop = 8;
 
             var title = new Label("本轮得分");
             StylePanelTitle(title);
             _actionPanel.Add(title);
 
+            var resultList = new ScrollView(ScrollViewMode.Vertical);
+            resultList.verticalScrollerVisibility = ScrollerVisibility.Hidden;
+            resultList.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            resultList.style.flexGrow = 1;
+            resultList.style.flexShrink = 1;
+            resultList.style.minHeight = 0;
+            resultList.style.marginTop = 2;
+            resultList.style.marginBottom = 6;
             foreach (var result in state.LastRoundResults)
-                _actionPanel.Add(CreateRevealRow(result));
+                resultList.Add(CreateRevealRow(result));
+            _actionPanel.Add(resultList);
 
             AddInterRoundControls(state);
         }
 
         public void RenderGameOver()
         {
+            ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
             _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = "游戏结束";
@@ -494,12 +516,14 @@ namespace Cabo.Client.UI
                 for (int slot = 0; slot < cardCount; slot++)
                 {
                     int targetSlot = slot;
+                    bool slotSelected = selected && _selectedOpponentSlot == targetSlot
+                        && (_flow.SubState == GameSubState.SkillSpySlot || _flow.SubState == GameSubState.SkillSwapTargetSlot);
                     _opponentSeats[i].CardRow.Add(CreateCard(
                         false,
                         0,
                         OppCardWidth,
                         OppCardHeight,
-                        selected,
+                        slotSelected || (selected && _selectedOpponentSlot < 0),
                         IsOpponentSlotClickable(_flow.SubState, player.PlayerId),
                         () => OnOpponentSlotClicked(player.PlayerId, targetSlot)));
                 }
@@ -512,11 +536,44 @@ namespace Cabo.Client.UI
             _drawPile.Clear();
             _discardPile.Clear();
 
-            _drawPile.Add(CreatePileCard("牌库", "CABO", state.DrawPileCount.ToString(), false));
-            _discardPile.Add(CreatePileCard("弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true));
+            bool compact = state.Phase == GamePhase.RoundReveal || state.Phase == GamePhase.GameOver;
+            _drawPile.Add(CreatePileCard("牌库", "CABO", state.DrawPileCount.ToString(), false, compact));
+            _discardPile.Add(CreatePileCard("弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true, compact));
 
             _pileRow.Add(_drawPile);
             _pileRow.Add(_discardPile);
+        }
+
+        void ConfigureActionPanelForGame()
+        {
+            _actionPanel.style.width = Length.Percent(92);
+            _actionPanel.style.maxWidth = 640;
+            _actionPanel.style.flexGrow = 0;
+            _actionPanel.style.flexShrink = 0;
+            _actionPanel.style.minHeight = StyleKeyword.Null;
+            _actionPanel.style.maxHeight = StyleKeyword.Null;
+            _actionPanel.style.paddingLeft = 16;
+            _actionPanel.style.paddingRight = 16;
+            _actionPanel.style.paddingTop = 8;
+            _actionPanel.style.paddingBottom = 8;
+            _actionPanel.style.marginTop = 10;
+            _actionPanel.style.overflow = Overflow.Visible;
+        }
+
+        void ConfigureActionPanelForOverlay()
+        {
+            _actionPanel.style.width = Length.Percent(78);
+            _actionPanel.style.maxWidth = 920;
+            _actionPanel.style.flexGrow = 1;
+            _actionPanel.style.flexShrink = 1;
+            _actionPanel.style.minHeight = 0;
+            _actionPanel.style.maxHeight = Length.Percent(82);
+            _actionPanel.style.paddingLeft = 22;
+            _actionPanel.style.paddingRight = 22;
+            _actionPanel.style.paddingTop = 12;
+            _actionPanel.style.paddingBottom = 12;
+            _actionPanel.style.marginTop = 8;
+            _actionPanel.style.overflow = Overflow.Hidden;
         }
 
         void RenderActionPanel(GameState state, bool deferNewTurnActions)
@@ -525,6 +582,7 @@ namespace Cabo.Client.UI
             _drawnCardSlot.Clear();
             _drawnCardSlot.style.display = DisplayStyle.None;
             _buttonRow.Clear();
+            _actionBody.style.display = DisplayStyle.None;
             _actionPanel.style.display = ShouldShowActionPanel(_flow.SubState) && !deferNewTurnActions
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
@@ -559,51 +617,68 @@ namespace Cabo.Client.UI
                 case GameSubState.AwaitingReplaceSlots:
                     _actionTitle.text = "用抽牌替换";
                     _actionBody.text = "选择一张或多张自己的手牌，然后确认。";
+                    _actionBody.style.display = DisplayStyle.Flex;
                     _drawnCardSlot.style.display = DisplayStyle.Flex;
                     _drawnCardSlot.Add(CreateDrawnCard(state, 48, 64));
                     AddActionButton("确认替换", () => ConfirmReplace(), _selectedOwnSlots.Count > 0);
+                    AddActionButton("返回选择", () => ReturnToDrawnDecision(), true);
                     AddActionButton("改为弃牌", () => _flow.DoDiscardDrawn(false), true);
+                    AddActionButton(BuildChangeToSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), state.DrawnCardSkill > 0);
                     break;
 
                 case GameSubState.AwaitingTakeSlots:
                     _actionTitle.text = "拿弃牌";
                     _actionBody.text = "选择一张或多张自己的手牌，与弃牌堆顶交换。";
+                    _actionBody.style.display = DisplayStyle.Flex;
                     AddActionButton("确认拿牌", () => ConfirmTakeDiscard(), _selectedOwnSlots.Count > 0);
+                    AddActionButton("返回选择", () => ReturnToMainInput(), true);
                     break;
 
                 case GameSubState.SkillPeekSlot:
                     _actionTitle.text = "看牌技能";
                     _actionBody.text = "选择一张自己的牌私下查看。";
+                    _actionBody.style.display = DisplayStyle.Flex;
+                    AddActionButton("确认看牌", () => ConfirmSkillPeekSlot(), _selectedOwnSlots.Count == 1);
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSpyTarget:
                     _actionTitle.text = "偷看技能";
                     _actionBody.text = "选择一名对手。";
+                    _actionBody.style.display = DisplayStyle.Flex;
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSpySlot:
                     _actionTitle.text = "偷看技能";
                     _actionBody.text = "选择该对手的一张牌。";
+                    _actionBody.style.display = DisplayStyle.Flex;
+                    AddActionButton("确认偷看", () => ConfirmSkillTargetSlot(), _selectedOpponentSlot >= 0);
+                    AddActionButton("返回选择对手", () => ReturnToSkillTargetSelection(), true);
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapMySlot:
                     _actionTitle.text = "换牌技能";
                     _actionBody.text = "选择自己要交换的一张牌。";
+                    _actionBody.style.display = DisplayStyle.Flex;
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapTargetPlayer:
                     _actionTitle.text = "换牌技能";
-                    _actionBody.text = "选择一名对手。";
+                    _actionBody.text = "请点击您想换的对手的牌。";
+                    _actionBody.style.display = DisplayStyle.Flex;
+                    AddActionButton("返回选择己方牌", () => ReturnToSkillStart(), true);
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
                 case GameSubState.SkillSwapTargetSlot:
                     _actionTitle.text = "换牌技能";
-                    _actionBody.text = "选择该对手要交换的一张牌。";
+                    _actionBody.text = "请点击您想换的对手的牌。";
+                    _actionBody.style.display = DisplayStyle.Flex;
+                    AddActionButton("确认换牌", () => ConfirmSkillTargetSlot(), _selectedOpponentSlot >= 0);
+                    AddActionButton("返回选择对手", () => ReturnToSkillTargetSelection(), true);
                     AddActionButton("跳过技能", () => _flow.DoSkipSkill(), true);
                     break;
 
@@ -925,7 +1000,7 @@ namespace Cabo.Client.UI
 
             _heldActionSourcePlayerId = 0;
             _heldActionUntil = 0f;
-            RenderGame();
+            _animationQueueDrained?.Invoke();
         }
 
         void PlayDrawAnimation(int value)
@@ -2077,7 +2152,7 @@ namespace Cabo.Client.UI
             return !(float.IsNaN(value.x) || float.IsNaN(value.y) || float.IsInfinity(value.x) || float.IsInfinity(value.y));
         }
 
-        VisualElement CreateCard(bool faceUp, int value, int width, int height, bool selected, bool clickable, Action onClick)
+        VisualElement CreateCard(bool faceUp, int value, int width, int height, bool selected, bool clickable, Action onClick, bool showSkillBadge = true)
         {
             var card = new VisualElement();
             card.style.width = width;
@@ -2111,7 +2186,7 @@ namespace Cabo.Client.UI
             valueLabel.style.color = faceUp ? new Color(0.10f, 0.10f, 0.12f) : new Color(0.88f, 0.92f, 1f);
             card.Add(valueLabel);
 
-            if (faceUp && value >= 7 && value <= 12)
+            if (showSkillBadge && faceUp && value >= 7 && value <= 12)
             {
                 var badge = new Label(GetSkillShortName(value));
                 badge.style.fontSize = 10;
@@ -2126,16 +2201,16 @@ namespace Cabo.Client.UI
             return card;
         }
 
-        VisualElement CreatePileCard(string title, string face, string count, bool faceUp)
+        VisualElement CreatePileCard(string title, string face, string count, bool faceUp, bool compact = false)
         {
             var stack = new VisualElement();
             stack.style.alignItems = Align.Center;
-            stack.style.marginLeft = 14;
-            stack.style.marginRight = 14;
+            stack.style.marginLeft = compact ? 10 : 14;
+            stack.style.marginRight = compact ? 10 : 14;
 
             var card = new VisualElement();
-            card.style.width = 70;
-            card.style.height = 92;
+            card.style.width = compact ? 54 : 70;
+            card.style.height = compact ? 70 : 92;
             card.style.flexShrink = 0;
             card.style.alignItems = Align.Center;
             card.style.justifyContent = Justify.Center;
@@ -2154,16 +2229,16 @@ namespace Cabo.Client.UI
             card.style.backgroundColor = faceUp ? new Color(0.92f, 0.90f, 0.80f) : new Color(0.08f, 0.14f, 0.34f);
 
             var label = new Label(face);
-            label.style.fontSize = faceUp ? 26 : 14;
+            label.style.fontSize = compact ? faceUp ? 22 : 11 : faceUp ? 26 : 14;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.color = faceUp ? new Color(0.10f, 0.10f, 0.12f) : Color.white;
             card.Add(label);
             stack.Add(card);
 
             var caption = new Label($"{title}  {count}");
-            caption.style.fontSize = 12;
+            caption.style.fontSize = compact ? 10 : 12;
             caption.style.unityTextAlign = TextAnchor.MiddleCenter;
-            caption.style.marginTop = 6;
+            caption.style.marginTop = compact ? 3 : 6;
             stack.Add(caption);
             return stack;
         }
@@ -2174,30 +2249,48 @@ namespace Cabo.Client.UI
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
             row.style.justifyContent = Justify.SpaceBetween;
-            row.style.marginTop = 8;
-            row.style.paddingTop = 6;
-            row.style.paddingBottom = 6;
+            row.style.minHeight = 58;
+            row.style.marginTop = 2;
+            row.style.paddingTop = 3;
+            row.style.paddingBottom = 3;
             row.style.borderBottomWidth = 1;
             row.style.borderBottomColor = new Color(0.20f, 0.36f, 0.31f);
 
             var name = new Label(result.Nickname + (result.IsSteadyCaller ? "  CABO" : "") + (result.IsLowest ? "  最低" : ""));
-            name.style.width = 180;
+            name.style.width = 150;
+            name.style.flexShrink = 0;
             name.style.fontSize = 13;
+            name.style.whiteSpace = WhiteSpace.Normal;
             row.Add(name);
 
             var cards = new VisualElement();
             cards.style.flexDirection = FlexDirection.Row;
             cards.style.flexGrow = 1;
+            cards.style.flexShrink = 1;
+            cards.style.justifyContent = Justify.Center;
+            cards.style.minWidth = 0;
             foreach (var value in result.CardValues)
-                cards.Add(CreateCard(true, value, 36, 50, false, false, null));
+                cards.Add(CreateRevealCard(value));
             row.Add(cards);
 
             var score = new Label($"{result.HandTotal} + {result.Penalty} = {result.RoundScore}    总分 {result.CumulativeScore}");
-            score.style.width = 190;
+            score.style.width = 170;
+            score.style.flexShrink = 0;
             score.style.fontSize = 13;
             score.style.unityTextAlign = TextAnchor.MiddleRight;
+            score.style.whiteSpace = WhiteSpace.Normal;
             row.Add(score);
             return row;
+        }
+
+        VisualElement CreateRevealCard(int value)
+        {
+            var card = CreateCard(true, value, 34, 46, false, false, null, false);
+            card.style.marginLeft = 3;
+            card.style.marginRight = 3;
+            card.style.marginTop = 2;
+            card.style.marginBottom = 2;
+            return card;
         }
 
         void AddInterRoundControls(GameState state)
@@ -2213,23 +2306,26 @@ namespace Cabo.Client.UI
 
             var divider = new VisualElement();
             divider.style.height = 1;
-            divider.style.marginTop = 10;
-            divider.style.marginBottom = 8;
+            divider.style.marginTop = 4;
+            divider.style.marginBottom = 6;
+            divider.style.flexShrink = 0;
             divider.style.backgroundColor = new Color(0.22f, 0.42f, 0.36f);
             _actionPanel.Add(divider);
 
             var readyTitle = new Label("下一轮准备");
-            readyTitle.style.fontSize = 15;
+            readyTitle.style.fontSize = 14;
             readyTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             readyTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-            readyTitle.style.marginBottom = 4;
+            readyTitle.style.marginBottom = 3;
+            readyTitle.style.flexShrink = 0;
             _actionPanel.Add(readyTitle);
 
             var readyGrid = new VisualElement();
             readyGrid.style.flexDirection = FlexDirection.Row;
             readyGrid.style.flexWrap = Wrap.Wrap;
             readyGrid.style.justifyContent = Justify.Center;
-            readyGrid.style.marginBottom = 8;
+            readyGrid.style.marginBottom = 5;
+            readyGrid.style.flexShrink = 0;
             foreach (var player in state.Players)
                 readyGrid.Add(CreateReadyBadge(player, player.PlayerId == state.MyPlayerId));
             _actionPanel.Add(readyGrid);
@@ -2238,6 +2334,8 @@ namespace Cabo.Client.UI
             controls.style.flexDirection = FlexDirection.Row;
             controls.style.justifyContent = Justify.Center;
             controls.style.flexWrap = Wrap.Wrap;
+            controls.style.alignItems = Align.Center;
+            controls.style.flexShrink = 0;
             _actionPanel.Add(controls);
 
             controls.Add(CreatePanelButton(myReady ? "已准备" : "准备", () => _flow.SendReady(), !myReady && state.MyPlayerId > 0 && state.RoomId > 0));
@@ -2249,9 +2347,10 @@ namespace Cabo.Client.UI
                 var wait = new Label(allReady ? "等待房主开始" : "等待所有玩家准备");
                 wait.style.fontSize = 12;
                 wait.style.unityTextAlign = TextAnchor.MiddleCenter;
-                wait.style.marginTop = 7;
+                wait.style.marginTop = 4;
                 wait.style.marginLeft = 8;
                 wait.style.color = new Color(0.78f, 0.88f, 0.82f);
+                wait.style.whiteSpace = WhiteSpace.Normal;
                 controls.Add(wait);
             }
 
@@ -2266,15 +2365,15 @@ namespace Cabo.Client.UI
             var badge = new VisualElement();
             badge.style.flexDirection = FlexDirection.Row;
             badge.style.alignItems = Align.Center;
-            badge.style.width = 150;
-            badge.style.marginLeft = 4;
-            badge.style.marginRight = 4;
-            badge.style.marginTop = 4;
-            badge.style.marginBottom = 4;
+            badge.style.width = 130;
+            badge.style.marginLeft = 3;
+            badge.style.marginRight = 3;
+            badge.style.marginTop = 3;
+            badge.style.marginBottom = 3;
             badge.style.paddingLeft = 8;
             badge.style.paddingRight = 8;
-            badge.style.paddingTop = 5;
-            badge.style.paddingBottom = 5;
+            badge.style.paddingTop = 4;
+            badge.style.paddingBottom = 4;
             badge.style.borderTopLeftRadius = 6;
             badge.style.borderTopRightRadius = 6;
             badge.style.borderBottomLeftRadius = 6;
@@ -2287,7 +2386,7 @@ namespace Cabo.Client.UI
             dot.style.width = 9;
             dot.style.height = 9;
             dot.style.flexShrink = 0;
-            dot.style.marginRight = 7;
+            dot.style.marginRight = 6;
             dot.style.borderTopLeftRadius = 5;
             dot.style.borderTopRightRadius = 5;
             dot.style.borderBottomLeftRadius = 5;
@@ -2297,7 +2396,8 @@ namespace Cabo.Client.UI
 
             var name = new Label((isSelf ? "你 " : "") + player.Nickname);
             name.style.flexGrow = 1;
-            name.style.fontSize = 12;
+            name.style.minWidth = 0;
+            name.style.fontSize = 11;
             name.style.unityTextAlign = TextAnchor.MiddleLeft;
             name.style.color = Color.white;
             badge.Add(name);
@@ -2314,11 +2414,11 @@ namespace Cabo.Client.UI
         {
             var button = new Button(action) { text = text };
             button.style.minWidth = 120;
-            button.style.height = 34;
+            button.style.height = 32;
             button.style.marginLeft = 5;
             button.style.marginRight = 5;
-            button.style.marginTop = 4;
-            button.style.marginBottom = 4;
+            button.style.marginTop = 3;
+            button.style.marginBottom = 3;
             StyleTableButton(button, enabled);
             button.SetEnabled(enabled);
             return button;
@@ -2369,9 +2469,13 @@ namespace Cabo.Client.UI
                     RenderGame();
                     break;
                 case GameSubState.SkillPeekSlot:
-                    _flow.DoSkillPeek(slot);
+                    _selectedOwnSlots.Clear();
+                    _selectedOwnSlots.Add(slot);
+                    RenderGame();
                     break;
                 case GameSubState.SkillSwapMySlot:
+                    _selectedOwnSlots.Clear();
+                    _selectedOwnSlots.Add(slot);
                     _flow.DoSkillSwapMySlot(slot);
                     break;
             }
@@ -2390,21 +2494,29 @@ namespace Cabo.Client.UI
             if (_flow.SubState == GameSubState.SkillSpyTarget)
             {
                 _flow.DoSkillSpyTarget(playerId);
-                _flow.DoSkillSpySlot(slot);
+                _selectedOpponentSlot = slot;
+                RenderGame();
                 return;
             }
             if (_flow.SubState == GameSubState.SkillSwapTargetPlayer)
             {
                 _flow.DoSkillSwapTargetPlayer(playerId);
-                _flow.DoSkillSwapTargetSlot(slot);
+                _selectedOpponentSlot = slot;
+                RenderGame();
                 return;
             }
             if (_flow.SkillTargetPlayerId != playerId) return;
 
             if (_flow.SubState == GameSubState.SkillSpySlot)
-                _flow.DoSkillSpySlot(slot);
+            {
+                _selectedOpponentSlot = slot;
+                RenderGame();
+            }
             else if (_flow.SubState == GameSubState.SkillSwapTargetSlot)
-                _flow.DoSkillSwapTargetSlot(slot);
+            {
+                _selectedOpponentSlot = slot;
+                RenderGame();
+            }
         }
 
         void ConfirmReplace()
@@ -2419,14 +2531,72 @@ namespace Cabo.Client.UI
             _selectedOwnSlots.Clear();
         }
 
+        void ConfirmSkillTargetSlot()
+        {
+            if (_selectedOpponentSlot < 0)
+                return;
+
+            if (_flow.SubState == GameSubState.SkillSpySlot)
+                _flow.DoSkillSpySlot(_selectedOpponentSlot);
+            else if (_flow.SubState == GameSubState.SkillSwapTargetSlot)
+                _flow.DoSkillSwapTargetSlot(_selectedOpponentSlot);
+            _selectedOpponentSlot = -1;
+        }
+
+        void ConfirmSkillPeekSlot()
+        {
+            if (_selectedOwnSlots.Count != 1)
+                return;
+
+            _flow.DoSkillPeek(ToSortedArray(_selectedOwnSlots)[0]);
+            _selectedOwnSlots.Clear();
+        }
+
+        void ReturnToDrawnDecision()
+        {
+            _selectedOwnSlots.Clear();
+            _flow.ReturnToDrawnDecision();
+        }
+
+        void ReturnToMainInput()
+        {
+            _selectedOwnSlots.Clear();
+            _flow.ReturnToMainInput();
+        }
+
+        void ReturnToSkillStart()
+        {
+            _selectedOwnSlots.Clear();
+            _selectedOpponentPlayerId = 0;
+            _selectedOpponentSlot = -1;
+            _flow.ReturnToSkillStart();
+        }
+
+        void ReturnToSkillTargetSelection()
+        {
+            _selectedOpponentPlayerId = 0;
+            _selectedOpponentSlot = -1;
+            _flow.ReturnToSkillTargetSelection();
+        }
+
         void ResetSelectionWhenSubStateChanges(GameSubState subState)
         {
             if (_lastSubState == subState) return;
-            _selectedOwnSlots.Clear();
+            if (!ShouldPreserveOwnSelection(_lastSubState, subState))
+                _selectedOwnSlots.Clear();
             _selectedOpponentPlayerId = subState == GameSubState.SkillSpySlot || subState == GameSubState.SkillSwapTargetSlot
                 ? _flow.SkillTargetPlayerId
                 : 0;
+            _selectedOpponentSlot = -1;
             _lastSubState = subState;
+        }
+
+        static bool ShouldPreserveOwnSelection(GameSubState previous, GameSubState current)
+        {
+            return previous == GameSubState.SkillSwapMySlot
+                && (current == GameSubState.SkillSwapTargetPlayer || current == GameSubState.SkillSwapTargetSlot)
+                || previous == GameSubState.SkillSwapTargetPlayer && current == GameSubState.SkillSwapTargetSlot
+                || previous == GameSubState.SkillSwapTargetSlot && current == GameSubState.SkillSwapTargetPlayer;
         }
 
         bool IsOwnSlotClickable(GameSubState subState)
@@ -2522,6 +2692,11 @@ namespace Cabo.Client.UI
         static string BuildSkillButtonText(int skill)
         {
             return skill > 0 ? $"使用{GetSkillName(skill)}" : "使用技能";
+        }
+
+        static string BuildChangeToSkillButtonText(int skill)
+        {
+            return skill > 0 ? $"改为使用{GetSkillName(skill)}" : "改为使用技能";
         }
 
         static string GetSkillName(int skill)

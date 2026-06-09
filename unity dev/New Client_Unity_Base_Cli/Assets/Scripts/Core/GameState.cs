@@ -813,6 +813,45 @@ namespace Cabo.Client
             });
         }
 
+        string FormatSlot(int slotIndex)
+        {
+            return slotIndex >= 0 ? $"第 {slotIndex + 1} 张牌" : "未知位置的牌";
+        }
+
+        string FormatSlots(IEnumerable<int> slotIndices, int fallbackCount = 0)
+        {
+            var slots = new List<int>();
+            if (slotIndices != null)
+            {
+                foreach (int slot in slotIndices)
+                {
+                    if (slot >= 0 && !slots.Contains(slot))
+                        slots.Add(slot);
+                }
+            }
+
+            slots.Sort();
+            var parts = new List<string>();
+            foreach (int slot in slots)
+                parts.Add((slot + 1).ToString());
+
+            if (parts.Count > 0)
+                return $"第 {string.Join("、", parts)} 张牌";
+            if (fallbackCount > 0)
+                return $"{fallbackCount} 张牌";
+            return "选中的牌";
+        }
+
+        string FormatExchangeFailureSuffix(ExchangeAttemptResult result, string incomingCardText)
+        {
+            int added = Mathf.Max(0, result?.AddedCardCount ?? 0);
+            if (result != null && result.DrewExtraPenaltyCard)
+                return $"{incomingCardText}加入手牌，并额外摸了 1 张惩罚牌";
+            if (added > 1)
+                return $"{added} 张牌加入手牌";
+            return $"{incomingCardText}加入手牌";
+        }
+
         string BuildActionMessage(ActionResultNotify ar)
         {
             string name = "玩家";
@@ -834,32 +873,41 @@ namespace Cabo.Client
                     return $">>> {name}{you} 弃掉抽到的牌{skill}";
                 case ActionType.ReplaceWithDrawn:
                     if (ar.ExchangeResult != null)
+                    {
+                        string slots = FormatSlots(ar.ExchangeResult.SelectedSlotIndices, ar.ExchangeResult.DiscardedCount);
                         return ar.ExchangeResult.Success
-                            ? $">>> {name}{you} 替换了 {ar.ExchangeResult.DiscardedCount} 张牌"
-                            : $">>> {name}{you} 替换失败，牌加入手牌";
+                            ? $">>> {name}{you} 用抽到的牌替换了{slots}"
+                            : $">>> {name}{you} 替换{slots}失败，{FormatExchangeFailureSuffix(ar.ExchangeResult, "抽到的牌")}";
+                    }
                     break;
                 case ActionType.TakeFromDiscard:
                     if (ar.ExchangeResult != null)
+                    {
+                        string slots = FormatSlots(ar.ExchangeResult.SelectedSlotIndices, ar.ExchangeResult.DiscardedCount);
                         return ar.ExchangeResult.Success
-                            ? $">>> {name}{you} 拿弃牌并替换了 {ar.ExchangeResult.DiscardedCount} 张牌"
-                            : $">>> {name}{you} 拿弃牌失败";
+                            ? $">>> {name}{you} 拿弃牌替换了{slots}"
+                            : $">>> {name}{you} 拿弃牌替换{slots}失败，{FormatExchangeFailureSuffix(ar.ExchangeResult, "弃牌堆顶牌")}";
+                    }
                     break;
                 case ActionType.UseSkill:
                     if (ar.SkillUsed == SkillType.PeekSelf)
-                        return $">>> {name}{you} 查看了自己的第 {ar.SourceSlot + 1} 张牌";
+                        return $">>> {name}{you} 查看了自己的{FormatSlot(ar.SourceSlot)}";
                     if (ar.SkillUsed == SkillType.Spy)
                     {
                         string tgt = "玩家";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
                         if (tp != null) tgt = tp.Nickname;
-                        return $">>> {name}{you} 偷看了 {tgt} 的第 {ar.TargetSlot + 1} 张牌";
+                        return $">>> {name}{you} 偷看了 {tgt} 的{FormatSlot(ar.TargetSlot)}";
                     }
                     if (ar.SkillUsed == SkillType.Swap)
                     {
                         string tgt = "玩家";
                         var tp = Players.Find(p => p.PlayerId == ar.TargetPlayerId);
                         if (tp != null) tgt = tp.Nickname;
-                        return $">>> {name}{you} 将第 {ar.SourceSlot + 1} 张牌与 {tgt} 的第 {ar.TargetSlot + 1} 张牌交换";
+                        string swapText = $"将自己的{FormatSlot(ar.SourceSlot)}与 {tgt} 的{FormatSlot(ar.TargetSlot)}交换";
+                        return ar.SwapOccurred
+                            ? $">>> {name}{you} {swapText}"
+                            : $">>> {name}{you} {swapText}失败";
                     }
                     break;
                 case ActionType.CallSteady:

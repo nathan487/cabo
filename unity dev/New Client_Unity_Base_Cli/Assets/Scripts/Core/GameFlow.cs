@@ -286,6 +286,15 @@ namespace Cabo.Client
             StateChanged?.Invoke();
         }
 
+        public void ReturnToMainInput()
+        {
+            if (!State.IsMyTurn || State.HasDrawnCard)
+                return;
+
+            SubState = GameSubState.AwaitingMainInput;
+            StateChanged?.Invoke();
+        }
+
         public void DoCallSteady()
         {
             Gateway.SendCallSteady(State.MyPlayerId, State.RoomId);
@@ -306,6 +315,15 @@ namespace Cabo.Client
         {
             if (!State.HasDrawnCard) return;
             SubState = GameSubState.AwaitingReplaceSlots;
+            StateChanged?.Invoke();
+        }
+
+        public void ReturnToDrawnDecision()
+        {
+            if (!State.IsMyTurn || !State.HasDrawnCard)
+                return;
+
+            SubState = GameSubState.AwaitingDrawnDecision;
             StateChanged?.Invoke();
         }
 
@@ -358,6 +376,34 @@ namespace Cabo.Client
         {
             SkillTargetSlot = slot;
             SendSkillRequest();
+        }
+
+        public void ReturnToSkillStart()
+        {
+            SkillMySlot = -1;
+            SkillTargetSlot = -1;
+            SkillTargetPlayerId = 0;
+            SubState = SkillTypePending switch
+            {
+                2 => GameSubState.SkillPeekSlot,
+                3 => GameSubState.SkillSpyTarget,
+                4 => GameSubState.SkillSwapMySlot,
+                _ => SubState
+            };
+            StateChanged?.Invoke();
+        }
+
+        public void ReturnToSkillTargetSelection()
+        {
+            SkillTargetSlot = -1;
+            SkillTargetPlayerId = 0;
+            SubState = SkillTypePending switch
+            {
+                3 => GameSubState.SkillSpyTarget,
+                4 => GameSubState.SkillSwapTargetPlayer,
+                _ => SubState
+            };
+            StateChanged?.Invoke();
         }
 
         void SendSkillRequest()

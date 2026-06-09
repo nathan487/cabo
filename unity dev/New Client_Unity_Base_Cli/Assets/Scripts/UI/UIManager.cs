@@ -54,6 +54,7 @@ namespace Cabo.Client.UI
             // Build panels
             RoomPanel = new RoomPanel(Root, flow);
             GameTablePanel = new GameTablePanel(Root, flow);
+            GameTablePanel.SetAnimationQueueDrainedCallback(OnStateChanged);
 
             // Listen for state changes
             flow.StateChanged += OnStateChanged;
@@ -70,8 +71,12 @@ namespace Cabo.Client.UI
 
             // Show/hide panels based on flow state
             bool showOver = state.Phase == GamePhase.GameOver;
-            bool showReveal = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
+            bool revealPending = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
+            bool waitForActionAnimation = revealPending && GameTablePanel.HasPendingActionAnimation;
+            bool showReveal = revealPending && !waitForActionAnimation;
             bool showGame = !showReveal && !showOver && (_flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing);
+            if (waitForActionAnimation)
+                showGame = true;
             bool showRoomPanel = _flow.Flow == FlowState.Home
                 || _flow.Flow == FlowState.Connecting
                 || _flow.Flow == FlowState.RoomFlow
