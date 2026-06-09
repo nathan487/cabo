@@ -1,5 +1,46 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-09 Update: In-Game Two-Column Social Layout Completed
+
+Latest committed-ready client UI work in `unity dev/New Client_Unity_Base_Cli`:
+
+- `Assets/Scripts/UI/GameTablePanel.cs`
+  - `CaboGameTable` is now a stable two-column layout.
+  - Left column `TablePlayArea` owns the full card table: top opponent, middle table row, and self hand.
+  - Right column `TableSocialPanel` is a fixed-width `300px` sidebar for chat/log tabs.
+  - `_socialPanel` was moved out of `TableMiddle`, so chat/log content no longer participates in the left/right opponent + center table layout and cannot squeeze or stretch the game table.
+  - `TableMiddle` now only contains left opponent, center table, and right opponent.
+- `Assets/Scripts/UI/RoomChatPanel.cs`
+  - Added a game-sidebar fill mode via `RoomChatPanel(flow, compact: true, fillHeight: true)`.
+  - Game chat message list flex-fills the sidebar and the input row stays pinned near the bottom.
+  - In-game input bottom spacing is now visually tight, using the sidebar padding instead of a large extra bottom margin.
+  - Emoji popup still opens above the input row, self-sizes to sticker count, and keeps the current 4 stickers on one row without a visible scrollbar.
+  - Waiting-room chat keeps the normal fixed-height behavior and was not converted to fill mode.
+
+Verified with Unity MCP:
+
+- Triggered `AssetDatabase.Refresh()` and script compilation twice; Unity Console returned 0 errors/warnings.
+- Entered Play Mode without starting the server.
+- Injected a synthetic 4-player active game state with long room chat history.
+- Captured and visually checked:
+  - `Assets/Screenshots/game_two_column_chat_final.png`
+  - `Assets/Screenshots/game_two_column_log_final.png`
+  - `Assets/Screenshots/game_two_column_emoji_reflection.png`
+  - `Assets/Screenshots/waiting_room_after_two_column_refactor.png`
+- Measured active game layout:
+  - `TablePlayArea` approximately `947px` wide.
+  - `TableSocialPanel` approximately `300px` wide and full table height.
+  - In-game chat message scroll area filled the sidebar.
+  - Emoji popup geometry: popup above input row, `gapToInput=8.6`, `trayChildren=4`, `stickerScroller=Hidden`.
+- Waiting-room regression check:
+  - Text field, Emoji, Send, player list, and chat messages remained visible.
+  - No `Enter a room to chat` status line appeared.
+
+Known follow-up:
+
+- The user should still do a real Windows player build verification with live server/bots when ready.
+- Server build/start remains user-owned. Do not build or start the server unless explicitly asked.
+
 ## 2026-06-09 Update: Room Chat Panel Layout Stabilized
 
 Latest uncommitted client UI work in `unity dev/New Client_Unity_Base_Cli`:

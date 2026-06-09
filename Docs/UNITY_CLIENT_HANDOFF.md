@@ -1,5 +1,63 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-09 Fast Resume: In-Game Two-Column Social Layout
+
+Most recent local work completed the comfortable two-column game-table layout requested by the user.
+
+Files changed in the latest patch:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/RoomChatPanel.cs`
+
+What changed in the latest patch:
+
+- `CaboGameTable` now lays out as two columns.
+- Left `TablePlayArea` contains the complete card table: top opponent, middle table row, and self hand.
+- Right `TableSocialPanel` is a fixed `300px` full-height sidebar for the game log / room chat tabs.
+- `_socialPanel` was moved out of `TableMiddle`, so chat/log content no longer squeezes or stretches the main table.
+- `TableMiddle` now only contains left opponent, center table, and right opponent.
+- In-game chat now uses `RoomChatPanel(flow, compact: true, fillHeight: true)`.
+- In-game chat messages flex-fill the sidebar, while the input row stays pinned near the bottom.
+- The in-game emoji popup opens above the input row, self-sizes to the sticker count, and keeps the current 4 stickers in one row with no visible sticker scrollbar.
+- Waiting-room chat keeps the default fixed-height layout and was regression-checked after the refactor.
+
+Latest Unity MCP verification:
+
+1. Triggered `AssetDatabase.Refresh()` and script compilation; Unity Console returned 0 errors/warnings.
+2. Entered Play Mode through MCP without starting the server.
+3. Injected a synthetic 4-player active game state with chat history.
+4. Captured screenshots:
+   - `Assets/Screenshots/game_two_column_chat_final.png`
+   - `Assets/Screenshots/game_two_column_log_final.png`
+   - `Assets/Screenshots/game_two_column_emoji_reflection.png`
+   - `Assets/Screenshots/waiting_room_after_two_column_refactor.png`
+5. Measured layout:
+   - `TablePlayArea` approximately `947px` wide.
+   - `TableSocialPanel` approximately `300px` wide and full table height.
+   - Emoji popup gap to input row: `8.6px`.
+   - Sticker tray children: `4`.
+   - Sticker scrollbar: `Hidden`.
+6. Waiting-room regression screenshot confirmed the player list, chat messages, text field, Emoji button, and Send button remained visible.
+7. Final Unity Console check returned 0 errors/warnings.
+
+Temporary screenshot artifacts may exist at:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots/`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots.meta`
+
+These screenshots are MCP verification artifacts and should not be committed unless the user explicitly asks to keep them.
+
+Recommended next live verification:
+
+- User starts server and bots.
+- Test waiting room and game scene with 2, 3, and 4 players.
+- Send enough chat messages to overflow the panel.
+- Confirm new messages auto-scroll to bottom.
+- Confirm the game table does not resize or deform when chat/log/emoji state changes.
+- Rebuild Windows player when asked and compare waiting-room/game-scene chat behavior against Play Mode.
+
+Server note: the user builds and starts the server. Do not run server build/start unless explicitly requested.
+
 ## 2026-06-09 Fast Resume: Chat Panel Layout Fix
 
 Most recent local work focuses on the room communication panel in both the waiting room and in-game table.

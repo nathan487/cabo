@@ -45,6 +45,7 @@ namespace Cabo.Client.UI
         readonly VisualElement _drawnCardSlot;
         readonly VisualElement _buttonRow;
         readonly Label _statusLine;
+        readonly VisualElement _playArea;
         readonly VisualElement _socialPanel;
         readonly VisualElement _socialContent;
         readonly RoomChatPanel _roomChatPanel;
@@ -81,7 +82,7 @@ namespace Cabo.Client.UI
 
             _container = new VisualElement { name = "CaboGameTable" };
             StretchToParent(_container);
-            _container.style.flexDirection = FlexDirection.Column;
+            _container.style.flexDirection = FlexDirection.Row;
             _container.style.paddingLeft = 22;
             _container.style.paddingRight = 22;
             _container.style.paddingTop = 16;
@@ -104,20 +105,33 @@ namespace Cabo.Client.UI
             _selfSeat = new SeatView("self", true);
             _opponentSeats = new[] { _topSeat, _leftSeat, _rightSeat };
 
-            _container.Add(_topSeat.Root);
+            _playArea = new VisualElement { name = "TablePlayArea" };
+            _playArea.style.flexDirection = FlexDirection.Column;
+            _playArea.style.flexGrow = 1;
+            _playArea.style.flexShrink = 1;
+            _playArea.style.minWidth = 0;
+            _playArea.style.minHeight = 0;
+            _playArea.style.height = Length.Percent(100);
+            _container.Add(_playArea);
+
+            _playArea.Add(_topSeat.Root);
 
             var middle = new VisualElement { name = "TableMiddle" };
             middle.style.flexGrow = 1;
+            middle.style.flexShrink = 1;
+            middle.style.minHeight = 0;
             middle.style.flexDirection = FlexDirection.Row;
             middle.style.alignItems = Align.Stretch;
             middle.style.marginTop = 10;
             middle.style.marginBottom = 10;
-            _container.Add(middle);
+            _playArea.Add(middle);
 
             middle.Add(_leftSeat.Root);
 
             _centerTable = new VisualElement { name = "CenterTable" };
             _centerTable.style.flexGrow = 1;
+            _centerTable.style.flexShrink = 1;
+            _centerTable.style.minWidth = 0;
             _centerTable.style.marginLeft = 16;
             _centerTable.style.marginRight = 16;
             _centerTable.style.alignItems = Align.Center;
@@ -235,12 +249,15 @@ namespace Cabo.Client.UI
             middle.Add(_rightSeat.Root);
 
             _socialPanel = new VisualElement { name = "TableSocialPanel" };
-            _socialPanel.style.width = 268;
-            _socialPanel.style.minWidth = 268;
-            _socialPanel.style.maxWidth = 268;
+            _socialPanel.style.flexDirection = FlexDirection.Column;
+            _socialPanel.style.width = 300;
+            _socialPanel.style.minWidth = 300;
+            _socialPanel.style.maxWidth = 300;
             _socialPanel.style.flexGrow = 0;
             _socialPanel.style.flexShrink = 0;
             _socialPanel.style.minHeight = 0;
+            _socialPanel.style.height = Length.Percent(100);
+            _socialPanel.style.alignSelf = Align.Stretch;
             _socialPanel.style.marginLeft = 12;
             _socialPanel.style.paddingLeft = 10;
             _socialPanel.style.paddingRight = 10;
@@ -254,10 +271,11 @@ namespace Cabo.Client.UI
             _socialPanel.style.overflow = Overflow.Hidden;
             SetBorderWidth(_socialPanel, 1);
             SetBorderColor(_socialPanel, new Color(0.12f, 0.32f, 0.27f));
-            middle.Add(_socialPanel);
+            _container.Add(_socialPanel);
 
             var socialTabs = new VisualElement();
             socialTabs.style.flexDirection = FlexDirection.Row;
+            socialTabs.style.flexShrink = 0;
             socialTabs.style.marginBottom = 8;
             _socialPanel.Add(socialTabs);
 
@@ -286,14 +304,13 @@ namespace Cabo.Client.UI
             _socialContent.style.overflow = Overflow.Hidden;
             _socialPanel.Add(_socialContent);
 
-            _roomChatPanel = new RoomChatPanel(_flow, true);
+            _roomChatPanel = new RoomChatPanel(_flow, true, true);
             _roomChatPanel.Root.style.flexGrow = 1;
             _roomChatPanel.Root.style.flexShrink = 1;
             _roomChatPanel.Root.style.minHeight = 0;
-            _roomChatPanel.Root.style.height = Length.Percent(100);
             _socialPanel.Add(_roomChatPanel.Root);
 
-            _container.Add(_selfSeat.Root);
+            _playArea.Add(_selfSeat.Root);
         }
 
         public void SetVisible(bool visible)
