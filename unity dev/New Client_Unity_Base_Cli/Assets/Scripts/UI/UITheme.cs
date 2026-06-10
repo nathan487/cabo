@@ -98,30 +98,6 @@ namespace Cabo.Client.UI
             button.style.unityTextAlign = TextAnchor.MiddleCenter;
         }
 
-        public static void ApplyInput(TextField field)
-        {
-            if (field == null) return;
-            field.pickingMode = PickingMode.Position;
-            field.style.color = TextPrimary;
-            field.style.backgroundColor = InputBackground;
-            SetRadius(field, 6f);
-            SetBorderWidth(field, 1f);
-            SetBorderColor(field, InputBorder);
-        }
-
-        public static void ApplyInputElement(VisualElement input)
-        {
-            if (input == null) return;
-            input.pickingMode = PickingMode.Position;
-            input.style.color = TextPrimary;
-            input.style.backgroundColor = InputBackground;
-            SetRadius(input, 6f);
-            SetBorderWidth(input, 0f);
-            SetBorderColor(input, InputBorder);
-            input.style.marginRight = 0;
-            input.style.paddingRight = 8;
-        }
-
         public static void SetBorderColor(VisualElement element, Color color)
         {
             if (element == null) return;

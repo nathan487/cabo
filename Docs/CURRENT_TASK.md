@@ -1,5 +1,44 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-10 Next Task: In-Game Animation Polish
+
+The next requested task is to optimize in-game animation rendering and player experience.
+
+Primary plan:
+
+- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+
+Primary implementation area:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+
+Task focus:
+
+- local-player action animation;
+- opponent action animation;
+- animation order and logic;
+- timing and smoothness;
+- whether final action animations finish before reveal/settlement;
+- whether animations communicate source, target, and result without relying on logs.
+
+Important constraints:
+
+- Use the `unity-mcp-orchestrator` skill and Unity MCP for compile checks, Play Mode state injection, screenshots, and Console verification.
+- Do not change game rules, protobuf schema, WebSocket transport, room logic, scoring, or the table/chat layout unless an animation bug absolutely requires it.
+- Do not commit MCP screenshot artifacts under `Assets/Screenshots/`.
+- Server build/start remains user-owned unless explicitly requested.
+
+Recommended first step in the next session:
+
+1. Read `Docs/UNITY_ANIMATION_NOTES.md`.
+2. Read `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`.
+3. Inspect current `GameTablePanel.cs` animation methods before editing.
+4. Build an action-animation matrix for local and opponent viewpoints.
+5. Then implement small, verified animation improvements.
+
 ## 2026-06-10 Update: WebSocket + Cloudflare Transport Implemented
 
 The raw TCP transport migration is now implemented for the main Unity client/server path.

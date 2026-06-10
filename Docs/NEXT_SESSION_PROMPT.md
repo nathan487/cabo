@@ -3,117 +3,155 @@
 Copy this into the next Codex session:
 
 ```text
-请先阅读这些文档，快速接手当前项目状态：
+请先阅读这些文档，快速接手当前 Unity 客户端状态：
 
 1. Docs/CURRENT_TASK.md
-2. Docs/NETWORK_LAYER.md
+2. Docs/UNITY_ANIMATION_NOTES.md
 3. Docs/UNITY_CLIENT_HANDOFF.md
-4. Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md
-5. Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md
+4. Docs/NETWORK_LAYER.md
+5. Docs/GAME_SESSION.md
+6. Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md
 
-当前项目路径：
-- 服务端：MuduoBaseGameServer
-- Unity 客户端：unity dev/New Client_Unity_Base_Cli
+当前工作区：
 
-重要背景：
-- 当前游戏逻辑、房间逻辑、protobuf 协议、Unity UI/动画/状态机都已经能工作。
-- 目前网络传输还是 raw TCP，格式是 `[4 bytes big-endian length][protobuf payload]`。
-- 下一步目标是把传输层改成 WebSocket，然后通过 Cloudflare Tunnel 暴露一个临时公网域名，让公网玩家的 Unity 客户端可以连接我的本地服务器。
-- 只改传输层和必要的连接地址输入/配置，不改游戏规则、不改 protobuf schema、不改房间/对局状态机、不重构 UI 布局。
-- 注意：现有 WebSocket/Cloudflare plan 是草案，不是绝对正确的执行脚本。必须先审查 `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md` 顶部的 2026-06-09 review notes，再结合当前代码修正实施方式。
+- Workspace: C:\Users\Admin\Desktop\Cabo GameObject
+- Unity client: unity dev/New Client_Unity_Base_Cli
+- Server: MuduoBaseGameServer
 
-先做 Plan 审查，不要直接开始大规模改代码：
+本次新任务：
 
-- 检查服务端 CMake、现有 `MessageCodec`、`MessageDispatcher`、`GameServer`、`RoomService`、`GameService` 的真实接口。
-- 检查 Unity 当前 `NetworkGateway`、`TcpNetworkClient`、`MessageCodec`、`GameFlow.ConnectToServerAddress` 的真实实现。
-- 明确哪些代码可以复用，哪些旧 plan 示例会导致编译错误或行为错误。
-- 先给出简短修正方案，再分阶段实现。
+优化游戏对局中的动画体验，包括玩家本人这边的所有动作，以及对手动作的展示。重点审查并优化动画渲染逻辑、顺序、时间、节奏、顺滑程度和可读性，让玩家不看日志也能理解刚刚发生了什么。
 
-本次新任务目标：
+必须先做审查和小计划，不要一上来大规模重写动画系统。先建立 action-animation matrix，覆盖：
 
-1. 服务端新增 WebSocket 支持
-   - 在 muduo TCP 连接之上新增 `WebSocketCodec`。
-   - 实现 RFC 6455 HTTP Upgrade 握手。
-   - 支持 WebSocket binary frame 解码。
-   - 客户端到服务端 frame 是 masked，需要解 mask。
-   - 服务端到客户端 frame 不 mask。
-   - 支持 ping/pong/close 基础控制帧。
-   - 解出的 binary payload 仍然是现有 protobuf bytes，继续交给现有 dispatcher。
-   - 发送给客户端时，把现有 protobuf payload 包成 WebSocket binary frame。
+- 本人抽牌；
+- 本人丢弃刚抽的牌；
+- 本人用刚抽的牌替换；
+- 本人拿弃牌堆并替换；
+- 本人 Peek / Spy / Swap 技能；
+- 本人 CABO；
+- 对手抽牌；
+- 对手丢弃刚抽的牌；
+- 对手替换；
+- 对手拿弃牌堆；
+- 对手 Peek / Spy / Swap 技能；
+- 对手 CABO；
+- 最后一手动作动画结束后再进入 RoundReveal / 结算面板。
 
-2. Unity 客户端改成 WebSocket transport
-   - 新增或改造网络层，使用 `System.Net.WebSockets.ClientWebSocket`。
-   - 连接地址改为完整 WebSocket URL：
-     - 本地：`ws://127.0.0.1:8888`
-     - Cloudflare：`wss://xxxx.trycloudflare.com`
-   - WebSocket 已经提供消息边界，所以 Unity 收包不再读取 4 字节长度前缀。
-   - `MessageCodec.Encode` / `Decode` 只处理 protobuf 序列化/反序列化，或者保留旧 TCP codec 但不要让 WebSocket 路径继续使用 4 字节 framing。
-   - 保持 `GameFlow` drain-then-render 行为，不要因为改 transport 破坏状态同步。
+核心目标：
 
-3. Cloudflare Tunnel 临时公网访问
-   - 添加文档或脚本，说明如何启动本地 GameServer 和 cloudflared。
-   - 典型命令：
-     - 本地服务器监听 `8888`。
-     - `cloudflared tunnel --url http://localhost:8888`
-   - Cloudflare 输出 `https://xxx.trycloudflare.com` 后，Unity 客户端使用 `wss://xxx.trycloudflare.com`。
-   - 注意：如果 Cloudflare 对 raw WebSocket upgrade 到非 HTTP 服务有要求，请验证实际握手路径。目标是 Unity `ClientWebSocket` 能通过 `wss://...trycloudflare.com` 连到本地 server。
+- 动画顺序必须和服务器 ActionResultNotify / TurnStartNotify 的顺序一致。
+- 动画要清楚表达谁行动、牌从哪里来、移动到哪里、哪个槽位被影响、结果是什么。
+- 本人视角和对手视角都要舒服、清晰。
+- 动画不能让牌桌布局跳动，不能影响右侧聊天/日志侧栏。
+- 不能有残留的临时牌、残留高亮、重复当前回合边框、卡住的 inspect/skill 状态。
+- 最后一手动作还没播放完时，不允许结算界面抢先出现；动画播放完后才进入结算。
 
-验证要求：
+重点代码：
 
-- 服务端 WebSocketCodec 单元测试：
-  - handshake returns 101
-  - mixed/lower-case handshake headers
-  - `Connection: keep-alive, Upgrade`
-  - missing/invalid key/version failure path
-  - encode small/medium/large binary payload
-  - decode masked binary payload
-  - reject unmasked client binary payload
-  - partial frame reassembly
-  - fragmented binary message reassembly, or explicit protocol-error rejection with a documented reason
-  - ping -> pong
-  - close frame handling
-- 服务端编译通过。
-- Unity 编译通过，Console 必须为 0 errors / 0 warnings。
-- 本地端到端验证：
-  - Unity 连接 `ws://127.0.0.1:8888`
-  - 创建房间
-  - 加入房间
-  - 准备/开始游戏
-  - 至少完成抽牌/弃牌或一个基础操作
-- 公网验证：
-  - 启动 Cloudflare Tunnel。
-  - Unity 连接 `wss://xxx.trycloudflare.com`。
-  - 至少两个客户端能进入同一房间。
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs
 
-重要限制：
+优先审查 GameTablePanel.cs 中这些方法：
 
-- 我会自己决定什么时候 build/start 服务端。不要主动启动长期运行的服务端，除非我明确要求。
-- 不要提交或保留 Unity MCP 截图产物，除非我明确要求。
-- 当前工作树可能有历史未提交文件，不要 revert 不属于本任务的改动。
-- 优先做小步提交/小步验证。不要一次性大改所有网络文件。
-- 不要盲目把 `MessageCodec.Encode` 全局改成纯 protobuf，除非确认没有任何旧 TCP 路径/测试还依赖长度前缀。更稳妥的做法是拆出 protobuf serialization helper，让 TCP codec 和 WebSocket transport 各管自己的 framing。
-- 不要从 WebSocket 后台接收线程直接操作 Unity UI 或渲染状态，只能入队消息，继续由主线程 drain 后刷新 UI。
-- 不要硬编码 OpenSSL 链接方式；先检查当前 CMake/toolchain，优先使用 `find_package(OpenSSL REQUIRED)` 和 imported targets，或确认项目环境已有可用 SHA1/Base64 方案。
-- Cloudflare `https://...trycloudflare.com` 到 Unity `wss://...trycloudflare.com` 的转换必须实测，不要只靠推断。
+- RenderGame()
+- BuildActionAnimationSnapshot(...)
+- EnqueueActionAnimation(...)
+- PlayActionAnimation(...)
+- PlaySkillAnimation(...)
+- PlayFlyCard(...)
+- PulsePlayer(...)
+- PulseCard(...)
+- RenderSeats(...)
+- RenderActionPanel(...)
+- ReleaseTurnDisplay(...)
+- Tick()
 
-当前最新 UI 状态：
-- 等待房间输入框黑框/右侧白边问题已优化。
-- 等待房间房主标记已改为金色徽章，左侧是真正生成的皇冠 bitmap 图案，右侧是 `房主`。
-- Unity MCP 已用 4 人等待房间截图验证过该 UI。
+重点检查 GameState.HandleActionResult(...) 写入的字段是否足够支持动画：
 
-建议实施顺序：
+- LastActionSequence
+- LastActionType
+- LastActionSkill
+- LastActionSourcePlayerId
+- LastActionTargetPlayerId
+- LastActionSourceSlot
+- LastActionTargetSlot
+- LastActionSwapOccurred
+- LastActionExchangeSucceeded
+- LastActionIncomingCardValue
+- LastActionDiscardedCount
+- LastActionSelectedSlots
+- ActionResultNotify.player_hands
 
-1. 审查并修正现有 plan，特别是 handshake 解析、mask enforcement、fragmentation、OpenSSL/CMake、Unity threading、MessageCodec 分层。
-2. 先实现服务端 `WebSocketCodec` 单元测试，测试失败时不要继续集成。
-3. 实现服务端 `WebSocketCodec`，通过单元测试。
-4. 集成服务端 WebSocket 接收/发送，但保持 protobuf dispatcher 和业务服务不变。
-5. 实现 Unity `ClientWebSocket` transport，只在后台线程入队消息，不碰 UI。
-6. 改 Unity 连接 UI/缓存，让用户输入完整 WebSocket URL，并兼容 `https://` 自动转 `wss://`。
-7. 本地 `ws://127.0.0.1:8888` 测通后，再处理 Cloudflare `wss://`。
-8. 更新文档，记录实际命令、坑点和最终验证结果。
+Unity MCP 要求：
+
+- 必须使用 unity-mcp-orchestrator skill。
+- MCP endpoint 通常是 http://127.0.0.1:8080/mcp。
+- 如果 MCP 断开，先读当前项目生成的：
+  unity dev/New Client_Unity_Base_Cli/Library/MCPForUnity/TerminalScripts/mcp-terminal.cmd
+  不要复用旧 token。
+- 在 Unity 中确认 Window > MCP For Unity 连接到 http://127.0.0.1:8080。
+
+每次 C# 修改后必须验证：
+
+1. AssetDatabase.Refresh()
+2. 请求脚本编译
+3. 等待 Unity 编译结束
+4. read_console 检查 error / warning
+5. 最终目标是 Console 0 errors / 0 warnings；如果有已存在且无关的 warning/error，必须说明证据。
+
+建议用 Unity MCP 注入 synthetic 4-player game state，先不依赖真实服务器。至少验证：
+
+- 4 人 active game；
+- 本人回合未抽牌；
+- 本人抽牌后等待决策；
+- 单槽替换；
+- 多槽替换；
+- 拿弃牌堆；
+- Peek 自己；
+- Spy 对手；
+- Swap 自己槽位和对手槽位；
+- 对手 draw/discard/replace/take；
+- 对手 skill action；
+- CABO；
+- action animation pending 时收到 RoundReveal，必须等待动画完成再渲染结算。
+
+截图验收要求：
+
+- 截图不能只截最终态，关键动画需要 before / mid / hold / after。
+- 推荐命名：
+  - animation_draw_self_before.png
+  - animation_draw_self_mid.png
+  - animation_replace_multi_hold.png
+  - animation_swap_cross_mid.png
+  - animation_spy_inspect_hold.png
+  - animation_opponent_action_mid.png
+  - animation_round_reveal_after_queue.png
+- Unity MCP 截图属于验证产物，不要提交 Assets/Screenshots/ 或 Assets/Screenshots.meta，除非用户明确要求。
+
+限制：
+
+- 不修改游戏规则。
+- 不修改 protobuf schema，除非先提出单独协议计划并获得确认。
+- 不修改 WebSocket transport。
+- 不修改服务器逻辑。
+- 不修改房间逻辑、结算规则、聊天/日志侧栏布局、牌桌整体布局。
+- 不要启动或构建服务器，除非用户明确要求；服务器 build/start 由用户掌控。
+- 不要一次性大规模重写。优先小步修改、小步编译、小步截图验证。
+
+完成标准：
+
+- 本人动作和对手动作都能被玩家看懂。
+- 动画顺序与真实动作顺序一致。
+- 转入下一回合或结算前，上一手动作已经完整展示。
+- 4 人牌桌不变形，右侧聊天/日志不抖动。
+- 没有卡住的临时牌、残留边框、残留高亮或重复 turn 状态。
+- Unity Console 最终为 0 errors / 0 warnings，或明确记录无关的既有问题。
 ```
 
 Asset note:
 
-- Unity MCP screenshots under `Assets/Screenshots/` are verification artifacts.
+- Unity MCP screenshots under `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots/` are verification artifacts.
 - Do not commit screenshot artifacts unless explicitly requested.

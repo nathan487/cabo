@@ -1,5 +1,47 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-10 Fast Resume: In-Game Animation Polish Next
+
+Next requested task:
+
+- Optimize in-game animations for local-player actions and opponent actions.
+- Review animation logic, order, timing, smoothness, and whether the player can understand the action without relying on logs.
+- Use Unity MCP for compile checks, synthetic Play Mode states, screenshots, and Console verification.
+
+Read first:
+
+- `Docs/CURRENT_TASK.md`
+- `Docs/UNITY_ANIMATION_NOTES.md`
+- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+
+Primary files:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+
+Do not start by rewriting the animation system. First audit the current action animation matrix:
+
+- self draw / discard drawn / replace / take discard;
+- self Peek / Spy / Swap / CABO;
+- opponent draw / discard drawn / replace / take discard;
+- opponent Peek / Spy / Swap / CABO;
+- final action animation into `RoundReveal`.
+
+Verification expectation:
+
+- Use synthetic 4-player states through Unity MCP before live-server testing.
+- Capture before/mid/hold/after screenshots when checking motion phases.
+- Verify no stuck temporary cards, stale highlights, layout jumps, or premature reveal panel.
+- Final Console should be `0 errors / 0 warnings`, or any pre-existing unrelated scene warnings must be explicitly documented.
+
+Constraints:
+
+- Do not change protobuf schema, server rules, WebSocket transport, room logic, scoring, or table/chat layout unless the user explicitly expands scope.
+- Do not commit Unity MCP screenshot artifacts under `Assets/Screenshots/`.
+- Server build/start remains user-owned unless explicitly requested.
+
 ## 2026-06-09 Fast Resume: Skill Flow + Logs + Round Reveal
 
 Most recent local work fixed late-round action/reveal sequencing, clarified action logs, and improved the round settlement panel.

@@ -1,5 +1,43 @@
 # Unity Animation Notes
 
+## 2026-06-10 Next Work: Animation Experience Polish
+
+The next requested Unity task is to review and improve all in-game action animations for both the local player and opponents.
+
+Start from:
+
+- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+- `Assets/Scripts/UI/GameTablePanel.cs`
+- `Assets/Scripts/Core/GameState.cs`
+- `Assets/Scripts/Core/GameFlow.cs`
+- `Assets/Scripts/UI/UIManager.cs`
+
+Focus areas:
+
+- action order: visual sequence must match server action order;
+- source/target clarity: players should understand who acted and which slot changed;
+- timing: readable but not sluggish;
+- smoothness: no abrupt layout jumps, stuck temporary cards, or stale highlights;
+- viewpoint quality: local-player feedback and opponent-action feedback must both be understandable;
+- round reveal handoff: the final action animation should finish before settlement/reveal UI takes over.
+
+Use Unity MCP for:
+
+- compile refresh and Console checks;
+- synthetic 4-player game states;
+- screenshots at before/mid/hold/after timestamps;
+- round-reveal handoff tests while action animation is pending.
+
+Do not change:
+
+- game rules;
+- protobuf schema;
+- server logic;
+- WebSocket transport;
+- table/chat layout.
+
+Screenshots under `Assets/Screenshots/` are verification artifacts and should not be committed unless explicitly requested.
+
 ## 2026-06-09 Update: Round Reveal Waits for Action Queue
 
 Latest behavior:

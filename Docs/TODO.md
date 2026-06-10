@@ -2,7 +2,7 @@
 
 ## Immediate Next Task
 
-- [ ] **Plan Unity client migration** — Based on working CLI client + stable protocol
+- [ ] **Optimize in-game animation experience** - Review and improve local-player and opponent action animations, including order, timing, smoothness, readability, and round-reveal handoff. Start from `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`.
 
 ## Server Enhancements (Future)
 
@@ -12,14 +12,15 @@
 - [ ] Reconnect / state recovery (StateSyncNotify exists but not fully tested)
 - [ ] Per-action timers (replace server sleep with muduo timer for non-blocking delays)
 
-## Unity Client (Planned)
+## Unity Client
 
-- [ ] TCP + protobuf network layer (C# port of NetworkClient)
-- [ ] GameState management (C# port of GameState)
-- [ ] 4-player table layout UI
-- [ ] Card display (known/unknown states)
-- [ ] Action UI (draw, take from discard, call CABO)
-- [ ] Skill UI (peek, spy, swap)
-- [ ] Multi-card replace UI
-- [ ] Round reveal panel with ready/start
-- [ ] Score display + game over screen
+- [x] WebSocket + protobuf network layer for the main client path
+- [x] GameState management
+- [x] 4-player table layout UI
+- [x] Card display (known/unknown states)
+- [x] Action UI (draw, take from discard, call CABO)
+- [x] Skill UI (peek, spy, swap)
+- [x] Multi-card replace UI
+- [x] Round reveal panel with ready/start
+- [x] Score display + game over screen
+- [ ] In-game animation polish for local and opponent actions

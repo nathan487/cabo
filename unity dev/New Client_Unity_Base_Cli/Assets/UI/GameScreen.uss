@@ -51,27 +51,22 @@ Button:disabled {
 
 TextField {
     color: var(--cabo-text-primary);
-    background-color: var(--cabo-input-bg);
-    border-radius: 6px;
-    border-width: 1px;
-    border-color: var(--cabo-input-border);
-    picking-mode: position;
-    white-space: normal;
 }
 
-TextField .unity-base-field__input,
 TextField .unity-base-text-field__input,
 TextField .unity-text-field__input {
     color: var(--cabo-text-primary);
     background-color: var(--cabo-input-bg);
     border-radius: 6px;
-    border-width: 0;
+    border-width: 1px;
     border-color: var(--cabo-input-border);
-    margin-right: 0;
-    padding-right: 8px;
+}
+
+TextField:focus .unity-base-text-field__input,
+TextField:focus .unity-text-field__input {
+    border-color: rgb(57, 111, 75);
 }
 
 TextField Label {
     color: var(--cabo-text-secondary);
-    white-space: normal;
 }

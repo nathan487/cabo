@@ -9,7 +9,7 @@ namespace Cabo.Client.UI
     public class RoomPanel
     {
         VisualElement _root, _container;
-        VisualElement _serverRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
+        VisualElement _serverRow, _nicknameRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
         VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView, _roomContent;
         ScrollView _playerListScroll;
         RoomChatPanel _chatPanel;
@@ -63,15 +63,16 @@ namespace Cabo.Client.UI
             _serverRow = new VisualElement();
             _serverRow.style.flexDirection = FlexDirection.Row;
             _serverRow.style.justifyContent = Justify.Center;
-            _serverRow.style.alignItems = Align.FlexEnd;
-            _serverRow.style.marginTop = 18;
+            _serverRow.style.alignItems = Align.Center;
+            _serverRow.style.marginTop = 26;
             _container.Add(_serverRow);
 
-            _serverAddressInput = new TextField("服务器地址");
+            _serverRow.Add(CreateHomeFormLabel("服务器地址"));
+
+            _serverAddressInput = new TextField();
             _serverAddressInput.value = _flow.GetCachedServerAddress();
-            _serverAddressInput.style.width = 320;
-            _serverAddressInput.style.maxWidth = 320;
-            _serverAddressInput.style.marginRight = 10;
+            StyleHomeTextField(_serverAddressInput, 300);
+            _serverAddressInput.style.marginRight = 12;
             _serverAddressInput.maxLength = 128;
             _serverRow.Add(_serverAddressInput);
 
@@ -82,6 +83,8 @@ namespace Cabo.Client.UI
             });
             _btnConnect.text = "连接";
             _btnConnect.style.fontSize = 16;
+            _btnConnect.style.height = 44;
+            _btnConnect.style.minWidth = 132;
             _serverRow.Add(_btnConnect);
 
             _playerList = new Label();
@@ -126,13 +129,20 @@ namespace Cabo.Client.UI
             _status.style.color = UITheme.TextMuted;
             _container.Add(_status);
 
-            _nicknameInput = new TextField("昵称");
-            _nicknameInput.style.marginTop = 16;
-            _nicknameInput.style.width = 260;
-            _nicknameInput.style.maxWidth = 260;
-            _nicknameInput.style.alignSelf = Align.Center;
+            _nicknameRow = new VisualElement();
+            _nicknameRow.style.flexDirection = FlexDirection.Row;
+            _nicknameRow.style.justifyContent = Justify.Center;
+            _nicknameRow.style.alignItems = Align.Center;
+            _nicknameRow.style.marginTop = 16;
+            _nicknameRow.style.marginRight = 124;
+            _container.Add(_nicknameRow);
+
+            _nicknameRow.Add(CreateHomeFormLabel("昵称"));
+
+            _nicknameInput = new TextField();
+            StyleHomeTextField(_nicknameInput, 180);
             _nicknameInput.maxLength = 20;
-            _container.Add(_nicknameInput);
+            _nicknameRow.Add(_nicknameInput);
 
             _avatarSection = new VisualElement();
             _avatarSection.style.alignSelf = Align.Center;
@@ -206,23 +216,15 @@ namespace Cabo.Client.UI
             _joinFormRow = new VisualElement();
             _joinFormRow.style.flexDirection = FlexDirection.Row;
             _joinFormRow.style.justifyContent = Justify.Center;
-            _joinFormRow.style.alignItems = Align.FlexEnd;
+            _joinFormRow.style.alignItems = Align.Center;
             _joinFormRow.style.marginTop = 16;
             _container.Add(_joinFormRow);
 
-            var joinCodeLabel = new Label("房间码");
-            joinCodeLabel.style.fontSize = 14;
-            joinCodeLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-            joinCodeLabel.style.marginRight = 8;
-            joinCodeLabel.style.marginBottom = 7;
-            _joinFormRow.Add(joinCodeLabel);
+            _joinFormRow.Add(CreateHomeFormLabel("房间码"));
 
             _joinCodeInput = new TextField();
-            _joinCodeInput.style.width = 260;
-            _joinCodeInput.style.maxWidth = 260;
-            _joinCodeInput.style.minWidth = 260;
-            _joinCodeInput.style.fontSize = 16;
-            _joinCodeInput.style.marginRight = 10;
+            StyleHomeTextField(_joinCodeInput, 180);
+            _joinCodeInput.style.marginRight = 12;
             _joinCodeInput.maxLength = 16;
             _joinFormRow.Add(_joinCodeInput);
 
@@ -242,6 +244,7 @@ namespace Cabo.Client.UI
             });
             _btnConfirmJoin.text = "确认加入";
             _btnConfirmJoin.style.fontSize = 16;
+            _btnConfirmJoin.style.height = 44;
             _joinFormRow.Add(_btnConfirmJoin);
 
             _roomButtonRow = new VisualElement();
@@ -305,6 +308,35 @@ namespace Cabo.Client.UI
             return nickname;
         }
 
+        static Label CreateHomeFormLabel(string text)
+        {
+            var label = new Label(text);
+            label.style.width = 112;
+            label.style.minWidth = 112;
+            label.style.marginRight = 12;
+            label.style.fontSize = 15;
+            label.style.color = UITheme.TextSecondary;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleRight;
+            return label;
+        }
+
+        static void StyleHomeTextField(TextField field, float width)
+        {
+            if (field == null)
+                return;
+
+            field.style.width = width;
+            field.style.minWidth = width;
+            field.style.maxWidth = width;
+            field.style.height = 44;
+            field.style.fontSize = 16;
+            field.style.marginLeft = 0;
+            field.style.marginRight = 0;
+            field.style.marginTop = 0;
+            field.style.marginBottom = 0;
+        }
+
         public void Render()
         {
             var s = _flow.State;
@@ -318,7 +350,7 @@ namespace Cabo.Client.UI
             _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
 
             _serverRow.style.display = inRoom ? DisplayStyle.None : DisplayStyle.Flex;
-            _nicknameInput.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
+            _nicknameRow.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
             _avatarSection.style.display = (!inRoom && connected) ? DisplayStyle.Flex : DisplayStyle.None;
             _homeButtonRow.style.display = !inRoom ? DisplayStyle.Flex : DisplayStyle.None;
             _joinFormRow.style.display = (!inRoom && connected && _joinFormVisible) ? DisplayStyle.Flex : DisplayStyle.None;

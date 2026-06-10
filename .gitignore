@@ -42,6 +42,10 @@ Assets/AssetStoreTools*
 /[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
 /[Aa]ssets/[Ss]treamingAssets/aa.log
 
+# Unity MCP verification screenshots
+**/Assets/Screenshots/
+**/Assets/Screenshots.meta
+
 # 编译器生成的文件
 *.o
 *.a
