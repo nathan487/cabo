@@ -1,5 +1,5 @@
 #include "room/RoomService.h"
-#include "common/MessageCodec.h"
+#include "common/WebSocketCodec.h"
 #include <mymuduo/logger.h>
 #include <algorithm>
 #include <chrono>
@@ -91,7 +91,7 @@ void RoomService::sendTo(const TcpConnectionPtr& conn,
     if (!sendFunc_ || !conn) return;
     std::string payload;
     msg.SerializeToString(&payload);
-    auto frame = MessageCodec::encode(payload);
+    auto frame = WebSocketCodec::encode(payload);
     sendFunc_(conn, frame);
 }
 

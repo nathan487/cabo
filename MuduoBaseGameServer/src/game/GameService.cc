@@ -1,5 +1,5 @@
 #include "game/GameService.h"
-#include "common/MessageCodec.h"
+#include "common/WebSocketCodec.h"
 #include <mymuduo/logger.h>
 #include <algorithm>
 #include <sstream>
@@ -130,7 +130,7 @@ void GameService::sendToPlayer(const TcpConnectionPtr& conn,
 
     std::string payload;
     msg.SerializeToString(&payload);
-    auto frame = game::MessageCodec::encode(payload);
+    auto frame = game::WebSocketCodec::encode(payload);
     LOG_INFO("[Game] sendToPlayer: %s (%zu bytes)", msgType.c_str(), frame.size());
     sendFunc_(conn, frame);
 }

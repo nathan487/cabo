@@ -5,7 +5,7 @@
 #include <mymuduo/TcpConnection.h>
 #include <mymuduo/Buffer.h>
 
-#include "common/MessageCodec.h"
+#include "common/WebSocketCodec.h"
 #include "common/MessageDispatcher.h"
 #include "room/RoomService.h"
 #include "game/GameService.h"
@@ -157,7 +157,7 @@ private:
         if (conn->connected()) {
             LOG_INFO("GameServer - connection UP : %s",
                      conn->peerAddress().toIpPort().c_str());
-            codecs_[conn.get()] = game::MessageCodec();
+            codecs_[conn.get()] = game::WebSocketCodec();
         } else {
             LOG_INFO("GameServer - connection DOWN : %s",
                      conn->peerAddress().toIpPort().c_str());
@@ -175,6 +175,12 @@ private:
         it->second.feedBytes(raw.data(), raw.size(),
             [this, conn](const std::vector<uint8_t>& payload) {
                 dispatcher_.dispatch(conn, payload);
+            },
+            [conn](const std::string& data) {
+                conn->send(data);
+            },
+            [conn]() {
+                conn->shutdown();
             });
     }
 
@@ -183,7 +189,7 @@ private:
     game::MessageDispatcher dispatcher_;
     game::RoomService roomService_;
     cabogame::GameService gameService_;
-    std::unordered_map<const TcpConnection*, game::MessageCodec> codecs_;
+    std::unordered_map<const TcpConnection*, game::WebSocketCodec> codecs_;
 };
 
 int main(int argc, char* argv[]) {

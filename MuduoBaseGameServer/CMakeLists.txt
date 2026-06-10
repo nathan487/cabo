@@ -27,6 +27,13 @@ else()
     message(STATUS "Using system protobuf: ${PROTOBUF_INCLUDE_DIR}")
 endif()
 
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    message(STATUS "Using OpenSSL crypto: ${OPENSSL_VERSION}")
+else()
+    message(FATAL_ERROR "OpenSSL crypto is required for WebSocket Sec-WebSocket-Accept SHA1")
+endif()
+
 set(PROTO_SRC_DIR "${CMAKE_SOURCE_DIR}/src/proto")
 
 set(PROTO_SRCS
@@ -38,6 +45,7 @@ set(PROTO_SRCS
 )
 
 set(GAME_SERVER_SRCS
+    src/common/WebSocketCodec.cc
     src/common/MessageCodec.cc
     src/common/MessageDispatcher.cc
     src/room/RoomService.cc
@@ -63,15 +71,28 @@ target_link_libraries(GameServer
     mymuduo
     ${PROTOBUF_LIBRARY}
     pthread
+    OpenSSL::Crypto
 )
 
-# RPATH: CMake auto-adds anaconda path since we link against ${PROTOBUF_LIBRARY}.
-# Post-build step strips it and sets only muduo lib path.
-# Anaconda protobuf loaded via LD_PRELOAD (avoids older anaconda libstdc++).
-add_custom_command(TARGET GameServer POST_BUILD
-    COMMAND patchelf --set-rpath "${CMAKE_SOURCE_DIR}/lib" "$<TARGET_FILE:GameServer>"
-    COMMENT "Fixing RPATH: remove anaconda lib path, keep only muduo lib"
+set_target_properties(GameServer PROPERTIES
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH "${CMAKE_SOURCE_DIR}/lib"
 )
+
+add_executable(websocket_codec_test
+    mytest/websocket_codec_test.cpp
+    src/common/WebSocketCodec.cc
+)
+target_include_directories(websocket_codec_test PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+)
+target_link_libraries(websocket_codec_test
+    OpenSSL::Crypto
+)
+
+# RPATH intentionally points only to the local muduo library.
+# Anaconda protobuf is loaded via LD_PRELOAD (avoids older anaconda libstdc++).
 
 # ============================================================
 # Regenerate protobuf C++ code (run manually when .proto changes)

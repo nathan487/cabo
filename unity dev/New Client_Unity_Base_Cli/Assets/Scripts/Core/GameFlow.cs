@@ -44,10 +44,9 @@ namespace Cabo.Client
         public event Action StateChanged;  // Fire when UI should refresh
 
         public const string ServerAddressPrefsKey = "Cabo.LastServerAddress";
-        public const string DefaultServerAddress = "127.0.0.1:8888";
+        public const string DefaultServerAddress = "ws://127.0.0.1:8888";
 
-        string _host, _nickname = "玩家";
-        int _port;
+        string _nickname = "玩家";
         bool _running = true;
         bool _wasConnected;
 
@@ -64,18 +63,20 @@ namespace Cabo.Client
             PlayerPrefs.SetString(ServerAddressPrefsKey, trimmed);
             PlayerPrefs.Save();
 
-            if (!TryParseServerAddress(trimmed, out var host, out var port))
+            if (!TryNormalizeServerUrl(trimmed, out var url))
             {
-                LastConnectError = "服务器地址格式应为 host:port。";
+                LastConnectError = "服务器地址格式应为 ws://host:port 或 wss://域名。";
                 Flow = FlowState.Home;
                 StateChanged?.Invoke();
                 return;
             }
 
-            Connect(host, port, nickname);
+            PlayerPrefs.SetString(ServerAddressPrefsKey, url);
+            PlayerPrefs.Save();
+            Connect(url, nickname);
         }
 
-        public async void Connect(string host, int port, string nickname = null)
+        public async void Connect(string url, string nickname = null)
         {
             if (Gateway.IsConnected)
             {
@@ -83,13 +84,12 @@ namespace Cabo.Client
                 Gateway.Disconnect();
             }
 
-            _host = host; _port = port;
             LastConnectError = "";
-            ConnectedAddress = $"{host}:{port}";
+            ConnectedAddress = url;
             if (!string.IsNullOrWhiteSpace(nickname))
                 _nickname = NormalizeNickname(nickname);
             Flow = FlowState.Connecting; StateChanged?.Invoke();
-            await Gateway.ConnectAsync(host, port);
+            await Gateway.ConnectAsync(url);
             _wasConnected = Gateway.IsConnected;
             if (!Gateway.IsConnected)
             {
@@ -124,34 +124,51 @@ namespace Cabo.Client
             return string.IsNullOrEmpty(trimmed) ? "玩家" : trimmed;
         }
 
-        static bool TryParseServerAddress(string address, out string host, out int port)
+        static bool TryNormalizeServerUrl(string address, out string url)
         {
-            host = "";
-            port = 8888;
+            url = "";
 
             if (string.IsNullOrWhiteSpace(address))
                 return false;
 
             var trimmed = address.Trim();
-            if (trimmed.Contains("://") && Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
-            {
-                host = uri.Host;
-                port = uri.Port > 0 ? uri.Port : 8888;
-                return !string.IsNullOrWhiteSpace(host);
-            }
+            if (!trimmed.Contains("://"))
+                trimmed = "ws://" + trimmed;
 
-            int colon = trimmed.LastIndexOf(':');
-            if (colon > 0 && colon < trimmed.Length - 1)
-            {
-                host = trimmed.Substring(0, colon).Trim();
-                return int.TryParse(trimmed.Substring(colon + 1), out port)
-                    && port > 0
-                    && port <= 65535
-                    && !string.IsNullOrWhiteSpace(host);
-            }
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+                return false;
 
-            host = trimmed;
-            return !string.IsNullOrWhiteSpace(host);
+            string scheme = uri.Scheme.ToLowerInvariant();
+            if (scheme == "https")
+                scheme = "wss";
+            else if (scheme == "http")
+                scheme = "ws";
+
+            if (scheme != "ws" && scheme != "wss")
+                return false;
+
+            if (string.IsNullOrWhiteSpace(uri.Host))
+                return false;
+
+            var builder = new UriBuilder(uri) { Scheme = scheme };
+            if ((scheme == "ws" && builder.Port == 80) || (scheme == "wss" && builder.Port == 443))
+                builder.Port = -1;
+            url = builder.Uri.ToString();
+            if (url.EndsWith("/", StringComparison.Ordinal) && string.IsNullOrEmpty(uri.PathAndQuery.Trim('/')))
+                url = url.Substring(0, url.Length - 1);
+            return true;
+        }
+
+        public void Connect(string host, int port, string nickname = null)
+        {
+            if (!TryNormalizeServerUrl($"{host}:{port}", out var url))
+            {
+                LastConnectError = "服务器地址格式应为 ws://host:port 或 wss://域名。";
+                Flow = FlowState.Home;
+                StateChanged?.Invoke();
+                return;
+            }
+            Connect(url, nickname);
         }
 
         public void SendReady()

@@ -80,7 +80,7 @@ namespace Cabo.Client.Network
         /// </summary>
         public static byte[] Encode(ClientMessage message)
         {
-            var payload = message.ToByteArray();
+            var payload = EncodePayload(message);
             var frame = new byte[4 + payload.Length];
             WriteBigEndianInt32(frame, 0, payload.Length);
             Array.Copy(payload, 0, frame, 4, payload.Length);
@@ -88,10 +88,27 @@ namespace Cabo.Client.Network
         }
 
         /// <summary>
+        /// Serialize a ClientMessage as pure protobuf bytes.
+        /// WebSocket transport uses this because WebSocket supplies message boundaries.
+        /// </summary>
+        public static byte[] EncodePayload(ClientMessage message)
+        {
+            return message.ToByteArray();
+        }
+
+        /// <summary>
         /// Deserialize raw bytes (full frame payload WITHOUT 4-byte length prefix)
         /// into a ServerMessage.
         /// </summary>
         public static ServerMessage Decode(byte[] payload)
+        {
+            return DecodePayload(payload);
+        }
+
+        /// <summary>
+        /// Deserialize pure protobuf bytes into a ServerMessage.
+        /// </summary>
+        public static ServerMessage DecodePayload(byte[] payload)
         {
             return ServerMessage.Parser.ParseFrom(payload);
         }

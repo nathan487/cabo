@@ -1,59 +1,67 @@
 # Network Layer Reference (for Unity Client)
 
-## 2026-06-09 Next Transport Migration Target
+## 2026-06-10 Current Transport
 
-Current transport is still raw TCP with a custom 4-byte length prefix. The next major task is to migrate the transport to WebSocket so the game can be reached through Cloudflare Tunnel and a temporary public domain.
+Cabo now uses WebSocket binary messages for the main Unity client and C++ server path. The old raw TCP `[4-byte length][protobuf]` codec is still kept in the repository as a reference/backward-compatible helper, but Unity's `NetworkGateway` now sends and receives pure protobuf payloads over WebSocket.
 
-Target transport:
+Current transport:
 
 - Local development URL: `ws://127.0.0.1:8888`
 - Cloudflare temporary public URL: `wss://<random>.trycloudflare.com`
 - Payload format inside each WebSocket binary message: pure serialized protobuf bytes.
-- WebSocket message boundaries replace the current `[4 bytes big-endian length]` frame in the Unity client.
-- Protobuf schemas and all `ClientMessage` / `ServerMessage` payloads should stay unchanged.
+- WebSocket message boundaries replace the old `[4 bytes big-endian length]` frame in the Unity client.
+- Protobuf schemas and all `ClientMessage` / `ServerMessage` payloads remain unchanged.
 
-Server migration boundary:
+Server transport implementation:
 
-- Add `WebSocketCodec` beside the existing `MessageCodec`.
-- `WebSocketCodec` owns:
+- `MuduoBaseGameServer/src/common/WebSocketCodec.*` owns:
   - HTTP upgrade handshake.
   - `Sec-WebSocket-Accept` generation.
   - masked client-to-server binary frame decoding.
   - unmasked server-to-client binary frame encoding.
   - ping/pong/close control frames.
-- Existing dispatcher and services should continue to receive/send protobuf payload bytes.
-- Replace `MessageCodec::encode(payload)` calls in room/game services with `WebSocketCodec::encode(payload)` after server integration.
+  - binary continuation frame reassembly.
+- `GameServer` keeps one `WebSocketCodec` per connection.
+- Existing dispatcher and services continue to receive/send protobuf payload bytes.
+- `RoomService::sendTo` and `GameService::sendToPlayer` encode outbound payloads with `WebSocketCodec::encode`.
 
-Unity migration boundary:
+Unity transport implementation:
 
-- Add a `ClientWebSocket` transport layer.
-- Adapt `NetworkGateway` to receive complete binary WebSocket messages and call protobuf decode directly.
-- Adapt the home/server-address UI to accept a full WebSocket URL.
-- Keep reconnect/game state behavior and drain-then-render rules intact.
+- `WebSocketNetworkClient` uses `System.Net.WebSockets.ClientWebSocket`.
+- `NetworkGateway` receives complete binary WebSocket messages and calls protobuf decode directly.
+- `MessageCodec.EncodePayload` / `DecodePayload` are pure protobuf helpers; the legacy TCP `Encode` / `FeedBytes` remain length-prefixed.
+- The home/server-address UI accepts full URLs and normalizes:
+  - `https://...trycloudflare.com` -> `wss://...trycloudflare.com`
+  - `http://host:port` -> `ws://host:port`
+  - bare `host:port` -> `ws://host:port`
+- The existing drain-then-render rule remains intact: background receive only queues messages, and Unity state/UI updates happen from `DrainMessages`.
 
 Cloudflare Tunnel boundary:
 
 - Start the local server on `localhost:8888`.
 - Start a tunnel such as `cloudflared tunnel --url http://localhost:8888`.
 - Convert the generated `https://...trycloudflare.com` URL to `wss://...trycloudflare.com` in the Unity client.
-- Verify public access with at least two clients before considering the task done.
+- 2026-06-09 validation used `wss://currently-warming-assigned-genes.trycloudflare.com` and confirmed:
+  - public WebSocket handshake returned `101 Switching Protocols`.
+  - a protobuf `CreateRoomReq` returned `CreateRoomRsp`.
+  - a second WebSocket client joined the same room and received `JoinRoomRsp`.
 
 Detailed implementation docs:
 
+- `Docs/WEBSOCKET_CLOUDFLARE_RUNBOOK.md`
 - `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`
 - `Docs/superpowers/specs/2026-06-08-websocket-cloudflare-design.md`
 
-Important review warning:
+Historical review warning:
 
-- The existing WebSocket plan/spec were written before implementation and may contain inaccuracies.
-- Always read the `2026-06-09 Plan Review Notes` at the top of `Docs/superpowers/plans/2026-06-08-websocket-cloudflare-plan.md`.
-- In particular, verify handshake parsing, client masking enforcement, WebSocket fragmentation, OpenSSL/CMake integration, Unity receive-thread behavior, and whether `MessageCodec` can safely be split before coding.
+- The existing WebSocket plan/spec were written before implementation and contain sample-code inaccuracies.
+- The implemented path follows the `2026-06-09 Plan Review Notes`: case-insensitive handshake parsing, client mask enforcement, continuation frame handling, OpenSSL CMake integration, Unity background receive queueing, and careful split between TCP framing and pure protobuf helpers.
 
 ## Transport
 
-- TCP long connection
-- Frame: `[4 bytes big-endian length][protobuf payload]`
-- C++ reference: `NetworkClient.cpp` (encodeFrame / decodeFrame)
+- WebSocket long connection
+- Frame: WebSocket binary message containing pure protobuf payload bytes.
+- Legacy TCP reference: `MessageCodec.*` and `cli_client/src/NetworkClient.cpp` still show `[4 bytes big-endian length][protobuf payload]`.
 
 ## Message Protocol
 

@@ -1,5 +1,48 @@
 # Current Task: Unity Client Migration
 
+## 2026-06-10 Update: WebSocket + Cloudflare Transport Implemented
+
+The raw TCP transport migration is now implemented for the main Unity client/server path.
+
+Server changes:
+
+- Added `MuduoBaseGameServer/src/common/WebSocketCodec.h/.cc`.
+- `WebSocketCodec` handles RFC 6455 HTTP Upgrade, `Sec-WebSocket-Accept`, client mask enforcement, server binary frame encoding, ping/pong/close, partial TCP reads, and binary continuation reassembly.
+- `GameServer` now keeps one `WebSocketCodec` per connection and passes decoded protobuf payload bytes to the existing `MessageDispatcher`.
+- `RoomService` and `GameService` now send protobuf payloads wrapped as WebSocket binary frames.
+- `MessageCodec` remains in the repo for legacy TCP/reference paths.
+- `MuduoBaseGameServer/CMakeLists.txt` now finds OpenSSL Crypto and sets `GameServer` RPATH directly to the local muduo library path instead of relying on `patchelf`.
+
+Unity changes:
+
+- Added `Assets/Scripts/Network/WebSocketNetworkClient.cs` using `System.Net.WebSockets.ClientWebSocket`.
+- `NetworkGateway` now sends and receives pure protobuf bytes over WebSocket while preserving the existing background-queue plus main-thread `DrainMessages` behavior.
+- `MessageCodec` now exposes pure protobuf helpers `EncodePayload` / `DecodePayload`; legacy TCP length-prefix `Encode` / `FeedBytes` remain available.
+- `GameFlow.ConnectToServerAddress` now accepts WebSocket URLs and normalizes:
+  - `https://...` to `wss://...`
+  - `http://...` to `ws://...`
+  - bare `host:port` to `ws://host:port`
+- Default server address is now `ws://127.0.0.1:8888`.
+
+Verified:
+
+- WSL `cmake .. && make -j1 GameServer websocket_codec_test` succeeded.
+- `./websocket_codec_test` returned `10 passed, 0 failed`.
+- Local WebSocket handshake to `ws://127.0.0.1:8888` returned `101 Switching Protocols`.
+- Cloudflare quick tunnel produced:
+  - `https://currently-warming-assigned-genes.trycloudflare.com`
+  - Unity/client URL: `wss://currently-warming-assigned-genes.trycloudflare.com`
+- Public `wss://...trycloudflare.com` WebSocket handshake returned `101 Switching Protocols`.
+- A temporary .NET protobuf/WebSocket test client successfully:
+  - sent `CreateRoomReq` over the Cloudflare `wss://` URL and received `CreateRoomRsp`;
+  - opened a second WebSocket client, sent `JoinRoomReq`, and received `JoinRoomRsp` for the same room.
+
+Known follow-up:
+
+- Real Unity player/editor end-to-end gameplay over the Cloudflare URL still needs a hands-on pass.
+- Unity MCP compile refresh succeeded, but the current Editor Console still reports existing `The referenced script (Unknown) on this Behaviour is missing!` asset errors unrelated to the WebSocket C# compile path.
+- The account-less Cloudflare quick tunnel URL is temporary and has no uptime guarantee; restart `cloudflared tunnel --url http://localhost:8888` to get a new URL when needed.
+
 ## 2026-06-09 Update: Waiting-Room Input Cleanup + Host Crown Badge
 
 Latest local Unity client UI polish in `unity dev/New Client_Unity_Base_Cli`:

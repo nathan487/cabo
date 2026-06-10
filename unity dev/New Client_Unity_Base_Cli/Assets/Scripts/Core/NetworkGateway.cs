@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using Game.Messages;
 using Game.Room;
@@ -13,18 +11,14 @@ using UnityEngine;
 namespace Cabo.Client
 {
     /// <summary>
-    /// Thin TCP + protobuf gateway. Reuses the battle-tested TcpNetworkClient
-    /// and MessageCodec from the old project.
+    /// Thin WebSocket + protobuf gateway. WebSocket message boundaries carry
+    /// pure protobuf payloads; dispatch still drains on Unity's main thread.
     /// </summary>
     public class NetworkGateway : IDisposable
     {
-        private TcpClient tcpClient;
-        private NetworkStream stream;
-        private CancellationTokenSource receiveCts;
+        private WebSocketNetworkClient wsClient;
         private readonly Queue<ServerMessage> pendingMessages = new();
 
-        // MessageCodec: [4-byte big-endian length][protobuf payload]
-        private readonly MessageCodec codec = new();
         private readonly MessageDispatcher dispatcher = new();
 
         public bool IsConnected { get; private set; }
@@ -68,18 +62,35 @@ namespace Cabo.Client
             return drained.Count;
         }
 
-        public async Task ConnectAsync(string host, int port)
+        public async Task ConnectAsync(string url)
         {
             try
             {
-                tcpClient = new TcpClient { NoDelay = true };
-                await tcpClient.ConnectAsync(host, port);
-                stream = tcpClient.GetStream();
-                IsConnected = true;
-                receiveCts = new CancellationTokenSource();
-                _ = Task.Run(() => ReceiveLoop(receiveCts.Token));
-                Connected?.Invoke();
-                Debug.Log($"[NetworkGateway] Connected to {host}:{port}");
+                if (wsClient != null)
+                {
+                    try { wsClient.Dispose(); } catch { }
+                    wsClient = null;
+                    IsConnected = false;
+                }
+
+                wsClient = new WebSocketNetworkClient(url);
+                wsClient.Connected += () =>
+                {
+                    IsConnected = true;
+                    Connected?.Invoke();
+                };
+                wsClient.Disconnected += () =>
+                {
+                    bool wasConnected = IsConnected;
+                    IsConnected = false;
+                    if (wasConnected)
+                        Disconnected?.Invoke();
+                };
+                wsClient.DataReceived += OnDataReceived;
+                wsClient.ErrorOccurred += error => Error?.Invoke(error);
+
+                await wsClient.ConnectAsync();
+                Debug.Log($"[NetworkGateway] Connect attempt finished for {url}");
             }
             catch (Exception ex)
             {
@@ -91,20 +102,20 @@ namespace Cabo.Client
         public void Disconnect()
         {
             bool wasConnected = IsConnected;
-            IsConnected = false;
 
-            var cts = receiveCts;
-            receiveCts = null;
-            try { cts?.Cancel(); } catch (ObjectDisposedException) { }
-            try { cts?.Dispose(); } catch (ObjectDisposedException) { }
+            var client = wsClient;
+            wsClient = null;
+            try { client?.Disconnect(); } catch { }
 
-            try { stream?.Close(); } catch { }
-            try { tcpClient?.Close(); } catch { }
-            stream = null;
-            tcpClient = null;
-
-            if (wasConnected)
+            if (wasConnected && IsConnected)
+            {
+                IsConnected = false;
                 Disconnected?.Invoke();
+            }
+            else if (!wasConnected)
+            {
+                IsConnected = false;
+            }
         }
 
         /// <summary>Send a ClientMessage. Sets seq automatically.</summary>
@@ -112,8 +123,8 @@ namespace Cabo.Client
         {
             if (!IsConnected) return;
             msg.Seq = _nextSeq++;
-            var frame = MessageCodec.Encode(msg);
-            try { stream.Write(frame, 0, frame.Length); stream.Flush(); }
+            var payload = MessageCodec.EncodePayload(msg);
+            try { wsClient?.Send(payload); }
             catch (Exception ex) { Error?.Invoke($"Send failed: {ex.Message}"); Disconnect(); }
         }
 
@@ -282,34 +293,21 @@ namespace Cabo.Client
         public void Dispose()
         {
             Disconnect();
+            wsClient?.Dispose();
         }
 
-        private async Task ReceiveLoop(CancellationToken ct)
+        private void OnDataReceived(byte[] data)
         {
-            var buffer = new byte[8192];
             try
             {
-                while (!ct.IsCancellationRequested)
-                {
-                    int n = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
-                    if (n == 0) break;
-                    var data = new byte[n];
-                    Array.Copy(buffer, data, n);
-                    lock (codec)
-                    {
-                        codec.FeedBytes(data, msg =>
-                        {
-                            lock (pendingMessages)
-                                pendingMessages.Enqueue(msg);
-                        });
-                    }
-                }
+                var msg = MessageCodec.DecodePayload(data);
+                lock (pendingMessages)
+                    pendingMessages.Enqueue(msg);
             }
-            catch (OperationCanceledException) { }
-            catch (ObjectDisposedException) { }
-            catch (System.IO.IOException) { }
-            catch (Exception ex) { Debug.LogError($"[NetworkGateway] Receive error: {ex}"); }
-            finally { if (IsConnected) { IsConnected = false; Disconnected?.Invoke(); } }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NetworkGateway] Decode error: {ex}");
+            }
         }
     }
 }
