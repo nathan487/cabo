@@ -2435,13 +2435,21 @@ namespace Cabo.Client.UI
         Vector2 GetPlayerInspectionCenter(long playerId, Rect fallbackBounds)
         {
             var bounds = fallbackBounds.width > 1 ? fallbackBounds : GetPlayerBounds(playerId);
-            var center = CenterOf(bounds);
+            if (!HasUsableBounds(bounds))
+                return Vector2.zero;
+
+            var center = WorldBoundsToOverlayPosition(bounds);
             if (center == Vector2.zero)
                 return Vector2.zero;
 
-            float yOffset = -Mathf.Min(34f, bounds.height * 0.30f);
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            float scaleY = HasUsableBounds(rootBounds) && rootBounds.height > 0.01f
+                ? (Screen.height > 1 ? Screen.height : rootBounds.height) / rootBounds.height
+                : 1f;
+
+            float yOffset = Mathf.Min(34f, bounds.height * 0.30f) * scaleY;
             if (playerId == _flow.State.MyPlayerId)
-                yOffset = -Mathf.Min(48f, bounds.height * 0.34f);
+                yOffset = Mathf.Min(48f, bounds.height * 0.34f) * scaleY;
             return center + new Vector2(0f, yOffset);
         }
 

@@ -17,6 +17,7 @@ namespace Cabo.Client.UI
 
         GameFlow _flow;
         System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
+        bool _waitingForRevealAnimationDrain;
 
         void Awake()
         {
@@ -77,6 +78,25 @@ namespace Cabo.Client.UI
             OnStateChanged();
         }
 
+        void Update()
+        {
+            if (!_waitingForRevealAnimationDrain || _flow == null || GameTablePanel == null)
+                return;
+
+            var state = _flow.State;
+            bool revealPending = state.Phase == GamePhase.RoundReveal
+                || state.RoundJustRevealed
+                || _flow.Flow == FlowState.RoundReveal;
+            if (!revealPending)
+            {
+                _waitingForRevealAnimationDrain = false;
+                return;
+            }
+
+            if (!GameTablePanel.HasPendingActionAnimation)
+                OnStateChanged();
+        }
+
         void OnStateChanged()
         {
             var state = _flow.State;
@@ -86,6 +106,7 @@ namespace Cabo.Client.UI
             bool showOver = state.Phase == GamePhase.GameOver;
             bool revealPending = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
             bool waitForActionAnimation = revealPending && GameTablePanel.HasPendingActionAnimation;
+            _waitingForRevealAnimationDrain = waitForActionAnimation;
             bool showReveal = revealPending && !waitForActionAnimation;
             bool showGame = !showReveal && !showOver && (_flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing);
             if (waitForActionAnimation)
