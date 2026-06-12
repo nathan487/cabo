@@ -110,6 +110,7 @@ namespace Cabo.Client.UI.CardTable
         bool _layoutRefreshQueued;
 
         public bool HasRenderableLayout { get; private set; }
+        public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0;
 
         public static CardTableView Create(Transform parent)
         {
@@ -267,7 +268,7 @@ namespace Cabo.Client.UI.CardTable
                 ScheduleLayoutRefresh();
         }
 
-        public void Render(GameState state, CardTableLayout layout, long frozenPlayerId = 0, long secondFrozenPlayerId = 0)
+        public void Render(GameState state, CardTableLayout layout, long frozenPlayerId = 0, long secondFrozenPlayerId = 0, bool freezePiles = false)
         {
             if (state == null || layout == null)
                 return;
@@ -280,7 +281,8 @@ namespace Cabo.Client.UI.CardTable
             _lastScreenHeight = Screen.height;
             HasRenderableLayout = layout.Slots.Count > 0;
 
-            RenderPiles(state, layout);
+            if (!freezePiles)
+                RenderPiles(state, layout);
             EnsureHands(state);
 
             foreach (var hand in _hands)
@@ -522,17 +524,24 @@ namespace Cabo.Client.UI.CardTable
 
         IEnumerator PlayDiscardDrawn(CardTableActionSnapshot action)
         {
+            _animatingPlayers.Add(action.SourcePlayerId);
             bool hadMarker = _drawnMarkers.ContainsKey(action.SourcePlayerId);
             var marker = GetOrCreateDrawnMarker(action.SourcePlayerId, action.DrawPileSize);
             if (!hadMarker)
                 marker.RectTransform.anchoredPosition = action.TargetInspectionPosition != Vector2.zero
                     ? action.TargetInspectionPosition
                     : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition);
-            if (action.DiscardTopValue >= 0)
+            bool revealDuringFlight = action.SourcePlayerId == _myPlayerId && action.DiscardTopValue >= 0;
+            if (revealDuringFlight)
                 marker.ShowFront(action.DiscardTopValue);
+            else
+                marker.ShowBack();
 
             yield return marker.MoveTo(action.DiscardPilePosition, MoveDuration);
+            if (!revealDuringFlight && action.DiscardTopValue >= 0)
+                yield return marker.FlipToFront(action.DiscardTopValue, 0.18f);
             RemoveDrawnMarker(action.SourcePlayerId);
+            _animatingPlayers.Remove(action.SourcePlayerId);
             Reconcile();
         }
 
@@ -698,12 +707,13 @@ namespace Cabo.Client.UI.CardTable
                 RemoveDrawnMarker(action.SourcePlayerId);
             }
 
-            var incomingFinal = FindIncomingFinalSlot(action, survivorCards.Count);
+            int incomingInsertIndex = GetIncomingInsertIndex(action);
+            var incomingFinal = FindIncomingFinalSlot(action, incomingInsertIndex);
             if (incomingFinal.IsValid)
             {
                 incoming.SetSize(incomingFinal.Size);
                 if (action.SelectedSlots.Count > 1)
-                    StartSurvivorMoves(hand, action, survivorCards);
+                    StartSurvivorMoves(hand, action, survivorCards, incomingInsertIndex);
                 yield return incoming.MoveTo(incomingFinal.AnchoredPosition, MoveDuration);
                 hand.AttachCard(incomingFinal.SlotIndex, incoming);
                 UntrackTransient(incoming);
@@ -711,7 +721,7 @@ namespace Cabo.Client.UI.CardTable
             else
             {
                 if (action.SelectedSlots.Count > 1)
-                    StartSurvivorMoves(hand, action, survivorCards);
+                    StartSurvivorMoves(hand, action, survivorCards, incomingInsertIndex);
                 yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
                 DestroyCard(incoming);
             }
@@ -776,6 +786,12 @@ namespace Cabo.Client.UI.CardTable
 
             sourceCard.ShowBack();
             targetCard.ShowBack();
+            var sharedSize = GetActionDisplaySize(sourceSlot.Size, targetSlot.Size);
+            if (sharedSize.x > 1f && sharedSize.y > 1f)
+            {
+                sourceCard.SetSize(sharedSize);
+                targetCard.SetSize(sharedSize);
+            }
             sourceCard.MoveTo(targetSlot.AnchoredPosition, SwapDuration);
             yield return targetCard.MoveTo(sourceSlot.AnchoredPosition, SwapDuration);
 
@@ -805,10 +821,39 @@ namespace Cabo.Client.UI.CardTable
                 yield break;
             }
 
+            if (playerId == _myPlayerId)
+            {
+                _animatingPlayers.Add(playerId);
+                var previewSlot = hand.GetSlot(slotIndex);
+                var fallbackStart = previewSlot != null ? previewSlot.RectTransform.anchoredPosition : Vector2.zero;
+                var fallbackSize = previewSlot != null ? previewSlot.RectTransform.sizeDelta : new Vector2(70f, 96f);
+                var preview = CardView.Create(_cardRoot, $"PeekPreview_{action.Sequence}");
+                TrackTransient(preview);
+                preview.SetSize(fallbackSize);
+                preview.RectTransform.anchoredPosition = fallbackStart;
+                preview.ShowBack();
+                preview.SetVisible(true);
+                PrepareMovingCard(preview);
+
+                if (action.PeekedValue >= 0)
+                    yield return preview.FlipToFront(action.PeekedValue, 0.18f);
+                else
+                    yield return new WaitForSecondsRealtime(0.18f);
+
+                yield return new WaitForSecondsRealtime(InspectHoldDuration);
+                DestroyCard(preview);
+                _animatingPlayers.Remove(playerId);
+                Reconcile();
+                yield break;
+            }
+
+            _animatingPlayers.Add(playerId);
+
             var slot = hand.GetSlot(slotIndex);
             var card = hand.DetachCard(slotIndex);
             if (card == null)
             {
+                _animatingPlayers.Remove(playerId);
                 Reconcile();
                 yield break;
             }
@@ -816,6 +861,7 @@ namespace Cabo.Client.UI.CardTable
             TrackTransient(card);
             var start = slot != null ? slot.RectTransform.anchoredPosition : card.RectTransform.anchoredPosition;
             var size = slot != null ? slot.RectTransform.sizeDelta : card.RectTransform.sizeDelta;
+            size = GetInspectionDisplaySize(size);
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
             card.ShowBack();
@@ -833,6 +879,7 @@ namespace Cabo.Client.UI.CardTable
             yield return card.MoveTo(start, MoveDuration);
             hand.AttachCard(slotIndex, card);
             UntrackTransient(card);
+            _animatingPlayers.Remove(playerId);
             Reconcile();
         }
 
@@ -854,10 +901,13 @@ namespace Cabo.Client.UI.CardTable
                 yield break;
             }
 
+            _animatingPlayers.Add(targetPlayerId);
+
             var slot = targetHand.GetSlot(slotIndex);
             var card = targetHand.DetachCard(slotIndex);
             if (card == null)
             {
+                _animatingPlayers.Remove(targetPlayerId);
                 Reconcile();
                 yield break;
             }
@@ -865,6 +915,7 @@ namespace Cabo.Client.UI.CardTable
             TrackTransient(card);
             var start = slot != null ? slot.RectTransform.anchoredPosition : card.RectTransform.anchoredPosition;
             var size = slot != null ? slot.RectTransform.sizeDelta : card.RectTransform.sizeDelta;
+            size = GetInspectionDisplaySize(size);
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
             card.ShowBack();
@@ -882,6 +933,7 @@ namespace Cabo.Client.UI.CardTable
             yield return card.MoveTo(start, MoveDuration);
             targetHand.AttachCard(slotIndex, card);
             UntrackTransient(card);
+            _animatingPlayers.Remove(targetPlayerId);
             Reconcile();
         }
 
@@ -898,6 +950,59 @@ namespace Cabo.Client.UI.CardTable
             }
 
             return start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
+        }
+
+        Vector2 GetInspectionDisplaySize(Vector2 fallback)
+        {
+            var reference = GetPreferredActionCardSize();
+            if (reference.x > 1f && reference.y > 1f)
+                return reference;
+
+            return new Vector2(Mathf.Max(fallback.x, 56f), Mathf.Max(fallback.y, 78f));
+        }
+
+        Vector2 GetActionDisplaySize(Vector2 first, Vector2 second)
+        {
+            var reference = GetPreferredActionCardSize();
+            float width = Mathf.Max(first.x, second.x);
+            float height = Mathf.Max(first.y, second.y);
+            if (reference.x > 1f && reference.y > 1f)
+            {
+                width = Mathf.Max(width, reference.x);
+                height = Mathf.Max(height, reference.y);
+            }
+
+            return new Vector2(Mathf.Max(width, 56f), Mathf.Max(height, 78f));
+        }
+
+        Vector2 GetPreferredActionCardSize()
+        {
+            var hand = GetHand(_myPlayerId);
+            if (hand != null)
+            {
+                foreach (var pair in hand.Cards)
+                {
+                    var card = pair.Value;
+                    if (card != null && card.RectTransform != null)
+                    {
+                        var size = card.RectTransform.sizeDelta;
+                        if (size.x > 1f && size.y > 1f)
+                            return size;
+                    }
+                }
+            }
+
+            if (_lastLayout != null)
+            {
+                for (int i = 0; i < _lastLayout.Slots.Count; i++)
+                {
+                    var slot = _lastLayout.Slots[i];
+                    if (slot.PlayerId == _myPlayerId && slot.Size.x > 1f && slot.Size.y > 1f)
+                        return slot.Size;
+                }
+            }
+
+            return Vector2.zero;
         }
 
         IEnumerator ShakeSourceSlots(CardTableActionSnapshot action)
@@ -949,11 +1054,14 @@ namespace Cabo.Client.UI.CardTable
             return result;
         }
 
-        void StartSurvivorMoves(HandView hand, CardTableActionSnapshot action, List<CardView> survivors)
+        void StartSurvivorMoves(HandView hand, CardTableActionSnapshot action, List<CardView> survivors, int incomingInsertIndex)
         {
             int index = 0;
             for (int i = 0; i < action.FinalSourceHand.Count && index < survivors.Count; i++)
             {
+                if (i == incomingInsertIndex)
+                    continue;
+
                 var finalSlot = action.FinalSourceHand[i];
                 var card = survivors[index++];
                 card.SetSize(finalSlot.Size);
@@ -962,7 +1070,7 @@ namespace Cabo.Client.UI.CardTable
             }
         }
 
-        CardTableSlotSnapshot FindIncomingFinalSlot(CardTableActionSnapshot action, int survivorCount)
+        CardTableSlotSnapshot FindIncomingFinalSlot(CardTableActionSnapshot action, int incomingInsertIndex)
         {
             if (action.SelectedSlots.Count <= 1)
             {
@@ -973,9 +1081,35 @@ namespace Cabo.Client.UI.CardTable
                 return FindSnapshot(action.SourceSlots, targetSlot);
             }
 
-            if (survivorCount >= 0 && survivorCount < action.FinalSourceHand.Count)
-                return action.FinalSourceHand[survivorCount];
+            if (incomingInsertIndex >= 0 && incomingInsertIndex < action.FinalSourceHand.Count)
+                return action.FinalSourceHand[incomingInsertIndex];
             return default;
+        }
+
+        int GetIncomingInsertIndex(CardTableActionSnapshot action)
+        {
+            if (action == null || action.FinalSourceHand.Count == 0)
+                return -1;
+
+            if (action.SelectedSlots.Count <= 1)
+            {
+                int targetSlot = action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : action.SourceSlot;
+                for (int i = 0; i < action.FinalSourceHand.Count; i++)
+                    if (action.FinalSourceHand[i].SlotIndex == targetSlot)
+                        return i;
+                return Mathf.Clamp(targetSlot, 0, action.FinalSourceHand.Count - 1);
+            }
+
+            var selected = new HashSet<int>(action.SelectedSlots);
+            int insertionIndex = 0;
+            for (int i = 0; i < action.SourceHand.Count; i++)
+            {
+                if (selected.Contains(action.SourceHand[i].SlotIndex))
+                    break;
+                insertionIndex++;
+            }
+
+            return Mathf.Clamp(insertionIndex, 0, action.FinalSourceHand.Count - 1);
         }
 
         static CardTableSlotSnapshot SnapshotFromCard(long playerId, int slotIndex, CardView card)

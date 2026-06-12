@@ -18,6 +18,7 @@ namespace Cabo.Client.UI
         const int OppCardWidth = 46;
         const int OppCardHeight = 64;
         const int GameplayActionPanelTopMargin = 150;
+        const int GameplayPileTopOffset = 14;
         const float QuickMoveDuration = 0.70f;
         const float SkillMoveDuration = 0.80f;
         const float SwapMoveDuration = 0.90f;
@@ -82,6 +83,9 @@ namespace Cabo.Client.UI
         bool _lastRenderedSocialShowChat;
         long _lastAnimatedActionSequence;
         long _lastLocalDrawSequence;
+        int _lastRenderedRoundNumber = -1;
+        int _stableDiscardTopValue = int.MinValue;
+        int _stableDiscardPileCount = -1;
         VisualElement _temporaryHiddenCard;
         readonly Dictionary<long, VisualElement> _drawnCardMarkers = new();
         readonly Dictionary<VisualElement, int> _pulseVersions = new();
@@ -94,6 +98,7 @@ namespace Cabo.Client.UI
         long _heldActionSourcePlayerId;
         float _heldActionUntil;
         bool _inspectionActive;
+        bool _hideActionPanelDuringTransient;
         bool _showChat;
         bool _cardTableRefreshQueued;
         bool _layoutRefreshQueued;
@@ -402,6 +407,12 @@ namespace Cabo.Client.UI
         public void RenderGame()
         {
             var state = _flow.State;
+            if (state.RoundNumber != _lastRenderedRoundNumber)
+            {
+                _lastLocalDrawSequence = 0;
+                _lastRenderedRoundNumber = state.RoundNumber;
+            }
+
             ConfigureActionPanelForGame();
             bool shouldPlayLocalDraw = state.HasDrawnCard
                 && _flow.SubState == GameSubState.AwaitingDrawnDecision
@@ -420,6 +431,7 @@ namespace Cabo.Client.UI
             bool holdingPreviousAction = IsActionAnimationHoldActive();
             long visualCurrentPlayerId = holdingPreviousAction ? _heldActionSourcePlayerId : state.CurrentPlayerId;
             bool deferNewTurnActions = holdingPreviousAction && visualCurrentPlayerId != state.CurrentPlayerId;
+            bool freezePileVisuals = pendingAction != null || _cardTableView.HasActiveTransientAnimation;
 
             _roundLabel.text = "";
             _roundLabel.style.display = DisplayStyle.None;
@@ -428,13 +440,24 @@ namespace Cabo.Client.UI
 
             bool holdPendingSelfExchangeView = pendingAction == null && ShouldHoldPendingSelfExchangeView(state);
             RenderSeats(state, visualCurrentPlayerId, holdPendingSelfExchangeView);
-            RenderPiles(state);
+            RenderPiles(state, freezePileVisuals);
             if (pendingAction != null)
                 FinalizeActionAnimationSnapshot(pendingAction);
             RenderCardTableLayer(state, pendingAction);
             if (shouldPlayLocalDraw)
                 PlayDrawAnimation(state.DrawnCardValue);
-            RenderActionPanel(state, deferNewTurnActions);
+            bool hideActionPanelForTransient = _hideActionPanelDuringTransient && _cardTableView.HasActiveTransientAnimation;
+            if (pendingAction != null && ShouldHideActionPanelDuringAction(pendingAction))
+            {
+                _hideActionPanelDuringTransient = true;
+                hideActionPanelForTransient = true;
+            }
+            else if (!_cardTableView.HasActiveTransientAnimation)
+            {
+                _hideActionPanelDuringTransient = false;
+            }
+
+            RenderActionPanel(state, deferNewTurnActions, hideActionPanelForTransient);
             UpdateGameLogFromState(state);
             RenderSocialPanel(state);
 
@@ -638,14 +661,27 @@ namespace Cabo.Client.UI
                 StyleCardTablePlaceholder(row[i]);
         }
 
-        void RenderPiles(GameState state)
+        void RenderPiles(GameState state, bool freezeDiscardPile = false)
         {
             EnsurePileContainersAttached();
             bool compact = state.Phase == GamePhase.RoundReveal || state.Phase == GamePhase.GameOver;
             bool usePlaceholders = state.Phase == GamePhase.Playing;
             ConfigurePileRowLayout(usePlaceholders);
             EnsurePileCard(_drawPile, "牌库", "CABO", state.DrawPileCount.ToString(), false, compact, usePlaceholders);
-            EnsurePileCard(_discardPile, "弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true, compact, usePlaceholders);
+
+            int discardTopValue = freezeDiscardPile && _stableDiscardPileCount >= 0
+                ? _stableDiscardTopValue
+                : state.DiscardTopValue;
+            int discardPileCount = freezeDiscardPile && _stableDiscardPileCount >= 0
+                ? _stableDiscardPileCount
+                : state.DiscardPileCount;
+            EnsurePileCard(_discardPile, "弃牌堆", discardTopValue >= 0 ? discardTopValue.ToString() : "-", discardPileCount.ToString(), true, compact, usePlaceholders);
+
+            if (!freezeDiscardPile)
+            {
+                _stableDiscardTopValue = state.DiscardTopValue;
+                _stableDiscardPileCount = state.DiscardPileCount;
+            }
         }
 
         void ConfigurePileRowLayout(bool fixedGameplayAnchor)
@@ -658,7 +694,7 @@ namespace Cabo.Client.UI
                 _pileRow.style.position = Position.Absolute;
                 _pileRow.style.left = 0;
                 _pileRow.style.right = 0;
-                _pileRow.style.top = 0;
+                _pileRow.style.top = GameplayPileTopOffset;
                 _pileRow.style.bottom = StyleKeyword.Auto;
                 _pileRow.style.height = 122;
                 _pileRow.style.marginTop = 0;
@@ -716,9 +752,15 @@ namespace Cabo.Client.UI
             _actionPanel.style.overflow = Overflow.Hidden;
         }
 
-        void RenderActionPanel(GameState state, bool deferNewTurnActions)
+        void RenderActionPanel(GameState state, bool deferNewTurnActions, bool forceHidden = false)
         {
             ResetActionPanelForGame();
+            if (forceHidden)
+            {
+                _actionPanel.style.display = DisplayStyle.None;
+                return;
+            }
+
             bool needsRebuild = _lastActionPanelSubState != _flow.SubState
                 || _lastActionPanelDeferredNewTurnActions != deferNewTurnActions;
             if (needsRebuild)
@@ -1146,8 +1188,9 @@ namespace Cabo.Client.UI
             long secondFrozenPlayerId = pendingAction != null && pendingAction.ActionType == ActionType.UseSkill && pendingAction.Skill == SkillType.Swap
                 ? pendingAction.TargetPlayerId
                 : 0;
+            bool freezePiles = pendingAction != null || _cardTableView.HasActiveTransientAnimation;
             _cardTableView.SetVisible(true);
-            _cardTableView.Render(state, layout, frozenPlayerId, secondFrozenPlayerId);
+            _cardTableView.Render(state, layout, frozenPlayerId, secondFrozenPlayerId, freezePiles);
             if (!HasValidCardTableLayout(layout) && pendingAction == null)
                 ScheduleCardTableLayerRefresh();
         }
@@ -1159,6 +1202,9 @@ namespace Cabo.Client.UI
                 RenderGame();
                 return;
             }
+
+            if (_cardTableView.HasActiveTransientAnimation)
+                return;
 
             var layout = BuildCardTableLayout(_flow.State);
             if (!_cardTableView.HasRenderableLayout
@@ -1190,6 +1236,11 @@ namespace Cabo.Client.UI
                 _cardTableRefreshQueued = false;
                 if (generation != _animationGeneration || _flow.State.Phase != GamePhase.Playing)
                     return;
+                if (_cardTableView.HasActiveTransientAnimation)
+                {
+                    ScheduleCardTableLayerRefresh();
+                    return;
+                }
                 RenderCardTableLayer(_flow.State, null);
             }).ExecuteLater(50);
         }
@@ -1273,6 +1324,11 @@ namespace Cabo.Client.UI
                 return null;
 
             var drawTarget = GetDrawRevealTarget(action.SourcePlayerId, fallbackToSeat: true);
+            var inspectionTarget = action.Skill == SkillType.PeekSelf
+                ? drawTarget.position
+                : action.Skill == SkillType.Spy
+                    ? GetCenterInspectionTarget()
+                    : GetPlayerInspectionCenter(action.SourcePlayerId, action.SourcePlayerBounds);
             var snapshot = new CardTableActionSnapshot
             {
                 Sequence = action.Sequence,
@@ -1293,7 +1349,7 @@ namespace Cabo.Client.UI
                 DrawPileSize = BoundsSize(action.DrawPileBounds),
                 DiscardPilePosition = WorldBoundsToOverlayPosition(action.DiscardPileBounds),
                 DiscardPileSize = BoundsSize(action.DiscardPileBounds),
-                SourceInspectionPosition = GetPlayerInspectionCenter(action.SourcePlayerId, action.SourcePlayerBounds),
+                SourceInspectionPosition = inspectionTarget,
                 TargetInspectionPosition = drawTarget.position,
                 TargetInspectionSize = drawTarget.size,
                 PeekedValue = action.PeekedValue
@@ -1349,26 +1405,40 @@ namespace Cabo.Client.UI
         {
             var row = GetCardRow(playerId);
             var rowBounds = row?.worldBound ?? Rect.zero;
+            var seat = GetSeatRoot(playerId);
+            var seatBounds = seat?.worldBound ?? Rect.zero;
             if (HasUsableBounds(rowBounds))
             {
-                var rowPos = WorldBoundsToOverlayPosition(rowBounds);
                 var size = GetOverlayCardSizeFromRow(row, playerId);
-                float xBias = playerId == _flow.State.MyPlayerId
-                    ? Mathf.Clamp(rowBounds.width * 0.22f, 36f, 120f)
-                    : Mathf.Clamp(rowBounds.width * 0.16f, 24f, 88f);
+                if (playerId == _flow.State.MyPlayerId)
+                {
+                    if (HasUsableBounds(seatBounds))
+                    {
+                        var seatCenter = WorldBoundsToOverlayPosition(seatBounds);
+                        var seatSize = BoundsSize(seatBounds);
+                        float rightInset = Mathf.Max(size.x * 0.72f, seatSize.x * 0.11f);
+                        float bottomInset = Mathf.Max(size.y * 0.98f, seatSize.y * 0.23f);
+                        var selfPos = seatCenter + new Vector2(seatSize.x * 0.5f - rightInset, -(seatSize.y * 0.5f - bottomInset));
+                        if (IsFinite(selfPos.x) && IsFinite(selfPos.y))
+                            return (selfPos, size);
+                    }
+                }
+
+                var rowPos = WorldBoundsToOverlayPosition(rowBounds);
+                float xBias = Mathf.Clamp(rowBounds.width * 0.16f, 24f, 88f);
                 float yBias = Mathf.Clamp(rowBounds.height * 0.18f, 12f, 28f);
                 var pos = rowPos + new Vector2(xBias, yBias);
                 if (IsFinite(pos.x) && IsFinite(pos.y))
                     return (pos, size);
             }
 
-            var seat = GetSeatRoot(playerId);
-            var seatBounds = seat?.worldBound ?? Rect.zero;
             if (HasUsableBounds(seatBounds))
             {
                 var seatPos = WorldBoundsToOverlayPosition(seatBounds);
                 var size = GetOverlayCardSizeFromRow(row, playerId);
-                var pos = seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.28f, 36f, 120f), Mathf.Clamp(seatBounds.height * 0.18f, 12f, 28f));
+                var pos = playerId == _flow.State.MyPlayerId
+                    ? seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.30f, 84f, 176f), Mathf.Clamp(seatBounds.height * 0.22f, 34f, 76f))
+                    : seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.28f, 36f, 120f), Mathf.Clamp(seatBounds.height * 0.18f, 12f, 28f));
                 if (IsFinite(pos.x) && IsFinite(pos.y))
                     return (pos, size);
             }
@@ -1390,6 +1460,28 @@ namespace Cabo.Client.UI
             }
 
             return (Vector2.zero, Vector2.zero);
+        }
+
+        Vector2 GetCenterInspectionTarget()
+        {
+            var actionBounds = _actionPanel?.worldBound ?? Rect.zero;
+            if (HasUsableBounds(actionBounds))
+                return WorldBoundsToOverlayPosition(actionBounds);
+
+            var centerBounds = _centerTable?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(centerBounds))
+                return Vector2.zero;
+
+            var center = WorldBoundsToOverlayPosition(centerBounds);
+            var size = BoundsSize(centerBounds);
+            return center + new Vector2(0f, -Mathf.Min(48f, size.y * 0.20f));
+        }
+
+        static bool ShouldHideActionPanelDuringAction(ActionAnimationSnapshot action)
+        {
+            return action != null
+                && action.ActionType == ActionType.UseSkill
+                && (action.Skill == SkillType.PeekSelf || action.Skill == SkillType.Spy);
         }
 
         Vector2 GetOverlayCardSizeFromRow(VisualElement row, long playerId)
@@ -1505,8 +1597,12 @@ namespace Cabo.Client.UI
             _temporaryHiddenCard = null;
             _animationQueueUntil = 0f;
             _heldActionSequence = 0;
+            _stableDiscardTopValue = int.MinValue;
+            _stableDiscardPileCount = -1;
             _heldActionSourcePlayerId = 0;
             _heldActionUntil = 0f;
+            _hideActionPanelDuringTransient = false;
+            _lastLocalDrawSequence = 0;
         }
 
         void PlayDrawAnimation(int value)
