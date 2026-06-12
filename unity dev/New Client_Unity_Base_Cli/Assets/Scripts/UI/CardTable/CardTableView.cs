@@ -104,6 +104,10 @@ namespace Cabo.Client.UI.CardTable
         GameState _lastState;
         CardTableLayout _lastLayout;
         long _myPlayerId;
+        Rect _lastRootBounds;
+        int _lastScreenWidth;
+        int _lastScreenHeight;
+        bool _layoutRefreshQueued;
 
         public bool HasRenderableLayout { get; private set; }
 
@@ -181,6 +185,9 @@ namespace Cabo.Client.UI.CardTable
             _drawPileCaption = CreateCaption("DrawPileCaption");
             _discardPileCaption = CreateCaption("DiscardPileCaption");
             _drawPileCard.ShowBack();
+            _lastRootBounds = _root.rect;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
         }
 
         static void EnsureEventSystem()
@@ -227,6 +234,8 @@ namespace Cabo.Client.UI.CardTable
         public void SetVisible(bool visible)
         {
             gameObject.SetActive(visible);
+            if (visible)
+                ScheduleLayoutRefresh();
         }
 
         public void ClearTransient()
@@ -249,6 +258,15 @@ namespace Cabo.Client.UI.CardTable
                 Render(_lastState, _lastLayout);
         }
 
+        void Update()
+        {
+            if (!gameObject.activeInHierarchy)
+                return;
+
+            if (HasLayoutChanged())
+                ScheduleLayoutRefresh();
+        }
+
         public void Render(GameState state, CardTableLayout layout, long frozenPlayerId = 0, long secondFrozenPlayerId = 0)
         {
             if (state == null || layout == null)
@@ -257,6 +275,9 @@ namespace Cabo.Client.UI.CardTable
             _lastState = state;
             _lastLayout = layout;
             _myPlayerId = state.MyPlayerId;
+            _lastRootBounds = _root.rect;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
             HasRenderableLayout = layout.Slots.Count > 0;
 
             RenderPiles(state, layout);
@@ -284,6 +305,9 @@ namespace Cabo.Client.UI.CardTable
             _lastState = state;
             _lastLayout = layout;
             _myPlayerId = state.MyPlayerId;
+            _lastRootBounds = _root.rect;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
 
             RenderPiles(state, layout);
             EnsureHands(state);
@@ -296,6 +320,38 @@ namespace Cabo.Client.UI.CardTable
             }
 
             return true;
+        }
+
+        bool HasLayoutChanged()
+        {
+            if (_root == null)
+                return false;
+
+            return _lastRootBounds != _root.rect
+                || _lastScreenWidth != Screen.width
+                || _lastScreenHeight != Screen.height;
+        }
+
+        void ScheduleLayoutRefresh()
+        {
+            if (_layoutRefreshQueued || _lastState == null || _lastLayout == null)
+                return;
+
+            _layoutRefreshQueued = true;
+            StartCoroutine(LayoutRefreshRoutine());
+        }
+
+        IEnumerator LayoutRefreshRoutine()
+        {
+            yield return null;
+            _layoutRefreshQueued = false;
+            if (_lastState == null || _lastLayout == null || !gameObject.activeInHierarchy)
+                yield break;
+
+            _lastRootBounds = _root.rect;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            Render(_lastState, _lastLayout);
         }
 
         public bool PlayAction(CardTableActionSnapshot action)
@@ -765,9 +821,7 @@ namespace Cabo.Client.UI.CardTable
             card.ShowBack();
             card.SetVisible(true);
 
-            Vector2 inspect = action.SourceInspectionPosition != Vector2.zero
-                ? action.SourceInspectionPosition
-                : start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
+            Vector2 inspect = GetInspectionTarget(action, start, size);
 
             yield return card.MoveTo(inspect, MoveDuration);
             if (playerId == _myPlayerId && action.PeekedValue >= 0)
@@ -816,11 +870,7 @@ namespace Cabo.Client.UI.CardTable
             card.ShowBack();
             card.SetVisible(true);
 
-            Vector2 inspect = action.SourceInspectionPosition != Vector2.zero
-                ? action.SourceInspectionPosition
-                : action.SourcePlayerPosition != Vector2.zero
-                    ? action.SourcePlayerPosition
-                    : start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
+            Vector2 inspect = GetInspectionTarget(action, start, size);
 
             yield return card.MoveTo(inspect, MoveDuration);
             if (sourcePlayerId == _myPlayerId && action.PeekedValue >= 0)
@@ -833,6 +883,21 @@ namespace Cabo.Client.UI.CardTable
             targetHand.AttachCard(slotIndex, card);
             UntrackTransient(card);
             Reconcile();
+        }
+
+        static Vector2 GetInspectionTarget(CardTableActionSnapshot action, Vector2 start, Vector2 size)
+        {
+            if (action != null)
+            {
+                if (action.SourceInspectionPosition != Vector2.zero)
+                    return action.SourceInspectionPosition;
+                if (action.SourcePlayerPosition != Vector2.zero)
+                    return action.SourcePlayerPosition;
+                if (action.TargetInspectionPosition != Vector2.zero)
+                    return action.TargetInspectionPosition;
+            }
+
+            return start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
         }
 
         IEnumerator ShakeSourceSlots(CardTableActionSnapshot action)

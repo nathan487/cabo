@@ -66,6 +66,7 @@ namespace Cabo.Client.UI
         readonly Button _chatTabButton;
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
+        EventCallback<GeometryChangedEvent> _geometryChangedHandler;
         Action _animationQueueDrained;
 
         readonly HashSet<int> _selectedOwnSlots = new();
@@ -95,6 +96,10 @@ namespace Cabo.Client.UI
         bool _inspectionActive;
         bool _showChat;
         bool _cardTableRefreshQueued;
+        bool _layoutRefreshQueued;
+        Rect _lastRootBounds;
+        int _lastScreenWidth;
+        int _lastScreenHeight;
         float _inspectionEndsAt;
         Vector2 _inspectionReturnStart;
         Vector2 _inspectionReturnEnd;
@@ -126,6 +131,9 @@ namespace Cabo.Client.UI
 
             _cardTableView = CardTableView.Create(ownerTransform);
             _cardTableView.SetVisible(false);
+
+            _geometryChangedHandler = _ => ScheduleLayoutRefresh();
+            _root.RegisterCallback(_geometryChangedHandler);
 
             _topSeat = new SeatView("top", false);
             _leftSeat = new SeatView("left", false);
@@ -359,6 +367,8 @@ namespace Cabo.Client.UI
         public void Dispose()
         {
             ClearTransientAnimationState();
+            if (_geometryChangedHandler != null && _root != null)
+                _root.UnregisterCallback(_geometryChangedHandler);
             _container?.RemoveFromHierarchy();
             _animationLayer?.RemoveFromHierarchy();
             if (_cardTableView != null)
@@ -374,6 +384,9 @@ namespace Cabo.Client.UI
 
         public void Tick()
         {
+            if (HasLayoutChanged())
+                ScheduleLayoutRefresh();
+
             if (!_inspectionActive || Time.realtimeSinceStartup < _inspectionEndsAt)
                 return;
 
@@ -435,6 +448,52 @@ namespace Cabo.Client.UI
                 ClearPendingSelfSwapSnapshot(pendingAction);
             }
             _lastRenderedSubState = _flow.SubState;
+        }
+
+        bool HasLayoutChanged()
+        {
+            if (_root == null || _root.panel == null)
+                return false;
+
+            var bounds = _root.worldBound;
+            if (!HasUsableBounds(bounds))
+                return false;
+
+            return !_lastRootBounds.Equals(bounds)
+                || _lastScreenWidth != Screen.width
+                || _lastScreenHeight != Screen.height;
+        }
+
+        void ScheduleLayoutRefresh()
+        {
+            if (_layoutRefreshQueued || _root == null || _root.panel == null)
+                return;
+
+            _layoutRefreshQueued = true;
+            int generation = _animationGeneration;
+            _root.schedule.Execute(() =>
+            {
+                _layoutRefreshQueued = false;
+                if (generation != _animationGeneration || _flow == null || _root == null || _root.panel == null)
+                    return;
+
+                _lastRootBounds = _root.worldBound;
+                _lastScreenWidth = Screen.width;
+                _lastScreenHeight = Screen.height;
+
+                if (_flow.State.Phase == GamePhase.Playing)
+                {
+                    RenderGame();
+                }
+                else if (_flow.State.Phase == GamePhase.RoundReveal)
+                {
+                    RenderReveal();
+                }
+                else if (_flow.State.Phase == GamePhase.GameOver)
+                {
+                    RenderGameOver();
+                }
+            }).ExecuteLater(1);
         }
 
         public void RenderReveal()
