@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cabo.Client.UI.CardTable;
 using Game.Common;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -16,11 +17,22 @@ namespace Cabo.Client.UI
         const int SelfCardHeight = 96;
         const int OppCardWidth = 46;
         const int OppCardHeight = 64;
-        const float QuickMoveDuration = 1.15f;
-        const float SkillMoveDuration = 1.20f;
-        const float EmptySlotHoldDuration = 0.65f;
-        const float SkillHoldDuration = 2.25f;
-        const float FlipRevealDuration = 3.0f;
+        const int GameplayActionPanelTopMargin = 150;
+        const float QuickMoveDuration = 0.70f;
+        const float SkillMoveDuration = 0.80f;
+        const float SwapMoveDuration = 0.90f;
+        const float EmptySlotHoldDuration = 0.45f;
+        const float SkillHoldDuration = 1.60f;
+        const float FlipRevealDuration = 1.80f;
+        const float CaboCallDuration = 1.20f;
+        const float AnimationSettleDuration = 0.25f;
+        const float EmptyOriginHoldDuration = 0.20f;
+        const float SurvivorMoveDuration = 0.48f;
+        const float IncomingLandingPause = 0.12f;
+        const float SwapEmptyHoldDuration = 0.22f;
+        const float SwapSettleDuration = 0.16f;
+        const float PlaybackLayoutSettleDelay = 0.03f;
+        const float SurvivorMoveStagger = 0f;
 
         readonly VisualElement _root;
         readonly VisualElement _container;
@@ -44,6 +56,7 @@ namespace Cabo.Client.UI
         readonly Label _actionBody;
         readonly VisualElement _drawnCardSlot;
         readonly VisualElement _buttonRow;
+        readonly List<Button> _actionButtons = new();
         readonly Label _statusLine;
         readonly VisualElement _playArea;
         readonly VisualElement _socialPanel;
@@ -52,6 +65,7 @@ namespace Cabo.Client.UI
         readonly Button _logTabButton;
         readonly Button _chatTabButton;
         readonly VisualElement _animationLayer;
+        readonly CardTableView _cardTableView;
         Action _animationQueueDrained;
 
         readonly HashSet<int> _selectedOwnSlots = new();
@@ -61,23 +75,32 @@ namespace Cabo.Client.UI
         long _lastLoggedActionSequence;
         GameSubState _lastSubState = GameSubState.Idle;
         GameSubState _lastRenderedSubState = GameSubState.Idle;
+        GameSubState _lastActionPanelSubState = GameSubState.Idle;
+        bool _lastActionPanelDeferredNewTurnActions;
+        long _lastRenderedSocialActionSequence = -1;
+        bool _lastRenderedSocialShowChat;
         long _lastAnimatedActionSequence;
-        IVisualElementScheduledItem _drawAnimation;
+        long _lastLocalDrawSequence;
         VisualElement _temporaryHiddenCard;
         readonly Dictionary<long, VisualElement> _drawnCardMarkers = new();
         readonly Dictionary<VisualElement, int> _pulseVersions = new();
+        readonly Dictionary<VisualElement, float> _hiddenCardUntil = new();
+        PendingSelfExchangeSnapshot _pendingSelfExchangeSnapshot;
+        PendingSelfSwapSnapshot _pendingSelfSwapSnapshot;
+        int _animationGeneration;
         float _animationQueueUntil;
         long _heldActionSequence;
         long _heldActionSourcePlayerId;
         float _heldActionUntil;
         bool _inspectionActive;
         bool _showChat;
+        bool _cardTableRefreshQueued;
         float _inspectionEndsAt;
         Vector2 _inspectionReturnStart;
         Vector2 _inspectionReturnEnd;
         Color _inspectionReturnColor;
 
-        public GameTablePanel(VisualElement root, GameFlow flow)
+        public GameTablePanel(VisualElement root, GameFlow flow, Transform ownerTransform = null)
         {
             _root = root;
             _flow = flow;
@@ -100,6 +123,9 @@ namespace Cabo.Client.UI
             _animationLayer.style.top = 0;
             _animationLayer.style.bottom = 0;
             root.Add(_animationLayer);
+
+            _cardTableView = CardTableView.Create(ownerTransform);
+            _cardTableView.SetVisible(false);
 
             _topSeat = new SeatView("top", false);
             _leftSeat = new SeatView("left", false);
@@ -151,6 +177,7 @@ namespace Cabo.Client.UI
             _centerTable.style.borderRightColor = UITheme.TableBorder;
             _centerTable.style.borderBottomColor = UITheme.TableBorder;
             _centerTable.style.borderLeftColor = UITheme.TableBorder;
+            _centerTable.style.position = Position.Relative;
             middle.Add(_centerTable);
 
             _roundLabel = new Label();
@@ -214,7 +241,7 @@ namespace Cabo.Client.UI
             _actionPanel.style.paddingTop = 8;
             _actionPanel.style.paddingBottom = 8;
             _actionPanel.style.flexShrink = 0;
-            _actionPanel.style.marginTop = 10;
+            _actionPanel.style.marginTop = GameplayActionPanelTopMargin;
             _actionPanel.style.backgroundColor = UITheme.PanelSurface;
             _actionPanel.style.borderTopLeftRadius = 8;
             _actionPanel.style.borderTopRightRadius = 8;
@@ -324,6 +351,18 @@ namespace Cabo.Client.UI
         public void SetVisible(bool visible)
         {
             _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            _cardTableView.SetVisible(visible);
+            if (!visible)
+                ClearTransientAnimationState();
+        }
+
+        public void Dispose()
+        {
+            ClearTransientAnimationState();
+            _container?.RemoveFromHierarchy();
+            _animationLayer?.RemoveFromHierarchy();
+            if (_cardTableView != null)
+                CardTableView.DestroyView(_cardTableView);
         }
 
         public bool HasPendingActionAnimation => Time.realtimeSinceStartup < _animationQueueUntil;
@@ -351,6 +390,9 @@ namespace Cabo.Client.UI
         {
             var state = _flow.State;
             ConfigureActionPanelForGame();
+            bool shouldPlayLocalDraw = state.HasDrawnCard
+                && _flow.SubState == GameSubState.AwaitingDrawnDecision
+                && state.DrawResponseSequence > _lastLocalDrawSequence;
             ActionAnimationSnapshot pendingAction = null;
             if (state.LastActionSequence > _lastAnimatedActionSequence)
             {
@@ -371,8 +413,14 @@ namespace Cabo.Client.UI
             _turnLabel.text = "";
             _turnLabel.style.display = DisplayStyle.None;
 
-            RenderSeats(state, visualCurrentPlayerId);
+            bool holdPendingSelfExchangeView = pendingAction == null && ShouldHoldPendingSelfExchangeView(state);
+            RenderSeats(state, visualCurrentPlayerId, holdPendingSelfExchangeView);
             RenderPiles(state);
+            if (pendingAction != null)
+                FinalizeActionAnimationSnapshot(pendingAction);
+            RenderCardTableLayer(state, pendingAction);
+            if (shouldPlayLocalDraw)
+                PlayDrawAnimation(state.DrawnCardValue);
             RenderActionPanel(state, deferNewTurnActions);
             UpdateGameLogFromState(state);
             RenderSocialPanel(state);
@@ -381,13 +429,18 @@ namespace Cabo.Client.UI
             _statusLine.style.display = DisplayStyle.None;
 
             if (pendingAction != null)
+            {
                 EnqueueActionAnimation(pendingAction);
-
+                ClearPendingSelfExchangeSnapshot(pendingAction);
+                ClearPendingSelfSwapSnapshot(pendingAction);
+            }
             _lastRenderedSubState = _flow.SubState;
         }
 
         public void RenderReveal()
         {
+            ClearTransientAnimationState();
+            _cardTableView.SetVisible(false);
             var state = _flow.State;
             ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
@@ -424,6 +477,8 @@ namespace Cabo.Client.UI
 
         public void RenderGameOver()
         {
+            ClearTransientAnimationState();
+            _cardTableView.SetVisible(false);
             ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
             _turnLabel.style.display = DisplayStyle.Flex;
@@ -431,7 +486,8 @@ namespace Cabo.Client.UI
             _turnLabel.text = "最终排名";
             HideSeatsForOverlay();
             _drawnCardSlot.Clear();
-            _pileRow.Clear();
+            _drawPile.Clear();
+            _discardPile.Clear();
             RenderSocialPanel(_flow.State);
 
             _actionPanel.Clear();
@@ -466,33 +522,22 @@ namespace Cabo.Client.UI
             _statusLine.style.display = DisplayStyle.Flex;
         }
 
-        void RenderSeats(GameState state, long visualCurrentPlayerId)
+        void RenderSeats(GameState state, long visualCurrentPlayerId, bool holdPendingSelfExchangeView = false)
         {
             _selfSeat.Root.style.display = DisplayStyle.Flex;
             foreach (var seat in _opponentSeats)
             {
                 seat.Root.style.display = DisplayStyle.Flex;
-                seat.Clear();
             }
 
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
             bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
             _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, visualCurrentPlayerId == state.MyPlayerId, selfCabo ? "CABO" : "你", selfCabo,
                 PlayerProfileStore.GetAvatarPathForPlayer(state.MyPlayerId, true));
-            _selfSeat.CardRow.Clear();
-            for (int i = 0; i < state.MyCards.Count; i++)
-            {
-                int slot = i;
-                var card = state.MyCards[i];
-                _selfSeat.CardRow.Add(CreateCard(
-                    card.IsKnown,
-                    card.Value,
-                    SelfCardWidth,
-                    SelfCardHeight,
-                    _selectedOwnSlots.Contains(slot),
-                    IsOwnSlotClickable(_flow.SubState),
-                    () => OnOwnSlotClicked(slot)));
-            }
+            int selfCardCount = holdPendingSelfExchangeView && _pendingSelfExchangeSnapshot != null
+                ? _pendingSelfExchangeSnapshot.SourceHandCards.Count
+                : state.MyCards.Count;
+            EnsureCardAnchors(_selfSeat.CardRow, selfCardCount, SelfCardWidth, SelfCardHeight);
 
             var opponentIndices = BuildOpponentIndices(state);
             for (int i = 0; i < _opponentSeats.Length; i++)
@@ -510,38 +555,74 @@ namespace Cabo.Client.UI
                 bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
                 _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "目标" : "对手", cabo,
                     PlayerProfileStore.GetAvatarPathForPlayer(player.PlayerId, false));
-                _opponentSeats[i].CardRow.Clear();
-
-                int cardCount = Mathf.Max(0, player.CardCount);
-                for (int slot = 0; slot < cardCount; slot++)
-                {
-                    int targetSlot = slot;
-                    bool slotSelected = selected && _selectedOpponentSlot == targetSlot
-                        && (_flow.SubState == GameSubState.SkillSpySlot || _flow.SubState == GameSubState.SkillSwapTargetSlot);
-                    _opponentSeats[i].CardRow.Add(CreateCard(
-                        false,
-                        0,
-                        OppCardWidth,
-                        OppCardHeight,
-                        slotSelected || (selected && _selectedOpponentSlot < 0),
-                        IsOpponentSlotClickable(_flow.SubState, player.PlayerId),
-                        () => OnOpponentSlotClicked(player.PlayerId, targetSlot)));
-                }
+                EnsureCardAnchors(_opponentSeats[i].CardRow, Mathf.Max(0, player.CardCount), OppCardWidth, OppCardHeight);
             }
+        }
+
+        void EnsureCardAnchors(VisualElement row, int count, int width, int height)
+        {
+            if (row == null)
+                return;
+
+            count = Mathf.Max(0, count);
+            while (row.childCount > count)
+                row[row.childCount - 1].RemoveFromHierarchy();
+
+            while (row.childCount < count)
+            {
+                var anchor = CreateCard(false, 0, width, height, false, false, null);
+                StyleCardTablePlaceholder(anchor);
+                row.Add(anchor);
+            }
+
+            for (int i = 0; i < row.childCount; i++)
+                StyleCardTablePlaceholder(row[i]);
         }
 
         void RenderPiles(GameState state)
         {
-            _pileRow.Clear();
-            _drawPile.Clear();
-            _discardPile.Clear();
-
+            EnsurePileContainersAttached();
             bool compact = state.Phase == GamePhase.RoundReveal || state.Phase == GamePhase.GameOver;
-            _drawPile.Add(CreatePileCard("牌库", "CABO", state.DrawPileCount.ToString(), false, compact));
-            _discardPile.Add(CreatePileCard("弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true, compact));
+            bool usePlaceholders = state.Phase == GamePhase.Playing;
+            ConfigurePileRowLayout(usePlaceholders);
+            EnsurePileCard(_drawPile, "牌库", "CABO", state.DrawPileCount.ToString(), false, compact, usePlaceholders);
+            EnsurePileCard(_discardPile, "弃牌堆", state.DiscardTopValue >= 0 ? state.DiscardTopValue.ToString() : "-", state.DiscardPileCount.ToString(), true, compact, usePlaceholders);
+        }
 
-            _pileRow.Add(_drawPile);
-            _pileRow.Add(_discardPile);
+        void ConfigurePileRowLayout(bool fixedGameplayAnchor)
+        {
+            if (_pileRow == null)
+                return;
+
+            if (fixedGameplayAnchor)
+            {
+                _pileRow.style.position = Position.Absolute;
+                _pileRow.style.left = 0;
+                _pileRow.style.right = 0;
+                _pileRow.style.top = 0;
+                _pileRow.style.bottom = StyleKeyword.Auto;
+                _pileRow.style.height = 122;
+                _pileRow.style.marginTop = 0;
+                _pileRow.style.marginBottom = 0;
+                return;
+            }
+
+            _pileRow.style.position = Position.Relative;
+            _pileRow.style.left = StyleKeyword.Auto;
+            _pileRow.style.right = StyleKeyword.Auto;
+            _pileRow.style.top = StyleKeyword.Auto;
+            _pileRow.style.bottom = StyleKeyword.Auto;
+            _pileRow.style.height = StyleKeyword.Auto;
+            _pileRow.style.marginTop = 2;
+            _pileRow.style.marginBottom = 0;
+        }
+
+        void EnsurePileContainersAttached()
+        {
+            if (_drawPile.parent != _pileRow)
+                _pileRow.Add(_drawPile);
+            if (_discardPile.parent != _pileRow)
+                _pileRow.Add(_discardPile);
         }
 
         void ConfigureActionPanelForGame()
@@ -556,7 +637,7 @@ namespace Cabo.Client.UI
             _actionPanel.style.paddingRight = 16;
             _actionPanel.style.paddingTop = 8;
             _actionPanel.style.paddingBottom = 8;
-            _actionPanel.style.marginTop = 10;
+            _actionPanel.style.marginTop = GameplayActionPanelTopMargin;
             _actionPanel.style.overflow = Overflow.Visible;
         }
 
@@ -579,10 +660,16 @@ namespace Cabo.Client.UI
         void RenderActionPanel(GameState state, bool deferNewTurnActions)
         {
             ResetActionPanelForGame();
-            _drawnCardSlot.Clear();
-            _drawnCardSlot.style.display = DisplayStyle.None;
-            _buttonRow.Clear();
-            _actionBody.style.display = DisplayStyle.None;
+            bool needsRebuild = _lastActionPanelSubState != _flow.SubState
+                || _lastActionPanelDeferredNewTurnActions != deferNewTurnActions;
+            if (needsRebuild)
+            {
+                _drawnCardSlot.Clear();
+                _buttonRow.Clear();
+                _actionButtons.Clear();
+                _drawnCardSlot.style.display = DisplayStyle.None;
+                _actionBody.style.display = DisplayStyle.None;
+            }
             _actionPanel.style.display = ShouldShowActionPanel(_flow.SubState) && !deferNewTurnActions
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
@@ -591,9 +678,23 @@ namespace Cabo.Client.UI
             {
                 _actionTitle.text = "动作展示中";
                 _actionBody.text = "等待上一名玩家的操作动画完成。";
+                _lastActionPanelSubState = _flow.SubState;
+                _lastActionPanelDeferredNewTurnActions = deferNewTurnActions;
                 return;
             }
 
+            if (needsRebuild)
+            {
+                BuildActionPanelContent(state);
+            }
+
+            UpdateActionPanelButtons(state);
+            _lastActionPanelSubState = _flow.SubState;
+            _lastActionPanelDeferredNewTurnActions = deferNewTurnActions;
+        }
+
+        void BuildActionPanelContent(GameState state)
+        {
             switch (_flow.SubState)
             {
                 case GameSubState.AwaitingMainInput:
@@ -607,8 +708,6 @@ namespace Cabo.Client.UI
                 case GameSubState.AwaitingDrawnDecision:
                     _actionTitle.text = "抽到的牌";
                     _actionBody.text = "可以弃掉、替换手牌，或弃掉后发动技能。";
-                    _drawnCardSlot.style.display = DisplayStyle.Flex;
-                    _drawnCardSlot.Add(CreateDrawnCard(state, 48, 64));
                     AddActionButton("弃牌", () => _flow.DoDiscardDrawn(false), true);
                     AddActionButton("替换", () => _flow.BeginReplaceWithDrawn(), true);
                     AddActionButton(BuildSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), state.DrawnCardSkill > 0);
@@ -618,8 +717,6 @@ namespace Cabo.Client.UI
                     _actionTitle.text = "用抽牌替换";
                     _actionBody.text = "选择一张或多张自己的手牌，然后确认。";
                     _actionBody.style.display = DisplayStyle.Flex;
-                    _drawnCardSlot.style.display = DisplayStyle.Flex;
-                    _drawnCardSlot.Add(CreateDrawnCard(state, 48, 64));
                     AddActionButton("确认替换", () => ConfirmReplace(), _selectedOwnSlots.Count > 0);
                     AddActionButton("返回选择", () => ReturnToDrawnDecision(), true);
                     AddActionButton("改为弃牌", () => _flow.DoDiscardDrawn(false), true);
@@ -732,7 +829,9 @@ namespace Cabo.Client.UI
             StyleSocialTabState(_logTabButton, !_showChat);
             StyleSocialTabState(_chatTabButton, _showChat);
 
-            _socialContent.Clear();
+            bool showChatChanged = _lastRenderedSocialShowChat != _showChat;
+            bool logChanged = !_showChat && state.LastActionSequence != _lastRenderedSocialActionSequence;
+
             _socialContent.style.display = _showChat ? DisplayStyle.None : DisplayStyle.Flex;
             _roomChatPanel.Root.style.display = _showChat ? DisplayStyle.Flex : DisplayStyle.None;
 
@@ -740,13 +839,17 @@ namespace Cabo.Client.UI
             {
                 _roomChatPanel.Render();
             }
-            else
+            else if (showChatChanged || logChanged)
             {
+                _socialContent.Clear();
                 if (_gameLogEntries.Count == 0 && state.LastActionSequence == 0)
                     AddFeedPlaceholder("本局动作会显示在这里");
                 else
                     RenderFeed(_gameLogEntries, "等待第一条游戏日志");
             }
+
+            _lastRenderedSocialShowChat = _showChat;
+            _lastRenderedSocialActionSequence = state.LastActionSequence;
         }
 
         void RenderFeed(List<TableFeedEntry> entries, string emptyText)
@@ -908,22 +1011,17 @@ namespace Cabo.Client.UI
 
         VisualElement CreateDrawnCard(GameState state, int width, int height)
         {
-            var wrap = new VisualElement();
-            wrap.style.alignItems = Align.Center;
-            wrap.Add(CreateCard(true, state.DrawnCardValue, width, height, false, false, null));
-
-            var label = new Label(GetSkillName(state.DrawnCardSkill));
-            label.style.fontSize = 12;
-            label.style.unityTextAlign = TextAnchor.MiddleCenter;
-            label.style.color = UITheme.TextSecondary;
-            label.style.marginTop = 4;
-            wrap.Add(label);
-            return wrap;
+            return new VisualElement();
         }
 
         void ScheduleDrawAnimation(int value)
         {
-            _root.schedule.Execute(() => PlayDrawAnimation(value)).ExecuteLater(1);
+            int generation = _animationGeneration;
+            _root.schedule.Execute(() =>
+            {
+                if (generation == _animationGeneration)
+                    PlayDrawAnimation(value);
+            }).ExecuteLater(1);
         }
 
         ActionAnimationSnapshot BuildActionAnimationSnapshot(GameState state)
@@ -948,8 +1046,8 @@ namespace Cabo.Client.UI
                 PeekedValue = state.LastPeekedValue,
                 SourcePlayerBounds = GetPlayerBounds(state.LastActionSourcePlayerId),
                 TargetPlayerBounds = GetPlayerBounds(state.LastActionTargetPlayerId),
-                DrawPileBounds = _drawPile.worldBound,
-                DiscardPileBounds = _discardPile.worldBound
+                DrawPileBounds = GetPileCardBounds(_drawPile),
+                DiscardPileBounds = GetPileCardBounds(_discardPile)
             };
 
             snapshot.SelectedSlots.AddRange(state.LastActionSelectedSlots);
@@ -964,7 +1062,331 @@ namespace Cabo.Client.UI
             snapshot.SourceSwapSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, new[] { snapshot.SourceSlot }));
             snapshot.TargetSlotBounds.AddRange(CaptureSlotBounds(snapshot.TargetPlayerId, new[] { snapshot.TargetSlot }));
             snapshot.SourceHandBounds.AddRange(CaptureAllSlotBounds(snapshot.SourcePlayerId));
+            TryApplyPendingSelfExchangeSnapshot(snapshot);
+            TryApplyPendingSelfSwapSnapshot(snapshot);
             return snapshot;
+        }
+
+        void FinalizeActionAnimationSnapshot(ActionAnimationSnapshot action)
+        {
+            if (action == null)
+                return;
+
+            if (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
+            {
+                action.FinalSourceHandBounds.Clear();
+                action.FinalSourceHandBounds.AddRange(CaptureAllSlotBounds(action.SourcePlayerId));
+                BuildExchangeMotionPlan(action);
+            }
+        }
+
+        void RenderCardTableLayer(GameState state, ActionAnimationSnapshot pendingAction)
+        {
+            var layout = BuildCardTableLayout(state);
+            long frozenPlayerId = pendingAction != null ? pendingAction.SourcePlayerId : 0;
+            long secondFrozenPlayerId = pendingAction != null && pendingAction.ActionType == ActionType.UseSkill && pendingAction.Skill == SkillType.Swap
+                ? pendingAction.TargetPlayerId
+                : 0;
+            _cardTableView.SetVisible(true);
+            _cardTableView.Render(state, layout, frozenPlayerId, secondFrozenPlayerId);
+            if (!HasValidCardTableLayout(layout) && pendingAction == null)
+                ScheduleCardTableLayerRefresh();
+        }
+
+        void RefreshCardInteractionLayer()
+        {
+            if (_flow.State.Phase != GamePhase.Playing)
+            {
+                RenderGame();
+                return;
+            }
+
+            var layout = BuildCardTableLayout(_flow.State);
+            if (!_cardTableView.HasRenderableLayout
+                || !HasValidCardTableLayout(layout)
+                || !_cardTableView.RefreshInteractions(_flow.State, layout))
+            {
+                RenderCardTableLayer(_flow.State, null);
+            }
+            UpdateActionPanelButtons(_flow.State);
+        }
+
+        static bool HasValidCardTableLayout(CardTableLayout layout)
+        {
+            for (int i = 0; i < layout.Slots.Count; i++)
+                if (layout.Slots[i].IsValid)
+                    return true;
+            return false;
+        }
+
+        void ScheduleCardTableLayerRefresh()
+        {
+            if (_cardTableRefreshQueued)
+                return;
+
+            _cardTableRefreshQueued = true;
+            int generation = _animationGeneration;
+            _root.schedule.Execute(() =>
+            {
+                _cardTableRefreshQueued = false;
+                if (generation != _animationGeneration || _flow.State.Phase != GamePhase.Playing)
+                    return;
+                RenderCardTableLayer(_flow.State, null);
+            }).ExecuteLater(50);
+        }
+
+        CardTableLayout BuildCardTableLayout(GameState state)
+        {
+            var layout = new CardTableLayout();
+            AddCardTableSlots(layout, state.MyPlayerId, _selfSeat.CardRow, true);
+
+            var opponentIndices = BuildOpponentIndices(state);
+            for (int i = 0; i < opponentIndices.Count && i < _opponentSeats.Length; i++)
+            {
+                var player = state.Players[opponentIndices[i]];
+                AddCardTableSlots(layout, player.PlayerId, _opponentSeats[i].CardRow, false);
+            }
+
+            var drawBounds = GetPileCardBounds(_drawPile);
+            var discardBounds = GetPileCardBounds(_discardPile);
+            layout.DrawPilePosition = WorldBoundsToOverlayPosition(drawBounds);
+            layout.DrawPileSize = BoundsSize(drawBounds);
+            layout.DiscardPilePosition = WorldBoundsToOverlayPosition(discardBounds);
+            layout.DiscardPileSize = BoundsSize(discardBounds);
+            layout.DrawPileCaption = $"\u724c\u5e93  {state.DrawPileCount}";
+            layout.DiscardPileCaption = $"\u5f03\u724c\u5806  {state.DiscardPileCount}";
+            return layout;
+        }
+
+        void AddCardTableSlots(CardTableLayout layout, long playerId, VisualElement row, bool isSelf)
+        {
+            if (row == null)
+                return;
+
+            for (int slot = 0; slot < row.childCount; slot++)
+            {
+                var bounds = row[slot]?.worldBound ?? Rect.zero;
+                if (!HasUsableBounds(bounds))
+                    continue;
+
+                bool faceUp = false;
+                int value = 0;
+                bool selected = false;
+                bool clickable = false;
+                Action clicked = null;
+                if (isSelf && slot >= 0 && slot < _flow.State.MyCards.Count)
+                {
+                    faceUp = _flow.State.MyCards[slot].IsKnown;
+                    value = _flow.State.MyCards[slot].Value;
+                    selected = _selectedOwnSlots.Contains(slot);
+                    clickable = IsOwnSlotClickable(_flow.SubState);
+                    int ownSlot = slot;
+                    clicked = () => OnOwnSlotClicked(ownSlot);
+                }
+                else if (!isSelf)
+                {
+                    bool playerSelected = _selectedOpponentPlayerId == playerId;
+                    selected = playerSelected && (_selectedOpponentSlot < 0 || _selectedOpponentSlot == slot);
+                    clickable = IsOpponentSlotClickable(_flow.SubState, playerId);
+                    int targetSlot = slot;
+                    long targetPlayerId = playerId;
+                    clicked = () => OnOpponentSlotClicked(targetPlayerId, targetSlot);
+                }
+
+                layout.Slots.Add(new CardTableSlotLayout
+                {
+                    PlayerId = playerId,
+                    SlotIndex = slot,
+                    AnchoredPosition = WorldBoundsToOverlayPosition(bounds),
+                    Size = BoundsSize(bounds),
+                    FaceUp = faceUp,
+                    Value = value,
+                    Selected = selected,
+                    Clickable = clickable,
+                    Clicked = clicked
+                });
+            }
+        }
+
+        CardTableActionSnapshot ToCardTableAction(ActionAnimationSnapshot action)
+        {
+            if (action == null)
+                return null;
+
+            var drawTarget = GetDrawRevealTarget(action.SourcePlayerId, fallbackToSeat: true);
+            var snapshot = new CardTableActionSnapshot
+            {
+                Sequence = action.Sequence,
+                ActionType = action.ActionType,
+                Skill = action.Skill,
+                SourcePlayerId = action.SourcePlayerId,
+                TargetPlayerId = action.TargetPlayerId,
+                SourceSlot = action.SourceSlot,
+                TargetSlot = action.TargetSlot,
+                SwapOccurred = action.SwapOccurred,
+                ExchangeSucceeded = action.ExchangeSucceeded,
+                IncomingCardValue = action.IncomingCardValue,
+                DiscardTopValue = action.DiscardTopValue,
+                DrewExtraPenaltyCard = action.DrewExtraPenaltyCard,
+                SourcePlayerPosition = WorldBoundsToOverlayPosition(action.SourcePlayerBounds),
+                TargetPlayerPosition = WorldBoundsToOverlayPosition(action.TargetPlayerBounds),
+                DrawPilePosition = WorldBoundsToOverlayPosition(action.DrawPileBounds),
+                DrawPileSize = BoundsSize(action.DrawPileBounds),
+                DiscardPilePosition = WorldBoundsToOverlayPosition(action.DiscardPileBounds),
+                DiscardPileSize = BoundsSize(action.DiscardPileBounds),
+                SourceInspectionPosition = GetPlayerInspectionCenter(action.SourcePlayerId, action.SourcePlayerBounds),
+                TargetInspectionPosition = drawTarget.position,
+                TargetInspectionSize = drawTarget.size,
+                PeekedValue = action.PeekedValue
+            };
+
+            snapshot.SelectedSlots.AddRange(action.SelectedSlots);
+            AddCardTableSnapshots(snapshot.SourceHand, action.SourceHandBounds);
+            AddCardTableSnapshots(snapshot.FinalSourceHand, action.FinalSourceHandBounds);
+            AddCardTableSnapshots(snapshot.SourceSlots, action.SourceSlotBounds);
+            AddCardTableSnapshots(snapshot.SourceSwapSlots, action.SourceSwapSlotBounds);
+            AddCardTableSnapshots(snapshot.TargetSlots, action.TargetSlotBounds);
+            return snapshot;
+        }
+
+        void AddCardTableSnapshots(List<CardTableSlotSnapshot> target, List<SlotSnapshot> source)
+        {
+            for (int i = 0; i < source.Count; i++)
+            {
+                var slot = source[i];
+                target.Add(new CardTableSlotSnapshot
+                {
+                    PlayerId = slot.PlayerId,
+                    SlotIndex = slot.Slot,
+                    AnchoredPosition = WorldBoundsToOverlayPosition(slot.Bounds),
+                    Size = BoundsSize(slot.Bounds),
+                    FaceUp = slot.FaceUp,
+                    Value = slot.Value
+                });
+            }
+        }
+
+        Vector2 WorldBoundsToOverlayPosition(Rect bounds)
+        {
+            if (!HasUsableBounds(bounds))
+                return Vector2.zero;
+
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(rootBounds))
+                return Vector2.zero;
+
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            float scaleX = overlayWidth / rootBounds.width;
+            float scaleY = overlayHeight / rootBounds.height;
+            float centerX = bounds.x + bounds.width * 0.5f - rootBounds.x;
+            float centerY = bounds.y + bounds.height * 0.5f - rootBounds.y;
+            float x = (centerX - rootBounds.width * 0.5f) * scaleX;
+            float y = (rootBounds.height * 0.5f - centerY) * scaleY;
+            return new Vector2(x, y);
+        }
+
+        (Vector2 position, Vector2 size) GetDrawRevealTarget(long playerId, bool fallbackToSeat = false)
+        {
+            var row = GetCardRow(playerId);
+            var rowBounds = row?.worldBound ?? Rect.zero;
+            if (HasUsableBounds(rowBounds))
+            {
+                var rowPos = WorldBoundsToOverlayPosition(rowBounds);
+                var size = GetOverlayCardSizeFromRow(row, playerId);
+                float xBias = playerId == _flow.State.MyPlayerId
+                    ? Mathf.Clamp(rowBounds.width * 0.22f, 36f, 120f)
+                    : Mathf.Clamp(rowBounds.width * 0.16f, 24f, 88f);
+                float yBias = Mathf.Clamp(rowBounds.height * 0.18f, 12f, 28f);
+                var pos = rowPos + new Vector2(xBias, yBias);
+                if (IsFinite(pos.x) && IsFinite(pos.y))
+                    return (pos, size);
+            }
+
+            var seat = GetSeatRoot(playerId);
+            var seatBounds = seat?.worldBound ?? Rect.zero;
+            if (HasUsableBounds(seatBounds))
+            {
+                var seatPos = WorldBoundsToOverlayPosition(seatBounds);
+                var size = GetOverlayCardSizeFromRow(row, playerId);
+                var pos = seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.28f, 36f, 120f), Mathf.Clamp(seatBounds.height * 0.18f, 12f, 28f));
+                if (IsFinite(pos.x) && IsFinite(pos.y))
+                    return (pos, size);
+            }
+
+            if (fallbackToSeat)
+            {
+                if (row != null && row.childCount > 0)
+                {
+                    int fallbackIndex = Mathf.Clamp(row.childCount - 1, 0, row.childCount - 1);
+                    var fallback = row[fallbackIndex]?.worldBound ?? Rect.zero;
+                    if (HasUsableBounds(fallback))
+                    {
+                        var size = BoundsSize(fallback);
+                        var pos = WorldBoundsToOverlayPosition(fallback) + new Vector2(Mathf.Clamp(fallback.width * 0.24f, 22f, 86f), Mathf.Clamp(fallback.height * 0.16f, 10f, 24f));
+                        if (IsFinite(pos.x) && IsFinite(pos.y))
+                            return (pos, size);
+                    }
+                }
+            }
+
+            return (Vector2.zero, Vector2.zero);
+        }
+
+        Vector2 GetOverlayCardSizeFromRow(VisualElement row, long playerId)
+        {
+            if (row != null && row.childCount > 0)
+            {
+                var bounds = row[0]?.worldBound ?? Rect.zero;
+                if (HasUsableBounds(bounds))
+                    return BoundsSize(bounds);
+            }
+
+            return CssSizeToOverlaySize(playerId == _flow.State.MyPlayerId
+                ? new Vector2(SelfCardWidth, SelfCardHeight)
+                : new Vector2(OppCardWidth, OppCardHeight));
+        }
+
+        Vector2 CssSizeToOverlaySize(Vector2 cssSize)
+        {
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(rootBounds))
+                return cssSize;
+
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            return new Vector2(cssSize.x * overlayWidth / rootBounds.width, cssSize.y * overlayHeight / rootBounds.height);
+        }
+
+        Vector2 BoundsSize(Rect bounds)
+        {
+            if (!HasUsableBounds(bounds))
+                return Vector2.zero;
+
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(rootBounds))
+                return new Vector2(bounds.width, bounds.height);
+
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            float scaleX = overlayWidth / rootBounds.width;
+            float scaleY = overlayHeight / rootBounds.height;
+            return new Vector2(bounds.width * scaleX, bounds.height * scaleY);
+        }
+
+        static bool HasUsableBounds(Rect bounds)
+        {
+            return bounds.width > 1
+                && bounds.height > 1
+                && IsFinite(bounds.x)
+                && IsFinite(bounds.y)
+                && IsFinite(bounds.width)
+                && IsFinite(bounds.height);
+        }
+
+        static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         void EnqueueActionAnimation(ActionAnimationSnapshot action)
@@ -972,10 +1394,12 @@ namespace Cabo.Client.UI
             float now = Time.realtimeSinceStartup;
             float delay = Mathf.Max(0f, _animationQueueUntil - now);
             float duration = EstimateActionAnimationDuration(action);
-            _animationQueueUntil = now + delay + duration;
+            float settleDelay = delay <= 0.001f ? PlaybackLayoutSettleDelay : 0f;
+            _animationQueueUntil = now + delay + settleDelay + duration;
+            HideAuthoritativeCardsForAnimation(action, delay + settleDelay + duration);
             HoldTurnDisplay(action, _animationQueueUntil);
-            ScheduleAfter(delay, () => PlayActionAnimation(action));
-            ScheduleAfter(delay + duration, () => ReleaseTurnDisplay(action));
+            ScheduleAnimationAfter(delay + settleDelay, () => PlayActionAnimation(action));
+            ScheduleAfter(delay + settleDelay + duration, () => ReleaseTurnDisplay(action));
         }
 
         bool IsActionAnimationHoldActive()
@@ -1003,52 +1427,54 @@ namespace Cabo.Client.UI
             _animationQueueDrained?.Invoke();
         }
 
+        void ClearTransientAnimationState()
+        {
+            _animationGeneration++;
+            _drawnCardMarkers.Clear();
+            _pulseVersions.Clear();
+            _hiddenCardUntil.Clear();
+            _pendingSelfExchangeSnapshot = null;
+            _pendingSelfSwapSnapshot = null;
+            _cardTableRefreshQueued = false;
+            _animationLayer.Clear();
+            _cardTableView.ClearTransient();
+            _inspectionActive = false;
+            _inspectionEndsAt = 0f;
+            HideInspectionZone();
+            if (_temporaryHiddenCard != null && _temporaryHiddenCard.panel != null)
+                _temporaryHiddenCard.style.visibility = Visibility.Visible;
+            _temporaryHiddenCard = null;
+            _animationQueueUntil = 0f;
+            _heldActionSequence = 0;
+            _heldActionSourcePlayerId = 0;
+            _heldActionUntil = 0f;
+        }
+
         void PlayDrawAnimation(int value)
         {
-            var start = CenterOf(_drawPile.worldBound);
-            var targetBounds = _drawnCardSlot.worldBound;
-            if (targetBounds.width <= 1 || targetBounds.height <= 1)
-                targetBounds = _actionPanel.worldBound;
-            var end = CenterOf(targetBounds);
-            var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
-
-            if (start == Vector2.zero || end == Vector2.zero)
+            long sequence = _flow.State.DrawResponseSequence;
+            if (sequence != 0 && sequence <= _lastLocalDrawSequence)
                 return;
 
-            _drawAnimation?.Pause();
-            _animationLayer.Clear();
+            var drawStart = GetPileCardBounds(_drawPile);
+            if (drawStart.width <= 1 || drawStart.height <= 1)
+                return;
 
-            const int width = 48;
-            const int height = 64;
-            var card = CreateCard(true, value, width, height, false, false, null);
-            card.style.position = Position.Absolute;
-            card.style.marginLeft = 0;
-            card.style.marginRight = 0;
-            card.style.marginTop = 0;
-            card.style.marginBottom = 0;
-            _animationLayer.Add(card);
+            var target = GetDrawRevealTarget(_flow.State.MyPlayerId);
+            if (target.position == Vector2.zero || target.size == Vector2.zero)
+                target = GetDrawRevealTarget(_flow.State.MyPlayerId, fallbackToSeat: true);
+            if (target.position == Vector2.zero || target.size == Vector2.zero)
+                return;
 
-            float startedAt = Time.realtimeSinceStartup;
-            const float duration = 1.10f;
-            _drawAnimation = _root.schedule.Execute(() =>
-            {
-                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
-                float eased = 1f - Mathf.Pow(1f - t, 3f);
-                var p = Vector2.Lerp(start, end, eased) - rootOrigin;
-                card.style.left = p.x - width * 0.5f;
-                card.style.top = p.y - height * 0.5f;
-                card.style.opacity = Mathf.Lerp(1f, 0.15f, Mathf.Max(0f, (t - 0.72f) / 0.28f));
-
-                if (t >= 1f)
-                {
-                    _drawAnimation?.Pause();
-                    _animationLayer.Clear();
-                }
-            }).Every(16);
+            if (_cardTableView.PlayLocalDraw(value, target.position, target.size))
+                _lastLocalDrawSequence = sequence;
         }
 
         void PlayActionAnimation(ActionAnimationSnapshot action)
         {
+            if (_cardTableView.PlayAction(ToCardTableAction(action)))
+                return;
+
             switch (action.ActionType)
             {
                 case ActionType.Draw:
@@ -1074,10 +1500,13 @@ namespace Cabo.Client.UI
 
         void PlayDrawAction(ActionAnimationSnapshot action)
         {
+            if (_cardTableView.PlayAction(ToCardTableAction(action)))
+                return;
+
             var color = UITheme.SkillPeek;
             var start = CenterOf(action.DrawPileBounds);
             if (start == Vector2.zero)
-                start = CenterOf(_drawPile.worldBound);
+                start = CenterOf(GetPileCardBounds(_drawPile));
             var end = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
             if (end == Vector2.zero)
                 end = CenterOf(action.SourcePlayerBounds);
@@ -1085,20 +1514,18 @@ namespace Cabo.Client.UI
             RemoveDrawnMarker(action.SourcePlayerId);
             PlayMovingCard(start, end, false, 0, color, QuickMoveDuration, false,
                 () => ShowDrawnMarker(action.SourcePlayerId, end, color));
-            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + 0.35f);
+            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + AnimationSettleDuration);
         }
 
         void PlayDiscardDrawnAction(ActionAnimationSnapshot action)
         {
             var color = GetSkillColor(action.Skill);
             var start = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
-            var end = CenterOf(action.DiscardPileBounds);
-            if (end == Vector2.zero)
-                end = CenterOf(_discardPile.worldBound);
+            var discardBounds = GetValidBounds(action.DiscardPileBounds, GetPileCardBounds(_discardPile));
 
             RemoveDrawnMarker(action.SourcePlayerId);
-            PlayMovingCard(start, end, true, action.DiscardTopValue, color, QuickMoveDuration, true, null);
-            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + 0.45f);
+            PlayMovingCardToBounds(start, discardBounds, true, action.DiscardTopValue, color, QuickMoveDuration, null, true);
+            PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + AnimationSettleDuration);
         }
 
         void PlayReplaceWithDrawnAction(ActionAnimationSnapshot action)
@@ -1106,41 +1533,38 @@ namespace Cabo.Client.UI
             var color = action.IncomingCardValue >= 0 ? GetFaceColor(action.IncomingCardValue) : UITheme.SkillSwap;
             if (!action.ExchangeSucceeded)
             {
+                ClearPendingSelfExchangeSnapshot(action);
                 PlayFailedExchangeAction(action, color);
                 return;
             }
 
-            var discardCenter = CenterOf(action.DiscardPileBounds);
-            if (discardCenter == Vector2.zero)
-                discardCenter = CenterOf(_discardPile.worldBound);
-            var incomingTarget = GetPrimarySelectedSlotCenter(action);
-            if (incomingTarget == Vector2.zero)
-                incomingTarget = CenterOf(action.SourcePlayerBounds);
+            var discardBounds = GetValidBounds(action.DiscardPileBounds, GetPileCardBounds(_discardPile));
 
-            float discardPhase = GetDiscardPhaseDuration(action.SourceSlotBounds.Count);
-            float incomingDelay = discardPhase + EmptySlotHoldDuration;
-            float total = incomingDelay + QuickMoveDuration + 0.35f;
-            ShowSelectedSlotBlanks(action, color, total);
-            HideCurrentSlots(action.SourcePlayerId, action.SelectedSlots, total);
-            if (action.SourceSlotBounds.Count > 1)
-                ShowSourceHandOverlayDuringReflow(action, color, total);
+            float total = GetExchangeSuccessDuration(action);
+            HideExchangeAnimatedCards(action, total);
+            ShowFrozenExchangeSourceHand(action, color, total);
 
-            for (int i = 0; i < action.SourceSlotBounds.Count; i++)
+            for (int i = 0; i < action.SelectedSlotBounds.Count; i++)
             {
-                var slot = action.SourceSlotBounds[i];
-                float offset = GetDiscardStagger(i, action.SourceSlotBounds.Count);
-                ScheduleAfter(offset, () =>
-                    PlayMovingCardFromBounds(slot.Bounds, discardCenter, false, 0, color, QuickMoveDuration, true, null));
+                var slot = action.SelectedSlotBounds[i];
+                float offset = EmptyOriginHoldDuration + GetDiscardStagger(i, action.SelectedSlotBounds.Count);
+                ScheduleAnimationAfter(offset, () =>
+                    PlayMovingCardBetweenBounds(slot.Bounds, discardBounds, false, 0, color, QuickMoveDuration, true, null));
             }
 
             bool revealIncoming = action.SourcePlayerId == _flow.State.MyPlayerId && action.IncomingCardValue >= 0;
-            ScheduleAfter(incomingDelay, () =>
+            float incomingDelay = GetIncomingDelay(action);
+            ScheduleSurvivorMoves(action, color, incomingDelay);
+            ScheduleAnimationAfter(incomingDelay, () =>
             {
                 var incomingStart = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
                 RemoveDrawnMarker(action.SourcePlayerId);
-                PlayMovingCard(incomingStart, incomingTarget, revealIncoming, action.IncomingCardValue, color, QuickMoveDuration, true, null);
+                var incomingTarget = GetIncomingTargetBounds(action);
+                PlayMovingCardToBounds(incomingStart, incomingTarget, revealIncoming, action.IncomingCardValue, color, QuickMoveDuration,
+                    () => ShowCurrentSlot(action.SourcePlayerId, action.IncomingFinalSlot));
             });
             PulsePlayer(action.SourcePlayerId, color, total);
+            ClearPendingSelfExchangeSnapshot(action);
         }
 
         void PlayTakeFromDiscardAction(ActionAnimationSnapshot action)
@@ -1148,50 +1572,50 @@ namespace Cabo.Client.UI
             var color = UITheme.TurnHighlight;
             if (!action.ExchangeSucceeded)
             {
+                ClearPendingSelfExchangeSnapshot(action);
                 PlayFailedExchangeAction(action, color);
                 return;
             }
 
-            var discardCenter = CenterOf(action.DiscardPileBounds);
-            if (discardCenter == Vector2.zero)
-                discardCenter = CenterOf(_discardPile.worldBound);
-            var incomingTarget = GetPrimarySelectedSlotCenter(action);
-            if (incomingTarget == Vector2.zero)
-                incomingTarget = CenterOf(action.SourcePlayerBounds);
+            var discardBounds = GetValidBounds(action.DiscardPileBounds, GetPileCardBounds(_discardPile));
+            var discardCenter = CenterOf(discardBounds);
 
-            float discardPhase = GetDiscardPhaseDuration(action.SourceSlotBounds.Count);
-            float incomingDelay = discardPhase + EmptySlotHoldDuration;
-            float total = incomingDelay + QuickMoveDuration + 0.35f;
-            ShowSelectedSlotBlanks(action, color, total);
-            HideCurrentSlots(action.SourcePlayerId, action.SelectedSlots, total);
-            if (action.SourceSlotBounds.Count > 1)
-                ShowSourceHandOverlayDuringReflow(action, color, total);
+            float total = GetExchangeSuccessDuration(action);
+            HideExchangeAnimatedCards(action, total);
+            ShowFrozenExchangeSourceHand(action, color, total);
 
-            for (int i = 0; i < action.SourceSlotBounds.Count; i++)
+            for (int i = 0; i < action.SelectedSlotBounds.Count; i++)
             {
-                var slot = action.SourceSlotBounds[i];
-                float offset = GetDiscardStagger(i, action.SourceSlotBounds.Count);
-                ScheduleAfter(offset, () =>
-                    PlayMovingCardFromBounds(slot.Bounds, discardCenter, false, 0, color, QuickMoveDuration, true, null));
+                var slot = action.SelectedSlotBounds[i];
+                float offset = EmptyOriginHoldDuration + GetDiscardStagger(i, action.SelectedSlotBounds.Count);
+                ScheduleAnimationAfter(offset, () =>
+                    PlayMovingCardBetweenBounds(slot.Bounds, discardBounds, false, 0, color, QuickMoveDuration, true, null));
             }
 
             int incomingValue = action.IncomingCardValue >= 0 ? action.IncomingCardValue : action.DiscardTopValue;
-            ScheduleAfter(incomingDelay, () =>
-                PlayMovingCard(discardCenter, incomingTarget, true, incomingValue, color, QuickMoveDuration, true, null));
+            float incomingDelay = GetIncomingDelay(action);
+            ScheduleSurvivorMoves(action, color, incomingDelay);
+            ScheduleAnimationAfter(incomingDelay, () =>
+            {
+                var incomingTarget = GetIncomingTargetBounds(action);
+                PlayMovingCardToBounds(discardCenter, incomingTarget, true, incomingValue, color, QuickMoveDuration,
+                    () => ShowCurrentSlot(action.SourcePlayerId, action.IncomingFinalSlot));
+            });
             PulsePlayer(action.SourcePlayerId, color, total);
+            ClearPendingSelfExchangeSnapshot(action);
         }
 
         void PlayFailedExchangeAction(ActionAnimationSnapshot action, Color color)
         {
-            float total = QuickMoveDuration + EmptySlotHoldDuration + 0.65f;
-            foreach (var slot in action.SourceSlotBounds)
-                ShakeCardAt(slot.Bounds, color, 1.15f);
-            if (action.SourceSlotBounds.Count == 0)
-                PulsePlayer(action.SourcePlayerId, color, 1.15f);
+            float total = QuickMoveDuration + EmptySlotHoldDuration + AnimationSettleDuration;
+            foreach (var slot in action.SelectedSlotBounds.Count > 0 ? action.SelectedSlotBounds : action.SourceSlotBounds)
+                ShakeCardAt(slot.Bounds, color, QuickMoveDuration + AnimationSettleDuration);
+            if (action.SelectedSlotBounds.Count == 0 && action.SourceSlotBounds.Count == 0)
+                PulsePlayer(action.SourcePlayerId, color, QuickMoveDuration + AnimationSettleDuration);
 
             var start = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
             var end = CenterOf(action.SourcePlayerBounds);
-            ScheduleAfter(0.35f, () =>
+            ScheduleAnimationAfter(AnimationSettleDuration, () =>
             {
                 var markerStart = GetDrawnMarkerCenter(action.SourcePlayerId, action.SourcePlayerBounds);
                 RemoveDrawnMarker(action.SourcePlayerId);
@@ -1201,10 +1625,226 @@ namespace Cabo.Client.UI
             if (action.DrewExtraPenaltyCard)
             {
                 var deck = CenterOf(action.DrawPileBounds);
-                ScheduleAfter(0.70f, () =>
+                ScheduleAnimationAfter(0.70f, () =>
                     PlayMovingCard(deck, end + new Vector2(18f, 0f), false, 0, UITheme.SkillPeek, QuickMoveDuration, true, null));
             }
             PulsePlayer(action.SourcePlayerId, color, total);
+        }
+
+        void BuildExchangeMotionPlan(ActionAnimationSnapshot action)
+        {
+            action.SelectedSlotBounds.Clear();
+            action.SurvivorMoves.Clear();
+            action.IncomingFinalBounds = Rect.zero;
+            action.IncomingFinalSlot = -1;
+
+            var selected = new HashSet<int>(action.SelectedSlots);
+            foreach (var slot in action.SourceHandBounds)
+            {
+                if (selected.Contains(slot.Slot))
+                    action.SelectedSlotBounds.Add(slot);
+            }
+
+            if (!action.ExchangeSucceeded)
+                return;
+
+            if (action.SelectedSlots.Count <= 1)
+            {
+                int targetSlot = action.SelectedSlots.Count > 0
+                    ? action.SelectedSlots[0]
+                    : action.SourceSlot;
+                action.IncomingFinalBounds = GetFinalSlotBounds(action, targetSlot);
+                action.IncomingFinalSlot = targetSlot;
+                if (action.IncomingFinalBounds.width <= 1 && action.SelectedSlotBounds.Count > 0)
+                    action.IncomingFinalBounds = action.SelectedSlotBounds[0].Bounds;
+                return;
+            }
+
+            if (action.FinalSourceHandBounds.Count == 0)
+                return;
+
+            int survivorIndex = 0;
+            foreach (var oldSlot in action.SourceHandBounds)
+            {
+                if (selected.Contains(oldSlot.Slot))
+                    continue;
+                if (survivorIndex >= action.FinalSourceHandBounds.Count)
+                    break;
+
+                var finalSlot = action.FinalSourceHandBounds[survivorIndex];
+                action.SurvivorMoves.Add(new SlotMove
+                {
+                    PlayerId = action.SourcePlayerId,
+                    OldSlot = oldSlot.Slot,
+                    NewSlot = finalSlot.Slot,
+                    From = oldSlot.Bounds,
+                    To = finalSlot.Bounds,
+                    FaceUp = oldSlot.FaceUp,
+                    Value = oldSlot.Value
+                });
+                survivorIndex++;
+            }
+
+            if (survivorIndex < action.FinalSourceHandBounds.Count)
+            {
+                action.IncomingFinalBounds = action.FinalSourceHandBounds[survivorIndex].Bounds;
+                action.IncomingFinalSlot = action.FinalSourceHandBounds[survivorIndex].Slot;
+            }
+        }
+
+        Rect GetFinalSlotBounds(ActionAnimationSnapshot action, int slot)
+        {
+            if (slot < 0)
+                return Rect.zero;
+
+            for (int i = 0; i < action.FinalSourceHandBounds.Count; i++)
+                if (action.FinalSourceHandBounds[i].Slot == slot)
+                    return action.FinalSourceHandBounds[i].Bounds;
+            return GetCardBounds(action.SourcePlayerId, slot);
+        }
+
+        void ScheduleSurvivorMoves(ActionAnimationSnapshot action, Color color, float baseDelay)
+        {
+            if (action.SurvivorMoves.Count == 0)
+                return;
+
+            for (int i = 0; i < action.SurvivorMoves.Count; i++)
+            {
+                var move = action.SurvivorMoves[i];
+                if (SameCenter(move.From, move.To))
+                    continue;
+
+                float delay = baseDelay + i * SurvivorMoveStagger;
+                Action playMove = () => PlayMovingCardBetweenBounds(move.From, move.To, move.FaceUp, move.Value, color, SurvivorMoveDuration, false,
+                    () => ShowCurrentSlot(move.PlayerId, move.NewSlot));
+                ScheduleAnimationAfter(delay, playMove);
+            }
+        }
+
+        void ShowFrozenExchangeSourceHand(ActionAnimationSnapshot action, Color color, float duration)
+        {
+            if (action.SourceHandBounds.Count == 0)
+                return;
+
+            var selected = new HashSet<int>(action.SelectedSlots);
+            foreach (var slot in action.SourceHandBounds)
+            {
+                if (selected.Contains(slot.Slot))
+                    continue;
+                ShowStaticCardOverlay(slot.Bounds, slot.FaceUp, slot.Value, color, duration);
+            }
+        }
+
+        void ShowStaticCardOverlay(Rect bounds, bool faceUp, int value, Color color, float duration)
+        {
+            var center = CenterOf(bounds);
+            if (center == Vector2.zero)
+                return;
+
+            int width = Mathf.RoundToInt(Mathf.Clamp(bounds.width, 44f, 70f));
+            int height = Mathf.RoundToInt(Mathf.Clamp(bounds.height, 60f, 96f));
+            var card = CreateCard(faceUp, value, width, height, false, false, null);
+            card.style.position = Position.Absolute;
+            card.style.marginLeft = 0;
+            card.style.marginRight = 0;
+            card.style.marginTop = 0;
+            card.style.marginBottom = 0;
+            SetBorderColor(card, UITheme.WithAlpha(color, 0.82f));
+            PositionAbsolute(card, center, bounds.width, bounds.height);
+            _animationLayer.BringToFront();
+            _animationLayer.Add(card);
+            ScheduleAnimationAfter(duration, () =>
+            {
+                if (card.panel != null)
+                    card.RemoveFromHierarchy();
+            });
+        }
+
+        void HideAuthoritativeCardsForAnimation(ActionAnimationSnapshot action, float duration)
+        {
+            if (action == null)
+                return;
+
+            if (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
+            {
+                HideAuthoritativeExchangeLayout(action, duration);
+                return;
+            }
+
+            if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
+            {
+                float swapHideDuration = SwapEmptyHoldDuration + SwapMoveDuration;
+                HideCurrentSlot(action.SourcePlayerId, action.SourceSlot, swapHideDuration);
+                HideCurrentSlot(action.TargetPlayerId, action.TargetSlot, swapHideDuration);
+            }
+        }
+
+        void HideExchangeAnimatedCards(ActionAnimationSnapshot action, float duration)
+        {
+            if (!action.ExchangeSucceeded)
+                return;
+
+            foreach (var slot in action.SelectedSlots)
+                HideCurrentSlot(action.SourcePlayerId, slot, Mathf.Min(duration, EmptyOriginHoldDuration + QuickMoveDuration));
+
+            foreach (var move in action.SurvivorMoves)
+            {
+                if (!SameCenter(move.From, move.To))
+                    HideCurrentSlot(action.SourcePlayerId, move.NewSlot, duration);
+            }
+
+            if (action.IncomingFinalSlot >= 0)
+                HideCurrentSlot(action.SourcePlayerId, action.IncomingFinalSlot, duration);
+        }
+
+        void HideAuthoritativeExchangeLayout(ActionAnimationSnapshot action, float duration)
+        {
+            if (!action.ExchangeSucceeded)
+                return;
+
+            foreach (var slot in action.SelectedSlots)
+                HideCurrentSlot(action.SourcePlayerId, slot, Mathf.Min(duration, EmptyOriginHoldDuration + QuickMoveDuration));
+
+            foreach (var move in action.SurvivorMoves)
+            {
+                if (!SameCenter(move.From, move.To))
+                    HideCurrentSlot(action.SourcePlayerId, move.NewSlot, duration);
+            }
+
+            if (action.IncomingFinalSlot >= 0)
+                HideCurrentSlot(action.SourcePlayerId, action.IncomingFinalSlot, duration);
+        }
+
+        Rect GetIncomingTargetBounds(ActionAnimationSnapshot action)
+        {
+            if (action.IncomingFinalBounds.width > 1 && action.IncomingFinalBounds.height > 1)
+                return action.IncomingFinalBounds;
+
+            if (action.SourceSlotBounds.Count > 0)
+                return action.SourceSlotBounds[0].Bounds;
+
+            if (action.SelectedSlots.Count > 0)
+            {
+                var bounds = GetCardBounds(action.SourcePlayerId, action.SelectedSlots[0]);
+                if (bounds.width > 1 && bounds.height > 1)
+                    return bounds;
+            }
+
+            return action.SourcePlayerBounds;
+        }
+
+        float GetIncomingDelay(ActionAnimationSnapshot action)
+        {
+            float discardPhase = GetDiscardPhaseDuration(action.SelectedSlotBounds.Count);
+            return discardPhase + EmptyOriginHoldDuration + EmptySlotHoldDuration;
+        }
+
+        float GetExchangeSuccessDuration(ActionAnimationSnapshot action)
+        {
+            float survivorPhase = action.SurvivorMoves.Count > 0
+                ? (action.SurvivorMoves.Count - 1) * SurvivorMoveStagger + SurvivorMoveDuration
+                : 0f;
+            return GetIncomingDelay(action) + Mathf.Max(QuickMoveDuration, survivorPhase) + IncomingLandingPause;
         }
 
         void PlaySkillAnimation(ActionAnimationSnapshot action)
@@ -1219,14 +1859,18 @@ namespace Cabo.Client.UI
             if (action.Skill == SkillType.Spy)
             {
                 int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? action.PeekedValue : -1;
-                PlaySpyCardInspection(action, privateValue, color);
+                action.PeekedValue = privateValue;
+                if (!_cardTableView.PlayAction(ToCardTableAction(action)))
+                    PlaySpyCardInspection(action, privateValue, color);
                 return;
             }
 
             if (action.Skill == SkillType.PeekSelf)
             {
                 int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? GetKnownOwnCardValue(action.SourceSlot, action.PeekedValue) : -1;
-                PlayPeekSelfInspection(action, privateValue, color);
+                action.PeekedValue = privateValue;
+                if (!_cardTableView.PlayAction(ToCardTableAction(action)))
+                    PlayPeekSelfInspection(action, privateValue, color);
                 return;
             }
 
@@ -1245,25 +1889,27 @@ namespace Cabo.Client.UI
                 target = CenterOf(action.TargetPlayerBounds);
             if (source == Vector2.zero || target == Vector2.zero)
             {
-                PulsePlayer(action.SourcePlayerId, color, SkillMoveDuration + SkillHoldDuration);
-                PulsePlayer(action.TargetPlayerId, color, SkillMoveDuration + SkillHoldDuration);
+                PulsePlayer(action.SourcePlayerId, color, SwapMoveDuration + EmptySlotHoldDuration);
+                PulsePlayer(action.TargetPlayerId, color, SwapMoveDuration + EmptySlotHoldDuration);
                 return;
             }
 
-            float total = EmptySlotHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
-            ShowSlotBlank(sourceBounds, color, total);
-            ShowSlotBlank(targetBounds, color, total);
-            HideCurrentSlot(action.SourcePlayerId, action.SourceSlot, total);
-            HideCurrentSlot(action.TargetPlayerId, action.TargetSlot, total);
+            float total = SwapEmptyHoldDuration + SwapMoveDuration + SwapSettleDuration;
+            float hideDuration = SwapEmptyHoldDuration + SwapMoveDuration;
+            HideCurrentSlot(action.SourcePlayerId, action.SourceSlot, hideDuration);
+            HideCurrentSlot(action.TargetPlayerId, action.TargetSlot, hideDuration);
 
-            ScheduleAfter(EmptySlotHoldDuration, () =>
+            ScheduleAnimationAfter(SwapEmptyHoldDuration, () =>
             {
-                PlayMovingCard(source, target, false, 0, color, SkillMoveDuration, true, null);
-                PlayMovingCard(target, source, false, 0, color, SkillMoveDuration, true, null);
+                PlayMovingCardBetweenBounds(sourceBounds, targetBounds, false, 0, color, SwapMoveDuration, false,
+                    () => ShowCurrentSlot(action.TargetPlayerId, action.TargetSlot), -24f);
+                PlayMovingCardBetweenBounds(targetBounds, sourceBounds, false, 0, color, SwapMoveDuration, false,
+                    () => ShowCurrentSlot(action.SourcePlayerId, action.SourceSlot), 24f);
             });
 
             PulsePlayer(action.SourcePlayerId, color, total);
             PulsePlayer(action.TargetPlayerId, color, total);
+            ClearPendingSelfSwapSnapshot(action);
         }
 
         void PlayFlyCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration)
@@ -1282,6 +1928,33 @@ namespace Cabo.Client.UI
             PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, width, height);
         }
 
+        void PlayMovingCardBetweenBounds(Rect startBounds, Rect endBounds, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete, float arcHeight = 0f)
+        {
+            var start = CenterOf(startBounds);
+            var end = CenterOf(endBounds);
+            if (start == Vector2.zero || end == Vector2.zero)
+                return;
+
+            float startWidth = Mathf.Clamp(startBounds.width, 44f, 70f);
+            float startHeight = Mathf.Clamp(startBounds.height, 60f, 96f);
+            float endWidth = Mathf.Clamp(endBounds.width, 44f, 70f);
+            float endHeight = Mathf.Clamp(endBounds.height, 60f, 96f);
+            PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, startWidth, startHeight, endWidth, endHeight, arcHeight);
+        }
+
+        void PlayMovingCardToBounds(Vector2 start, Rect endBounds, bool faceUp, int value, Color color, float duration, Action onComplete, bool fadeOut = false)
+        {
+            var end = CenterOf(endBounds);
+            if (end == Vector2.zero)
+                return;
+
+            float startWidth = 46f;
+            float startHeight = 62f;
+            float endWidth = Mathf.Clamp(endBounds.width, 44f, 70f);
+            float endHeight = Mathf.Clamp(endBounds.height, 60f, 96f);
+            PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, startWidth, startHeight, endWidth, endHeight, 0f);
+        }
+
         void PlayMovingCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete)
         {
             PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, 44f, 60f);
@@ -1289,11 +1962,22 @@ namespace Cabo.Client.UI
 
         void PlayMovingCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete, float width, float height)
         {
+            PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, width, height, 0f);
+        }
+
+        void PlayMovingCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete, float width, float height, float arcHeight)
+        {
+            PlayMovingCard(start, end, faceUp, value, color, duration, fadeOut, onComplete, width, height, width, height, arcHeight);
+        }
+
+        void PlayMovingCard(Vector2 start, Vector2 end, bool faceUp, int value, Color color, float duration, bool fadeOut, Action onComplete, float startWidth, float startHeight, float endWidth, float endHeight, float arcHeight)
+        {
             var rootOrigin = new Vector2(_root.worldBound.x, _root.worldBound.y);
             if (start == Vector2.zero || end == Vector2.zero || !IsFinite(start) || !IsFinite(end) || !IsFinite(rootOrigin))
                 return;
 
-            var card = CreateCard(faceUp, value >= 0 ? value : 0, Mathf.RoundToInt(width), Mathf.RoundToInt(height), false, false, null);
+            int generation = _animationGeneration;
+            var card = CreateCard(faceUp, value >= 0 ? value : 0, Mathf.RoundToInt(startWidth), Mathf.RoundToInt(startHeight), false, false, null);
             card.style.position = Position.Absolute;
             card.style.marginLeft = 0;
             card.style.marginRight = 0;
@@ -1307,9 +1991,23 @@ namespace Cabo.Client.UI
             IVisualElementScheduledItem item = null;
             item = _root.schedule.Execute(() =>
             {
+                if (generation != _animationGeneration)
+                {
+                    item?.Pause();
+                    if (card.panel != null)
+                        card.RemoveFromHierarchy();
+                    return;
+                }
+
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
                 float eased = 1f - Mathf.Pow(1f - t, 3f);
                 var p = Vector2.Lerp(start, end, eased) - rootOrigin;
+                if (Mathf.Abs(arcHeight) > 0.01f)
+                    p.y += Mathf.Sin(t * Mathf.PI) * arcHeight;
+                float width = Mathf.Lerp(startWidth, endWidth, eased);
+                float height = Mathf.Lerp(startHeight, endHeight, eased);
+                card.style.width = width;
+                card.style.height = height;
                 card.style.left = p.x - width * 0.5f;
                 card.style.top = p.y - height * 0.5f;
                 card.style.opacity = fadeOut ? Mathf.Lerp(1f, 0f, Mathf.Max(0f, (t - 0.78f) / 0.22f)) : 1f;
@@ -1325,64 +2023,17 @@ namespace Cabo.Client.UI
 
         void PlayPeekSelfInspection(ActionAnimationSnapshot action, int privateValue, Color color)
         {
-            long playerId = action.SourcePlayerId;
-            int slot = action.SourceSlot;
-            var bounds = GetCapturedSlotBounds(action.SourceSwapSlotBounds, playerId, slot);
-            var center = CenterOf(bounds);
-            if (center == Vector2.zero)
-            {
-                PulsePlayer(playerId, color, FlipRevealDuration);
+            if (_cardTableView.PlayAction(ToCardTableAction(action)))
                 return;
-            }
-
-            bool revealValue = privateValue >= 0;
-            if (playerId == _flow.State.MyPlayerId)
-            {
-                PulseCard(playerId, slot, color, FlipRevealDuration);
-                PlayFlipCardAt(center, revealValue, privateValue, color, "看牌", FlipRevealDuration);
-                ShowHeldInspectionCard(center, revealValue, privateValue, color, "看牌", FlipRevealDuration);
-                return;
-            }
-
-            float total = SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
-            ShowSlotBlank(bounds, color, total);
-            HideCurrentSlot(playerId, slot, total);
-
-            var inspectAt = GetPlayerInspectionCenter(playerId, action.SourcePlayerBounds);
-            if (inspectAt == Vector2.zero)
-                inspectAt = CenterOf(action.SourcePlayerBounds);
-            if (inspectAt == Vector2.zero)
-                inspectAt = center;
-
-            PlayInspectCardRoundTrip(center, inspectAt, false, 0, color, "看牌");
-            PulsePlayer(playerId, color, total);
+            PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
         }
 
         void PlaySpyCardInspection(ActionAnimationSnapshot action, int privateValue, Color color)
         {
-            long sourcePlayerId = action.SourcePlayerId;
-            long targetPlayerId = action.TargetPlayerId;
-            int targetSlot = action.TargetSlot;
-            var targetBounds = GetCapturedSlotBounds(action.TargetSlotBounds, targetPlayerId, targetSlot);
-            var start = CenterOf(targetBounds);
-            if (start == Vector2.zero)
-                start = CenterOf(GetPlayerBounds(targetPlayerId));
-            var end = GetPlayerInspectionCenter(sourcePlayerId, action.SourcePlayerBounds);
-            if (end == Vector2.zero)
-                end = CenterOf(action.SourcePlayerBounds);
-            if (start == Vector2.zero || end == Vector2.zero)
-            {
-                PulseCard(targetPlayerId, targetSlot, color, FlipRevealDuration);
-                PulsePlayer(sourcePlayerId, color, FlipRevealDuration);
+            if (_cardTableView.PlayAction(ToCardTableAction(action)))
                 return;
-            }
-
-            float total = SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
-            ShowSlotBlank(targetBounds, color, total);
-            HideCurrentSlot(targetPlayerId, targetSlot, total);
-            PlayInspectCardRoundTrip(start, end, privateValue >= 0, privateValue, color, "偷看");
-            PulsePlayer(sourcePlayerId, color, total);
-            PulsePlayer(targetPlayerId, color, total);
+            PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
+            PulsePlayer(action.TargetPlayerId, color, FlipRevealDuration);
         }
 
         void PlayPeekSelfFlip(long playerId, int slot, int privateValue, Color color)
@@ -1435,7 +2086,7 @@ namespace Cabo.Client.UI
         void PlayCaboCallAnimation(long sourcePlayerId)
         {
             var color = UITheme.TurnHighlight;
-            PulsePlayer(sourcePlayerId, color, 1.65f);
+            PulsePlayer(sourcePlayerId, color, CaboCallDuration);
 
             var bounds = GetPlayerBounds(sourcePlayerId);
             var center = CenterOf(bounds);
@@ -1458,11 +2109,10 @@ namespace Cabo.Client.UI
             _animationLayer.Add(banner);
 
             float startedAt = Time.realtimeSinceStartup;
-            const float duration = 1.55f;
             IVisualElementScheduledItem item = null;
             item = _root.schedule.Execute(() =>
             {
-                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / duration);
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / CaboCallDuration);
                 float lift = Mathf.Sin(t * Mathf.PI) * 18f;
                 var p = center - rootOrigin + new Vector2(0f, -bounds.height * 0.42f - lift);
                 banner.style.left = p.x - 52f;
@@ -1635,7 +2285,16 @@ namespace Cabo.Client.UI
                 var element = GetCardElement(playerId, slot);
                 var bounds = element?.worldBound ?? Rect.zero;
                 if (bounds.width > 1 && bounds.height > 1)
-                    result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds });
+                {
+                    bool faceUp = false;
+                    int value = 0;
+                    if (playerId == _flow.State.MyPlayerId && slot >= 0 && slot < _flow.State.MyCards.Count)
+                    {
+                        faceUp = _flow.State.MyCards[slot].IsKnown;
+                        value = _flow.State.MyCards[slot].Value;
+                    }
+                    result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds, FaceUp = faceUp, Value = value });
+                }
             }
             return result;
         }
@@ -1651,7 +2310,16 @@ namespace Cabo.Client.UI
             {
                 var bounds = row[slot]?.worldBound ?? Rect.zero;
                 if (bounds.width > 1 && bounds.height > 1)
-                    result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds });
+                {
+                    bool faceUp = false;
+                    int value = 0;
+                    if (playerId == _flow.State.MyPlayerId && slot >= 0 && slot < _flow.State.MyCards.Count)
+                    {
+                        faceUp = _flow.State.MyCards[slot].IsKnown;
+                        value = _flow.State.MyCards[slot].Value;
+                    }
+                    result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds, FaceUp = faceUp, Value = value });
+                }
             }
             return result;
         }
@@ -1659,14 +2327,24 @@ namespace Cabo.Client.UI
         float EstimateActionAnimationDuration(ActionAnimationSnapshot action)
         {
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Spy)
-                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + 0.35f;
+                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.PeekSelf)
-                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + 0.35f;
+            {
+                if (action.SourcePlayerId == _flow.State.MyPlayerId)
+                    return FlipRevealDuration;
+                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
+            }
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
-                return EmptySlotHoldDuration + SkillMoveDuration + EmptySlotHoldDuration + 0.35f;
+                return SwapEmptyHoldDuration + SwapMoveDuration + SwapSettleDuration;
+            if (action.ActionType == ActionType.CallSteady)
+                return CaboCallDuration;
             if (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
-                return GetDiscardPhaseDuration(action.SourceSlotBounds.Count) + EmptySlotHoldDuration + QuickMoveDuration + 0.55f;
-            return QuickMoveDuration + 0.55f;
+            {
+                if (!action.ExchangeSucceeded)
+                    return QuickMoveDuration + EmptySlotHoldDuration + AnimationSettleDuration;
+                return GetExchangeSuccessDuration(action);
+            }
+            return QuickMoveDuration + AnimationSettleDuration;
         }
 
         float GetDiscardPhaseDuration(int cardCount)
@@ -1680,7 +2358,7 @@ namespace Cabo.Client.UI
         {
             if (cardCount <= 1)
                 return 0f;
-            return index * 0.32f;
+            return index * 0.20f;
         }
 
         Vector2 GetDrawnMarkerCenter(long playerId, Rect fallbackBounds)
@@ -1740,106 +2418,34 @@ namespace Cabo.Client.UI
             _drawnCardMarkers.Remove(playerId);
         }
 
-        void ShowSelectedSlotBlanks(ActionAnimationSnapshot action, Color color, float duration)
-        {
-            foreach (var slot in action.SourceSlotBounds)
-                ShowSlotBlank(slot.Bounds, color, duration);
-        }
-
-        void ShowSlotBlank(Rect bounds, Color color, float duration)
-        {
-            var center = CenterOf(bounds);
-            if (center == Vector2.zero)
-                return;
-
-            var blank = new VisualElement();
-            blank.style.position = Position.Absolute;
-            blank.style.marginLeft = 0;
-            blank.style.marginRight = 0;
-            blank.style.marginTop = 0;
-            blank.style.marginBottom = 0;
-            blank.style.backgroundColor = UITheme.WithAlpha(UITheme.PanelSurfaceAlt, 0.88f);
-            blank.style.borderTopLeftRadius = 7;
-            blank.style.borderTopRightRadius = 7;
-            blank.style.borderBottomLeftRadius = 7;
-            blank.style.borderBottomRightRadius = 7;
-            SetBorderWidth(blank, 2);
-            SetBorderColor(blank, color);
-            PositionAbsolute(blank, center, bounds.width, bounds.height);
-            _animationLayer.BringToFront();
-            _animationLayer.Add(blank);
-            ScheduleAfter(duration, () => blank.RemoveFromHierarchy());
-        }
-
-        void ShowSourceHandOverlayDuringReflow(ActionAnimationSnapshot action, Color color, float duration)
-        {
-            HideCurrentHandCards(action.SourcePlayerId, duration);
-
-            var selected = new HashSet<int>(action.SelectedSlots);
-            foreach (var slot in action.SourceHandBounds)
-            {
-                if (selected.Contains(slot.Slot))
-                    continue;
-                ShowStaticCardOverlay(slot.Bounds, color, duration);
-            }
-        }
-
-        void ShowStaticCardOverlay(Rect bounds, Color color, float duration)
-        {
-            var center = CenterOf(bounds);
-            if (center == Vector2.zero)
-                return;
-
-            var card = CreateCard(false, 0, Mathf.RoundToInt(bounds.width), Mathf.RoundToInt(bounds.height), false, false, null);
-            card.style.position = Position.Absolute;
-            card.style.marginLeft = 0;
-            card.style.marginRight = 0;
-            card.style.marginTop = 0;
-            card.style.marginBottom = 0;
-            SetBorderColor(card, UITheme.WithAlpha(color, 0.82f));
-            PositionAbsolute(card, center, bounds.width, bounds.height);
-            _animationLayer.BringToFront();
-            _animationLayer.Add(card);
-            ScheduleAfter(duration, () => card.RemoveFromHierarchy());
-        }
-
-        void HideCurrentSlots(long playerId, IEnumerable<int> slots, float duration)
-        {
-            if (slots == null)
-                return;
-            foreach (var slot in slots)
-                HideCurrentSlot(playerId, slot, duration);
-        }
-
-        void HideCurrentHandCards(long playerId, float duration)
-        {
-            var row = GetCardRow(playerId);
-            if (row == null)
-                return;
-
-            for (int i = 0; i < row.childCount; i++)
-            {
-                var element = row[i];
-                element.style.visibility = Visibility.Hidden;
-                ScheduleAfter(duration, () =>
-                {
-                    if (element.panel != null)
-                        element.style.visibility = Visibility.Visible;
-                });
-            }
-        }
-
         void HideCurrentSlot(long playerId, int slot, float duration)
         {
             var element = GetCardElement(playerId, slot);
             if (element == null)
                 return;
+            float showAt = Time.realtimeSinceStartup + Mathf.Max(0f, duration);
+            if (_hiddenCardUntil.TryGetValue(element, out var existingShowAt) && existingShowAt > showAt)
+                showAt = existingShowAt;
+            _hiddenCardUntil[element] = showAt;
             element.style.visibility = Visibility.Hidden;
-            ScheduleAfter(duration, () =>
+            ScheduleAnimationAfter(duration, () =>
             {
-                if (element.panel != null)
-                    element.style.visibility = Visibility.Visible;
+                if (element.panel == null)
+                    return;
+                if (_hiddenCardUntil.TryGetValue(element, out var hiddenUntil) && Time.realtimeSinceStartup + 0.02f < hiddenUntil)
+                    return;
+                _hiddenCardUntil.Remove(element);
+                element.style.visibility = Visibility.Visible;
             });
+        }
+
+        void ShowCurrentSlot(long playerId, int slot)
+        {
+            var element = GetCardElement(playerId, slot);
+            if (element == null)
+                return;
+            _hiddenCardUntil.Remove(element);
+            element.style.visibility = Visibility.Visible;
         }
 
         Vector2 GetPrimarySelectedSlotCenter(ActionAnimationSnapshot action)
@@ -1906,6 +2512,16 @@ namespace Cabo.Client.UI
                 item?.Pause();
                 action?.Invoke();
             }).Every(50);
+        }
+
+        void ScheduleAnimationAfter(float delaySeconds, Action action)
+        {
+            int generation = _animationGeneration;
+            ScheduleAfter(delaySeconds, () =>
+            {
+                if (generation == _animationGeneration)
+                    action?.Invoke();
+            });
         }
 
         VisualElement CreateFloatingCard(bool faceUp, int value, int width, int height, Color color, string caption)
@@ -2014,7 +2630,7 @@ namespace Cabo.Client.UI
                     _pulseVersions.Remove(element);
                     if (IsSeatRoot(element))
                     {
-                        RenderGame();
+                        RestoreSeatBorderAndRefreshCards(element);
                     }
                     else
                     {
@@ -2025,6 +2641,57 @@ namespace Cabo.Client.UI
                     }
                 }
             }).Every(16).Until(() => Time.realtimeSinceStartup - startedAt >= duration);
+        }
+
+        void RestoreSeatBorderAndRefreshCards(VisualElement element)
+        {
+            if (element == null || _flow.State.Phase != GamePhase.Playing)
+                return;
+
+            RenderSeatHeaderBorder(element);
+            RefreshCardInteractionLayer();
+        }
+
+        void RenderSeatHeaderBorder(VisualElement element)
+        {
+            var state = _flow.State;
+            long visualCurrentPlayerId = IsActionAnimationHoldActive() ? _heldActionSourcePlayerId : state.CurrentPlayerId;
+            if (element == _selfSeat.Root)
+            {
+                ApplySeatRootChrome(element, visualCurrentPlayerId == state.MyPlayerId, state.SteadyCallerId == state.MyPlayerId);
+                return;
+            }
+
+            var opponentIndices = BuildOpponentIndices(state);
+            for (int i = 0; i < _opponentSeats.Length && i < opponentIndices.Count; i++)
+            {
+                if (element != _opponentSeats[i].Root)
+                    continue;
+
+                var player = state.Players[opponentIndices[i]];
+                ApplySeatRootChrome(element, visualCurrentPlayerId == player.PlayerId, state.SteadyCallerId == player.PlayerId);
+                return;
+            }
+
+            ApplySeatRootChrome(element, false, false);
+        }
+
+        static void ApplySeatRootChrome(VisualElement element, bool isCurrentTurn, bool isCaboCaller)
+        {
+            if (element == null)
+                return;
+
+            element.style.backgroundColor = isCaboCaller ? UITheme.CaboSurface : UITheme.PanelSurface;
+            var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnBorder : UITheme.PanelBorder;
+            element.style.borderTopColor = borderColor;
+            element.style.borderRightColor = borderColor;
+            element.style.borderBottomColor = borderColor;
+            element.style.borderLeftColor = borderColor;
+            float borderWidth = isCaboCaller || isCurrentTurn ? 3 : 1;
+            element.style.borderTopWidth = borderWidth;
+            element.style.borderRightWidth = borderWidth;
+            element.style.borderBottomWidth = borderWidth;
+            element.style.borderLeftWidth = borderWidth;
         }
 
         bool IsSeatRoot(VisualElement element)
@@ -2058,6 +2725,24 @@ namespace Cabo.Client.UI
         Rect GetCardBounds(long playerId, int slot)
         {
             return GetCardElement(playerId, slot)?.worldBound ?? GetPlayerBounds(playerId);
+        }
+
+        Rect GetPileCardBounds(VisualElement pile)
+        {
+            if (pile == null)
+                return Rect.zero;
+
+            var stack = pile.childCount > 0 ? pile[0] : null;
+            var card = stack != null && stack.childCount > 0 ? stack[0] : null;
+            var bounds = card?.worldBound ?? Rect.zero;
+            if (bounds.width > 1 && bounds.height > 1)
+                return bounds;
+            return pile.worldBound;
+        }
+
+        static Rect GetValidBounds(Rect primary, Rect fallback)
+        {
+            return primary.width > 1 && primary.height > 1 ? primary : fallback;
         }
 
         VisualElement GetCardElement(long playerId, int slot)
@@ -2153,6 +2838,13 @@ namespace Cabo.Client.UI
             return !(float.IsNaN(value.x) || float.IsNaN(value.y) || float.IsInfinity(value.x) || float.IsInfinity(value.y));
         }
 
+        static bool SameCenter(Rect left, Rect right)
+        {
+            var a = CenterOf(left);
+            var b = CenterOf(right);
+            return a != Vector2.zero && b != Vector2.zero && Vector2.Distance(a, b) < 0.5f;
+        }
+
         VisualElement CreateCard(bool faceUp, int value, int width, int height, bool selected, bool clickable, Action onClick, bool showSkillBadge = true)
         {
             var card = new VisualElement();
@@ -2202,6 +2894,59 @@ namespace Cabo.Client.UI
             return card;
         }
 
+        static void StyleCardTablePlaceholder(VisualElement card)
+        {
+            if (card == null)
+                return;
+
+            card.style.opacity = 0f;
+            card.style.backgroundColor = Color.clear;
+            card.style.borderTopColor = Color.clear;
+            card.style.borderRightColor = Color.clear;
+            card.style.borderBottomColor = Color.clear;
+            card.style.borderLeftColor = Color.clear;
+            card.pickingMode = PickingMode.Ignore;
+        }
+
+        static void StylePileCardPlaceholder(VisualElement pileVisual)
+        {
+            if (pileVisual == null || pileVisual.childCount == 0)
+                return;
+
+            for (int i = 0; i < pileVisual.childCount; i++)
+            {
+                var child = pileVisual[i];
+                StyleCardTablePlaceholder(child);
+                child.style.visibility = Visibility.Hidden;
+                child.pickingMode = PickingMode.Ignore;
+            }
+            pileVisual.pickingMode = PickingMode.Ignore;
+        }
+
+        void EnsurePileCard(VisualElement pile, string title, string face, string count, bool faceUp, bool compact, bool placeholder)
+        {
+            if (pile == null)
+                return;
+
+            VisualElement stack;
+            if (pile.childCount == 0)
+            {
+                stack = CreatePileCard(title, face, count, faceUp, compact);
+                pile.Add(stack);
+            }
+            else
+            {
+                stack = pile[0];
+                UpdatePileCard(stack, title, face, count, faceUp, compact);
+            }
+
+            pile.pickingMode = placeholder ? PickingMode.Ignore : PickingMode.Position;
+            if (placeholder)
+                StylePileCardPlaceholder(stack);
+            else
+                RestorePileCardVisibility(stack);
+        }
+
         VisualElement CreatePileCard(string title, string face, string count, bool faceUp, bool compact = false)
         {
             var stack = new VisualElement();
@@ -2242,6 +2987,72 @@ namespace Cabo.Client.UI
             caption.style.marginTop = compact ? 3 : 6;
             stack.Add(caption);
             return stack;
+        }
+
+        void UpdatePileCard(VisualElement stack, string title, string face, string count, bool faceUp, bool compact)
+        {
+            if (stack == null)
+                return;
+
+            stack.style.alignItems = Align.Center;
+            stack.style.marginLeft = compact ? 10 : 14;
+            stack.style.marginRight = compact ? 10 : 14;
+
+            var card = stack.childCount > 0 ? stack[0] : null;
+            if (card != null)
+            {
+                card.style.width = compact ? 54 : 70;
+                card.style.height = compact ? 70 : 92;
+                card.style.flexShrink = 0;
+                card.style.alignItems = Align.Center;
+                card.style.justifyContent = Justify.Center;
+                card.style.borderTopLeftRadius = 8;
+                card.style.borderTopRightRadius = 8;
+                card.style.borderBottomLeftRadius = 8;
+                card.style.borderBottomRightRadius = 8;
+                card.style.borderTopWidth = 2;
+                card.style.borderRightWidth = 2;
+                card.style.borderBottomWidth = 2;
+                card.style.borderLeftWidth = 2;
+                card.style.borderTopColor = UITheme.CardBorder;
+                card.style.borderRightColor = UITheme.CardBorder;
+                card.style.borderBottomColor = UITheme.CardBorder;
+                card.style.borderLeftColor = UITheme.CardBorder;
+                card.style.backgroundColor = faceUp ? UITheme.CardMid : UITheme.CardBack;
+
+                if (card.childCount > 0 && card[0] is Label label)
+                {
+                    label.text = face;
+                    label.style.fontSize = compact ? faceUp ? 22 : 11 : faceUp ? 26 : 14;
+                    label.style.unityFontStyleAndWeight = FontStyle.Bold;
+                    label.style.color = faceUp ? UITheme.TextPrimary : Color.white;
+                }
+            }
+
+            if (stack.childCount > 1 && stack[1] is Label caption)
+            {
+                caption.text = $"{title}  {count}";
+                caption.style.fontSize = compact ? 10 : 12;
+                caption.style.unityTextAlign = TextAnchor.MiddleCenter;
+                caption.style.marginTop = compact ? 3 : 6;
+            }
+        }
+
+        static void RestorePileCardVisibility(VisualElement stack)
+        {
+            if (stack == null)
+                return;
+
+            stack.style.opacity = 1f;
+            stack.style.visibility = Visibility.Visible;
+            stack.pickingMode = PickingMode.Position;
+            for (int i = 0; i < stack.childCount; i++)
+            {
+                var child = stack[i];
+                child.style.opacity = 1f;
+                child.style.visibility = Visibility.Visible;
+                child.pickingMode = PickingMode.Position;
+            }
         }
 
         VisualElement CreateRevealRow(RoundResult result)
@@ -2438,6 +3249,9 @@ namespace Cabo.Client.UI
             _actionPanel.Add(_actionBody);
             _actionPanel.Add(_drawnCardSlot);
             _actionPanel.Add(_buttonRow);
+            _lastActionPanelSubState = GameSubState.Idle;
+            _lastActionPanelDeferredNewTurnActions = false;
+            _actionButtons.Clear();
         }
 
         void AddActionButton(string text, Action action, bool enabled)
@@ -2452,6 +3266,71 @@ namespace Cabo.Client.UI
             StyleTableButton(button, enabled);
             button.SetEnabled(enabled);
             _buttonRow.Add(button);
+            _actionButtons.Add(button);
+        }
+
+        void UpdateActionPanelButtons(GameState state)
+        {
+            switch (_flow.SubState)
+            {
+                case GameSubState.AwaitingMainInput:
+                    SetActionButtonEnabled(0, true);
+                    SetActionButtonEnabled(1, state.TurnNumber > 1 && state.DiscardPileCount > 0);
+                    SetActionButtonEnabled(2, !state.IsFinalRound);
+                    break;
+                case GameSubState.AwaitingDrawnDecision:
+                    SetActionButtonEnabled(0, true);
+                    SetActionButtonEnabled(1, true);
+                    SetActionButtonEnabled(2, state.DrawnCardSkill > 0);
+                    break;
+                case GameSubState.AwaitingReplaceSlots:
+                    SetActionButtonEnabled(0, _selectedOwnSlots.Count > 0);
+                    SetActionButtonEnabled(1, true);
+                    SetActionButtonEnabled(2, true);
+                    SetActionButtonEnabled(3, state.DrawnCardSkill > 0);
+                    break;
+                case GameSubState.AwaitingTakeSlots:
+                    SetActionButtonEnabled(0, _selectedOwnSlots.Count > 0);
+                    SetActionButtonEnabled(1, true);
+                    break;
+                case GameSubState.SkillPeekSlot:
+                    SetActionButtonEnabled(0, _selectedOwnSlots.Count == 1);
+                    SetActionButtonEnabled(1, true);
+                    break;
+                case GameSubState.SkillSpyTarget:
+                    SetActionButtonEnabled(0, true);
+                    break;
+                case GameSubState.SkillSpySlot:
+                    SetActionButtonEnabled(0, _selectedOpponentSlot >= 0);
+                    SetActionButtonEnabled(1, true);
+                    SetActionButtonEnabled(2, true);
+                    break;
+                case GameSubState.SkillSwapMySlot:
+                    SetActionButtonEnabled(0, true);
+                    break;
+                case GameSubState.SkillSwapTargetPlayer:
+                    SetActionButtonEnabled(0, true);
+                    SetActionButtonEnabled(1, true);
+                    break;
+                case GameSubState.SkillSwapTargetSlot:
+                    SetActionButtonEnabled(0, _selectedOpponentSlot >= 0);
+                    SetActionButtonEnabled(1, true);
+                    SetActionButtonEnabled(2, true);
+                    break;
+            }
+        }
+
+        void SetActionButtonEnabled(int index, bool enabled)
+        {
+            if (index < 0 || index >= _actionButtons.Count)
+                return;
+
+            var button = _actionButtons[index];
+            if (button == null)
+                return;
+
+            button.SetEnabled(enabled);
+            StyleTableButton(button, enabled);
         }
 
         static void StyleTableButton(Button button, bool enabled)
@@ -2467,12 +3346,12 @@ namespace Cabo.Client.UI
                 case GameSubState.AwaitingTakeSlots:
                     if (!_selectedOwnSlots.Add(slot))
                         _selectedOwnSlots.Remove(slot);
-                    RenderGame();
+                    RefreshCardInteractionLayer();
                     break;
                 case GameSubState.SkillPeekSlot:
                     _selectedOwnSlots.Clear();
                     _selectedOwnSlots.Add(slot);
-                    RenderGame();
+                    RefreshCardInteractionLayer();
                     break;
                 case GameSubState.SkillSwapMySlot:
                     _selectedOwnSlots.Clear();
@@ -2496,14 +3375,14 @@ namespace Cabo.Client.UI
             {
                 _flow.DoSkillSpyTarget(playerId);
                 _selectedOpponentSlot = slot;
-                RenderGame();
+                RefreshCardInteractionLayer();
                 return;
             }
             if (_flow.SubState == GameSubState.SkillSwapTargetPlayer)
             {
                 _flow.DoSkillSwapTargetPlayer(playerId);
                 _selectedOpponentSlot = slot;
-                RenderGame();
+                RefreshCardInteractionLayer();
                 return;
             }
             if (_flow.SkillTargetPlayerId != playerId) return;
@@ -2511,25 +3390,158 @@ namespace Cabo.Client.UI
             if (_flow.SubState == GameSubState.SkillSpySlot)
             {
                 _selectedOpponentSlot = slot;
-                RenderGame();
+                RefreshCardInteractionLayer();
             }
             else if (_flow.SubState == GameSubState.SkillSwapTargetSlot)
             {
                 _selectedOpponentSlot = slot;
-                RenderGame();
+                RefreshCardInteractionLayer();
             }
         }
 
         void ConfirmReplace()
         {
+            CachePendingSelfExchangeSnapshot(ActionType.ReplaceWithDrawn);
             _flow.DoReplaceWithDrawn(ToSortedArray(_selectedOwnSlots));
             _selectedOwnSlots.Clear();
         }
 
         void ConfirmTakeDiscard()
         {
+            CachePendingSelfExchangeSnapshot(ActionType.TakeFromDiscard);
             _flow.DoTakeFromDiscardSlots(ToSortedArray(_selectedOwnSlots));
             _selectedOwnSlots.Clear();
+        }
+
+        void CachePendingSelfExchangeSnapshot(ActionType actionType)
+        {
+            if (_selectedOwnSlots.Count == 0)
+            {
+                _pendingSelfExchangeSnapshot = null;
+                return;
+            }
+
+            var selected = ToSortedArray(_selectedOwnSlots);
+            var snapshot = new PendingSelfExchangeSnapshot
+            {
+                ActionType = actionType,
+                SourcePlayerBounds = GetPlayerBounds(_flow.State.MyPlayerId)
+            };
+            snapshot.SelectedSlots.AddRange(selected);
+            snapshot.SourceSlotBounds.AddRange(CaptureSlotBounds(_flow.State.MyPlayerId, selected));
+            snapshot.SourceHandBounds.AddRange(CaptureAllSlotBounds(_flow.State.MyPlayerId));
+            foreach (var card in _flow.State.MyCards)
+                snapshot.SourceHandCards.Add(new CardSnapshot { FaceUp = card.IsKnown, Value = card.Value });
+            _pendingSelfExchangeSnapshot = snapshot;
+        }
+
+        void TryApplyPendingSelfExchangeSnapshot(ActionAnimationSnapshot snapshot)
+        {
+            var pending = _pendingSelfExchangeSnapshot;
+            if (pending == null || pending.SelectedSlots.Count == 0)
+                return;
+            if (snapshot.SourcePlayerId != _flow.State.MyPlayerId || snapshot.ActionType != pending.ActionType)
+                return;
+
+            if (!SameSlots(snapshot.SelectedSlots, pending.SelectedSlots))
+            {
+                _pendingSelfExchangeSnapshot = null;
+                return;
+            }
+
+            if (pending.SourcePlayerBounds.width > 1 && pending.SourcePlayerBounds.height > 1)
+                snapshot.SourcePlayerBounds = pending.SourcePlayerBounds;
+            snapshot.SourceSlotBounds.Clear();
+            snapshot.SourceSlotBounds.AddRange(pending.SourceSlotBounds);
+            snapshot.SourceHandBounds.Clear();
+            snapshot.SourceHandBounds.AddRange(pending.SourceHandBounds);
+            snapshot.UsesPendingSelfExchangeSnapshot = true;
+        }
+
+        static bool SameSlots(List<int> left, List<int> right)
+        {
+            if (left.Count != right.Count)
+                return false;
+
+            for (int i = 0; i < left.Count; i++)
+                if (!right.Contains(left[i]))
+                    return false;
+            return true;
+        }
+
+        void ClearPendingSelfExchangeSnapshot(ActionAnimationSnapshot action)
+        {
+            if (action == null || !action.UsesPendingSelfExchangeSnapshot)
+                return;
+            _pendingSelfExchangeSnapshot = null;
+        }
+
+        bool ShouldHoldPendingSelfExchangeView(GameState state)
+        {
+            var pending = _pendingSelfExchangeSnapshot;
+            if (pending == null || pending.SelectedSlots.Count == 0)
+                return false;
+            if (state.LastActionSequence > _lastAnimatedActionSequence)
+                return false;
+            return _flow.SubState == GameSubState.WaitingReplaceRsp
+                || _flow.SubState == GameSubState.WaitingTakeRsp
+                || _flow.SubState == GameSubState.Idle;
+        }
+
+        void CachePendingSelfSwapSnapshot()
+        {
+            int sourceSlot = _selectedOwnSlots.Count == 1 ? ToSortedArray(_selectedOwnSlots)[0] : _flow.SkillMySlot;
+            int targetSlot = _selectedOpponentSlot;
+            long targetPlayerId = _flow.SkillTargetPlayerId;
+            if (sourceSlot < 0 || targetSlot < 0 || targetPlayerId <= 0)
+            {
+                _pendingSelfSwapSnapshot = null;
+                return;
+            }
+
+            var snapshot = new PendingSelfSwapSnapshot
+            {
+                SourcePlayerId = _flow.State.MyPlayerId,
+                TargetPlayerId = targetPlayerId,
+                SourceSlot = sourceSlot,
+                TargetSlot = targetSlot,
+                SourcePlayerBounds = GetPlayerBounds(_flow.State.MyPlayerId),
+                TargetPlayerBounds = GetPlayerBounds(targetPlayerId)
+            };
+            snapshot.SourceSwapSlotBounds.AddRange(CaptureSlotBounds(_flow.State.MyPlayerId, new[] { sourceSlot }));
+            snapshot.TargetSlotBounds.AddRange(CaptureSlotBounds(targetPlayerId, new[] { targetSlot }));
+            _pendingSelfSwapSnapshot = snapshot;
+        }
+
+        void TryApplyPendingSelfSwapSnapshot(ActionAnimationSnapshot snapshot)
+        {
+            var pending = _pendingSelfSwapSnapshot;
+            if (pending == null)
+                return;
+            if (snapshot.ActionType != ActionType.UseSkill || snapshot.Skill != SkillType.Swap || !snapshot.SwapOccurred)
+                return;
+            if (snapshot.SourcePlayerId != pending.SourcePlayerId
+                || snapshot.TargetPlayerId != pending.TargetPlayerId
+                || snapshot.SourceSlot != pending.SourceSlot
+                || snapshot.TargetSlot != pending.TargetSlot)
+                return;
+
+            if (pending.SourcePlayerBounds.width > 1 && pending.SourcePlayerBounds.height > 1)
+                snapshot.SourcePlayerBounds = pending.SourcePlayerBounds;
+            if (pending.TargetPlayerBounds.width > 1 && pending.TargetPlayerBounds.height > 1)
+                snapshot.TargetPlayerBounds = pending.TargetPlayerBounds;
+            snapshot.SourceSwapSlotBounds.Clear();
+            snapshot.SourceSwapSlotBounds.AddRange(pending.SourceSwapSlotBounds);
+            snapshot.TargetSlotBounds.Clear();
+            snapshot.TargetSlotBounds.AddRange(pending.TargetSlotBounds);
+            snapshot.UsesPendingSelfSwapSnapshot = true;
+        }
+
+        void ClearPendingSelfSwapSnapshot(ActionAnimationSnapshot action)
+        {
+            if (action == null || !action.UsesPendingSelfSwapSnapshot)
+                return;
+            _pendingSelfSwapSnapshot = null;
         }
 
         void ConfirmSkillTargetSlot()
@@ -2540,7 +3552,10 @@ namespace Cabo.Client.UI
             if (_flow.SubState == GameSubState.SkillSpySlot)
                 _flow.DoSkillSpySlot(_selectedOpponentSlot);
             else if (_flow.SubState == GameSubState.SkillSwapTargetSlot)
+            {
+                CachePendingSelfSwapSnapshot();
                 _flow.DoSkillSwapTargetSlot(_selectedOpponentSlot);
+            }
             _selectedOpponentSlot = -1;
         }
 
@@ -2755,6 +3770,7 @@ namespace Cabo.Client.UI
             readonly Label _score;
             readonly Label _tag;
             readonly VisualElement _avatarSlot;
+            string _avatarCacheKey;
 
             public SeatView(string name, bool isSelf)
             {
@@ -2849,8 +3865,13 @@ namespace Cabo.Client.UI
 
             public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false, string avatarPath = "")
             {
-                _avatarSlot.Clear();
-                _avatarSlot.Add(PlayerProfileStore.CreateAvatarVisual(name, avatarPath, 32));
+                string avatarKey = $"{name}|{avatarPath}";
+                if (_avatarCacheKey != avatarKey)
+                {
+                    _avatarSlot.Clear();
+                    _avatarSlot.Add(PlayerProfileStore.CreateAvatarVisual(name, avatarPath, 32));
+                    _avatarCacheKey = avatarKey;
+                }
                 _name.text = name;
                 _score.text = $"总分 {score}";
                 _tag.text = isCurrentTurn && isCaboCaller ? "CABO 回合" : isCurrentTurn ? "回合" : tag;
@@ -2897,15 +3918,61 @@ namespace Cabo.Client.UI
             public bool DrewExtraPenaltyCard;
             public int DiscardTopValue;
             public int PeekedValue;
+            public bool UsesPendingSelfExchangeSnapshot;
+            public bool UsesPendingSelfSwapSnapshot;
+            public Rect IncomingFinalBounds;
+            public int IncomingFinalSlot = -1;
             public Rect SourcePlayerBounds;
             public Rect TargetPlayerBounds;
             public Rect DrawPileBounds;
             public Rect DiscardPileBounds;
             public readonly List<int> SelectedSlots = new();
+            public readonly List<SlotMove> SurvivorMoves = new();
             public readonly List<SlotSnapshot> SourceHandBounds = new();
+            public readonly List<SlotSnapshot> FinalSourceHandBounds = new();
+            public readonly List<SlotSnapshot> SelectedSlotBounds = new();
             public readonly List<SlotSnapshot> SourceSlotBounds = new();
             public readonly List<SlotSnapshot> SourceSwapSlotBounds = new();
             public readonly List<SlotSnapshot> TargetSlotBounds = new();
+        }
+
+        sealed class PendingSelfExchangeSnapshot
+        {
+            public ActionType ActionType;
+            public Rect SourcePlayerBounds;
+            public readonly List<int> SelectedSlots = new();
+            public readonly List<CardSnapshot> SourceHandCards = new();
+            public readonly List<SlotSnapshot> SourceHandBounds = new();
+            public readonly List<SlotSnapshot> SourceSlotBounds = new();
+        }
+
+        sealed class PendingSelfSwapSnapshot
+        {
+            public long SourcePlayerId;
+            public long TargetPlayerId;
+            public int SourceSlot;
+            public int TargetSlot;
+            public Rect SourcePlayerBounds;
+            public Rect TargetPlayerBounds;
+            public readonly List<SlotSnapshot> SourceSwapSlotBounds = new();
+            public readonly List<SlotSnapshot> TargetSlotBounds = new();
+        }
+
+        struct SlotMove
+        {
+            public long PlayerId;
+            public int OldSlot;
+            public int NewSlot;
+            public Rect From;
+            public Rect To;
+            public bool FaceUp;
+            public int Value;
+        }
+
+        struct CardSnapshot
+        {
+            public bool FaceUp;
+            public int Value;
         }
 
         struct SlotSnapshot
@@ -2913,6 +3980,8 @@ namespace Cabo.Client.UI
             public long PlayerId;
             public int Slot;
             public Rect Bounds;
+            public bool FaceUp;
+            public int Value;
         }
     }
 }

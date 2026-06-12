@@ -90,6 +90,7 @@ namespace Cabo.Client
         // Draw state
         public bool HasDrawnCard;
         public int DrawnCardValue, DrawnCardSkill;
+        public long DrawResponseSequence;
 
         // Request waiting flags
         public bool WaitingForDrawResponse;
@@ -352,6 +353,7 @@ namespace Cabo.Client
             CurrentPlayerId = notify.FirstPlayerId;
             IsFinalRound = false; FinalRoundRemaining = 0; SteadyCallerId = 0;
             HasDrawnCard = false; DrawnCardValue = 0; DrawnCardSkill = 0;
+            DrawResponseSequence = 0;
             WaitingForDrawResponse = false; WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
             foreach (var player in Players)
@@ -431,6 +433,7 @@ namespace Cabo.Client
             {
                 HasDrawnCard = true; DrawnCardValue = rsp.Value;
                 DrawnCardSkill = (int)(rsp.Skill);
+                DrawResponseSequence++;
             }
         }
 
@@ -713,6 +716,7 @@ namespace Cabo.Client
             FinalRankings.Clear();
             LastPeekedValue = -1;
             LastSwapOccurred = false;
+            DrawResponseSequence = 0;
             LastActionMessage = "";
             LastActionSequence = 0;
             LastActionType = ActionType.Unknown;
@@ -770,6 +774,7 @@ namespace Cabo.Client
             LastRoomChatError = "";
             LastPeekedValue = -1;
             LastSwapOccurred = false;
+            DrawResponseSequence = 0;
             LastActionMessage = "";
             LastActionSequence = 0;
             LastActionType = ActionType.Unknown;

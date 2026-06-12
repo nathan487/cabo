@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cabo.Client.UI.CardTable;
 
 namespace Cabo.Client.UI
 {
@@ -15,6 +16,7 @@ namespace Cabo.Client.UI
         public GameTablePanel GameTablePanel { get; private set; }
 
         GameFlow _flow;
+        System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
 
         void Awake()
         {
@@ -47,17 +49,29 @@ namespace Cabo.Client.UI
 
         public void Initialize(GameFlow flow)
         {
+            if (_flow != null)
+            {
+                _flow.StateChanged -= OnStateChanged;
+                if (_messageReceivedHandler != null)
+                    _flow.Gateway.MessageReceived -= _messageReceivedHandler;
+            }
+
             _flow = flow;
             EnsureRoot();
+            GameTablePanel?.Dispose();
+            GameTablePanel = null;
+            Root?.Clear();
+            CardTableView.DestroyAllUnder(transform);
 
             // Build panels
             RoomPanel = new RoomPanel(Root, flow);
-            GameTablePanel = new GameTablePanel(Root, flow);
+            GameTablePanel = new GameTablePanel(Root, flow, transform);
             GameTablePanel.SetAnimationQueueDrainedCallback(OnStateChanged);
 
             // Listen for state changes
             flow.StateChanged += OnStateChanged;
-            flow.Gateway.MessageReceived += _ => OnStateChanged();
+            _messageReceivedHandler = _ => OnStateChanged();
+            flow.Gateway.MessageReceived += _messageReceivedHandler;
 
             // Initial render
             OnStateChanged();
@@ -150,7 +164,14 @@ namespace Cabo.Client.UI
 
         void OnDestroy()
         {
-            if (_flow != null) _flow.StateChanged -= OnStateChanged;
+            GameTablePanel?.Dispose();
+            CardTableView.DestroyAllUnder(transform);
+            if (_flow != null)
+            {
+                _flow.StateChanged -= OnStateChanged;
+                if (_messageReceivedHandler != null)
+                    _flow.Gateway.MessageReceived -= _messageReceivedHandler;
+            }
             Input.imeCompositionMode = IMECompositionMode.Auto;
         }
     }

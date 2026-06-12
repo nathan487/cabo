@@ -1,5 +1,48 @@
 # Unity Animation Notes
 
+## 2026-06-11 Decision: Migrate Card Visuals To Persistent Card Views
+
+The next animation task should not continue deepening the UI Toolkit clone/hide workaround for replacement animations. Start the card-table migration described in:
+
+- `Docs/UNITY_CARD_VIEW_MIGRATION.md`
+
+Decision:
+
+- Keep UI Toolkit for home, room, chat, log, action buttons, reveal panels, and non-card UI.
+- Move in-game card visuals to persistent uGUI/GameObject card views.
+- Prefer uGUI `RectTransform` + `Image` card objects under a Canvas for the first pass.
+
+Reason:
+
+- Current cards are `VisualElement`s rebuilt by `GameTablePanel.RenderSeats()`.
+- Action broadcasts immediately update `GameState` to the authoritative final hand.
+- Replacement/take animations need to show old layout first, then final layout.
+- The current approach uses captured `worldBound`, hidden real cards, temporary clone cards, and scheduled callbacks.
+- This is fragile when selected cards are removed and survivors reflow; slot indices change meaning after the server state applies.
+- Swap is stable because hand counts do not change.
+
+Target replacement behavior for the new CardView layer:
+
+- Single replace/take:
+  - selected old card moves to discard;
+  - selected slot is empty;
+  - incoming card lands in that final slot;
+  - other hand cards stay still.
+- Multi replace/take:
+  - old hand is visually frozen;
+  - selected old cards move to discard;
+  - selected old slots remain empty;
+  - survivors and incoming move together to final compacted slots;
+  - final authoritative hand is shown only after movement completes.
+
+Validation remains the same:
+
+- Use Unity MCP.
+- Validate/compile after C# edits.
+- Check Console.
+- Use synthetic 4-player states and screenshots for before/mid/hold/after animation phases.
+- Ensure `RoundReveal` still waits for pending action animations.
+
 ## 2026-06-10 Next Work: Animation Experience Polish
 
 The next requested Unity task is to review and improve all in-game action animations for both the local player and opponents.

@@ -1,5 +1,63 @@
 # Unity Client Handoff / MCP Quick Start
 
+## 2026-06-11 Fast Resume: Card Table View Migration Next
+
+Next requested task:
+
+- Start migrating the in-game card visuals and animations from UI Toolkit `VisualElement` cards to persistent uGUI/GameObject card views.
+- Keep UI Toolkit for home/room/chat/log/buttons/reveal panels.
+- Migrate only the card table/card visuals first.
+- Prefer uGUI `RectTransform` + `Image` CardView objects under a Canvas, not world-space SpriteRenderers.
+
+Read first:
+
+- `Docs/CURRENT_TASK.md`
+- `Docs/UNITY_CARD_VIEW_MIGRATION.md`
+- `Docs/UNITY_ANIMATION_NOTES.md`
+- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+
+Why this is the next direction:
+
+- Current cards in `GameTablePanel.cs` are UI Toolkit `VisualElement`s.
+- Server state is rendered immediately to the final hand layout.
+- Replacement animations need the old layout first, then final layout.
+- The clone/hide/`worldBound` approach is brittle for `ReplaceWithDrawn` and `TakeFromDiscard`, especially multi-card replacement.
+- Swap is stable because hand counts do not change; replacement changes hand count and slot meaning.
+
+Primary files:
+
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs`
+- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+- new scripts under `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/`
+
+Recommended first implementation step:
+
+1. Add minimal `CardView`, `CardSlotView`, and `CardTableView` scripts with placeholder card visuals.
+2. Let the new card layer coexist with `GameTablePanel`; do not delete the old card rendering first.
+3. Connect the local player's hand in a synthetic 4-player state.
+4. Add opponent hands and draw/discard pile anchors.
+5. Implement replacement/take two-phase animation in the new card layer:
+   - selected old cards move to discard first;
+   - selected old slots are empty;
+   - survivors and incoming move together to final slots;
+   - only then reconcile to authoritative final hand.
+
+Verification expectation:
+
+- Use Unity MCP synthetic Play Mode states before live-server testing.
+- Capture before/mid/hold/after screenshots for single and multi replace/take.
+- Verify swap still works after migration.
+- Verify `RoundReveal` still waits for the action animation queue.
+- Final Console should be `0 errors / 0 warnings`, except clearly identified unrelated MCP warnings.
+
+Constraints:
+
+- Do not change protobuf schema, server rules, WebSocket transport, room logic, scoring, or table/chat/sidebar layout.
+- Do not commit Unity MCP screenshot artifacts under `Assets/Screenshots/`.
+- Server build/start remains user-owned unless explicitly requested.
+
 ## 2026-06-10 Fast Resume: In-Game Animation Polish Next
 
 Next requested task:

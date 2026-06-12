@@ -1,12 +1,26 @@
 # Current Task: Unity Client Migration
 
-## 2026-06-10 Next Task: In-Game Animation Polish
+## 2026-06-11 Next Task: Card Table View Migration
 
-The next requested task is to optimize in-game animation rendering and player experience.
+The next requested task is to start migrating the in-game card visuals and card animations from rebuild-heavy UI Toolkit `VisualElement` cards to persistent uGUI/GameObject card views.
 
-Primary plan:
+Primary migration doc:
 
-- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+- `Docs/UNITY_CARD_VIEW_MIGRATION.md`
+
+Reason:
+
+- Current card visuals in `GameTablePanel.cs` are UI Toolkit `VisualElement`s rebuilt from `GameState`.
+- Replacement actions (`ReplaceWithDrawn` and `TakeFromDiscard`) require old layout and final layout to coexist during animation.
+- The current clone/hide/`worldBound` approach is fragile and produced overlapping cards or unrelated cards disappearing.
+- Swap is stable because card counts do not change; replacement is hard because selected cards are removed and surviving cards reflow.
+
+Architecture decision:
+
+- Keep UI Toolkit for home, room, chat, log, action buttons, reveal panels, and non-card UI.
+- Migrate only the in-game card table/card visuals to persistent uGUI/GameObject views.
+- Prefer uGUI `CardView` prefabs under a Canvas over world-space SpriteRenderers for the first pass.
+- Keep `GameState`, `GameFlow`, protobuf schema, server logic, WebSocket transport, room flow, scoring, and chat/sidebar layout unchanged.
 
 Primary implementation area:
 
@@ -14,15 +28,15 @@ Primary implementation area:
 - `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs`
 - `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs`
 - `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+- new scripts under `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/`
 
 Task focus:
 
-- local-player action animation;
-- opponent action animation;
-- animation order and logic;
-- timing and smoothness;
-- whether final action animations finish before reveal/settlement;
-- whether animations communicate source, target, and result without relying on logs.
+- create minimal persistent `CardView`, `CardSlotView`, `HandView`, and `CardTableView`;
+- render local and opponent hands through persistent card objects;
+- keep card art replaceable through a provider/prefab image path;
+- implement and verify draw, discard drawn, swap, single replace, multi replace, single take discard, and multi take discard;
+- preserve action animation queue order and RoundReveal waiting behavior.
 
 Important constraints:
 
@@ -33,11 +47,13 @@ Important constraints:
 
 Recommended first step in the next session:
 
-1. Read `Docs/UNITY_ANIMATION_NOTES.md`.
-2. Read `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`.
-3. Inspect current `GameTablePanel.cs` animation methods before editing.
-4. Build an action-animation matrix for local and opponent viewpoints.
-5. Then implement small, verified animation improvements.
+1. Read `Docs/UNITY_CARD_VIEW_MIGRATION.md`.
+2. Read `Docs/UNITY_ANIMATION_NOTES.md` and `Docs/UNITY_CLIENT_HANDOFF.md`.
+3. Inspect current `GameTablePanel.cs` card rendering and animation methods before editing.
+4. Create minimal `CardView`, `CardSlotView`, and `CardTableView` scripts with placeholder visuals.
+5. Connect only the local player's hand in a synthetic state first.
+6. Add opponent hands and pile anchors.
+7. Implement replacement/take two-phase animation in the new card layer and verify with screenshots.
 
 ## 2026-06-10 Update: WebSocket + Cloudflare Transport Implemented
 

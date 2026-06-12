@@ -3,152 +3,125 @@
 Copy this into the next Codex session:
 
 ```text
-请先阅读这些文档，快速接手当前 Unity 客户端状态：
-
-1. Docs/CURRENT_TASK.md
-2. Docs/UNITY_ANIMATION_NOTES.md
-3. Docs/UNITY_CLIENT_HANDOFF.md
-4. Docs/NETWORK_LAYER.md
-5. Docs/GAME_SESSION.md
-6. Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md
-
-当前工作区：
+请接手当前 Unity 客户端任务。工作区：
 
 - Workspace: C:\Users\Admin\Desktop\Cabo GameObject
 - Unity client: unity dev/New Client_Unity_Base_Cli
 - Server: MuduoBaseGameServer
 
-本次新任务：
+必须先阅读这些文档：
 
-优化游戏对局中的动画体验，包括玩家本人这边的所有动作，以及对手动作的展示。重点审查并优化动画渲染逻辑、顺序、时间、节奏、顺滑程度和可读性，让玩家不看日志也能理解刚刚发生了什么。
+1. Docs/CURRENT_TASK.md
+2. Docs/UNITY_CARD_VIEW_MIGRATION.md
+3. Docs/UNITY_CLIENT_HANDOFF.md
+4. Docs/UNITY_ANIMATION_NOTES.md
+5. Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md
 
-必须先做审查和小计划，不要一上来大规模重写动画系统。先建立 action-animation matrix，覆盖：
+当前任务：
 
-- 本人抽牌；
-- 本人丢弃刚抽的牌；
-- 本人用刚抽的牌替换；
-- 本人拿弃牌堆并替换；
-- 本人 Peek / Spy / Swap 技能；
-- 本人 CABO；
-- 对手抽牌；
-- 对手丢弃刚抽的牌；
-- 对手替换；
-- 对手拿弃牌堆；
-- 对手 Peek / Spy / Swap 技能；
-- 对手 CABO；
-- 最后一手动作动画结束后再进入 RoundReveal / 结算面板。
+开始把游戏牌桌里的“卡牌显示和卡牌动画”从 UI Toolkit 的 VisualElement 卡牌迁移到持久化 uGUI/GameObject CardView。
 
-核心目标：
+重要背景：
 
-- 动画顺序必须和服务器 ActionResultNotify / TurnStartNotify 的顺序一致。
-- 动画要清楚表达谁行动、牌从哪里来、移动到哪里、哪个槽位被影响、结果是什么。
-- 本人视角和对手视角都要舒服、清晰。
-- 动画不能让牌桌布局跳动，不能影响右侧聊天/日志侧栏。
-- 不能有残留的临时牌、残留高亮、重复当前回合边框、卡住的 inspect/skill 状态。
-- 最后一手动作还没播放完时，不允许结算界面抢先出现；动画播放完后才进入结算。
+- 现在 GameTablePanel.cs 里的卡牌不是 Unity GameObject，而是 UI Toolkit VisualElement。
+- 真实手牌每次 RenderSeats() 都会根据 GameState 重建。
+- 动画牌是 _animationLayer 上的临时 VisualElement clone。
+- ReplaceWithDrawn / TakeFromDiscard 很难修，是因为服务器状态一回来，真实手牌已经是最终布局；但动画需要先显示旧布局，只空 selected，再飞弃牌堆，最后 survivors + incoming 到最终布局。
+- Swap 已经稳定，原因是 swap 不改变手牌数量，slot 语义不会重排。
+- 单牌替换和多牌替换出现过重叠/错误消失，本质是旧布局 clone、最终真实卡、隐藏真实卡三层生命周期纠缠。
 
-重点代码：
+架构决策：
 
-- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs
-- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs
-- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs
-- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs
+- 不要继续在 VisualElement + clone + hide + worldBound 上无限修。
+- 不要迁移整个 UI。
+- 保留 UI Toolkit 做首页、房间、聊天、日志、按钮、结算面板。
+- 只把游戏牌桌里的卡牌视觉和动画迁移成持久化 uGUI/GameObject CardView。
+- 第一阶段优先用 uGUI：Canvas + RectTransform + Image，而不是世界空间 SpriteRenderer。
 
-优先审查 GameTablePanel.cs 中这些方法：
+目标新增脚本建议放在：
 
-- RenderGame()
-- BuildActionAnimationSnapshot(...)
-- EnqueueActionAnimation(...)
-- PlayActionAnimation(...)
-- PlaySkillAnimation(...)
-- PlayFlyCard(...)
-- PulsePlayer(...)
-- PulseCard(...)
-- RenderSeats(...)
-- RenderActionPanel(...)
-- ReleaseTurnDisplay(...)
-- Tick()
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/CardView.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/CardSlotView.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/HandView.cs
+- unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/CardTable/CardTableView.cs
+- 可选：CardArtProvider.cs
+- 可选：CardAnimationRunner.cs
 
-重点检查 GameState.HandleActionResult(...) 写入的字段是否足够支持动画：
+第一阶段不要删除旧 GameTablePanel 卡牌代码。让新 CardTableView 和旧 UI 共存，先证明新卡牌层可以渲染和动画。
 
-- LastActionSequence
-- LastActionType
-- LastActionSkill
-- LastActionSourcePlayerId
-- LastActionTargetPlayerId
-- LastActionSourceSlot
-- LastActionTargetSlot
-- LastActionSwapOccurred
-- LastActionExchangeSucceeded
-- LastActionIncomingCardValue
-- LastActionDiscardedCount
-- LastActionSelectedSlots
-- ActionResultNotify.player_hands
+推荐开发顺序：
 
-Unity MCP 要求：
+1. 使用 unity-mcp-orchestrator skill。
+2. 检查 git status，注意已有未提交文件，不要回滚用户/旧会话改动。
+3. 阅读 GameTablePanel.cs 当前 RenderSeats、BuildActionAnimationSnapshot、EnqueueActionAnimation、PlayReplaceWithDrawnAction、PlayTakeFromDiscardAction、PlaySwapAction。
+4. 创建最小 CardView / CardSlotView / CardTableView：
+   - CardView.ShowFront(value)
+   - CardView.ShowBack()
+   - CardView.SetSelected(bool)
+   - CardView.MoveTo(RectTransform target, float duration)
+   - CardView.FlipToFront(value, duration)
+   - CardView.SetVisible(bool)
+5. 先用占位卡面，不需要等待正式美术资源；但结构要支持以后通过 Image/Sprite 替换卡面和牌背。
+6. 用合成 4 人 GameState 先渲染本机手牌。
+7. 再渲染对手手牌、抽牌堆、弃牌堆 anchors。
+8. 实现新 CardTableView 里的替换动画，不要依赖 UI Toolkit clone：
+   - 单牌替换：selected old card -> discard，selected slot empty，incoming -> final slot，其它手牌不动。
+   - 多牌替换：旧手牌冻结，selected old cards -> discard，selected slots empty，然后 survivors + incoming 一起移动到最终 compacted slots。
+   - TakeFromDiscard 与替换相同，但 incoming 从弃牌堆开始。
+9. 保持 swap 稳定，不要破坏现有稳定行为；迁移后也要验证 swap。
+10. 保持 RoundReveal 等待 action animation queue 的行为。
 
-- 必须使用 unity-mcp-orchestrator skill。
-- MCP endpoint 通常是 http://127.0.0.1:8080/mcp。
-- 如果 MCP 断开，先读当前项目生成的：
-  unity dev/New Client_Unity_Base_Cli/Library/MCPForUnity/TerminalScripts/mcp-terminal.cmd
-  不要复用旧 token。
-- 在 Unity 中确认 Window > MCP For Unity 连接到 http://127.0.0.1:8080。
+不要改：
+
+- 游戏规则
+- protobuf schema
+- 服务器逻辑
+- WebSocket transport
+- 房间逻辑
+- 结算规则
+- 聊天/日志侧栏布局
+- 整体牌桌布局，除非只是为了挂载新卡牌 Canvas/layer
 
 每次 C# 修改后必须验证：
 
-1. AssetDatabase.Refresh()
-2. 请求脚本编译
-3. 等待 Unity 编译结束
-4. read_console 检查 error / warning
-5. 最终目标是 Console 0 errors / 0 warnings；如果有已存在且无关的 warning/error，必须说明证据。
+1. validate_script
+2. refresh_unity(scope="scripts", compile="request", wait_for_ready=true)
+3. read_console(types=["error","warning"])
+4. 最终目标是 Console 0 errors / 0 warnings；如果只有无关 MCP warning，要明确说明。
 
-建议用 Unity MCP 注入 synthetic 4-player game state，先不依赖真实服务器。至少验证：
+合成验证至少覆盖：
 
-- 4 人 active game；
-- 本人回合未抽牌；
-- 本人抽牌后等待决策；
-- 单槽替换；
-- 多槽替换；
-- 拿弃牌堆；
-- Peek 自己；
-- Spy 对手；
-- Swap 自己槽位和对手槽位；
-- 对手 draw/discard/replace/take；
-- 对手 skill action；
-- CABO；
-- action animation pending 时收到 RoundReveal，必须等待动画完成再渲染结算。
+- 4 人 active game
+- 本人单牌 ReplaceWithDrawn
+- 本人多牌 ReplaceWithDrawn
+- 本人单牌 TakeFromDiscard
+- 本人多牌 TakeFromDiscard
+- 对手 replace/take，隐藏值只显示背面
+- Swap cross movement
+- Draw / DiscardDrawn
+- PeekSelf / Spy 隐私规则不破坏
+- action animation pending 时收到 RoundReveal，必须等动画结束再进结算
 
-截图验收要求：
+截图验证要求：
 
-- 截图不能只截最终态，关键动画需要 before / mid / hold / after。
+- 不要只截最终态。
+- Replace/Take 至少截 before / phase1 selected empty / phase2 survivors+incoming / after。
 - 推荐命名：
-  - animation_draw_self_before.png
-  - animation_draw_self_mid.png
-  - animation_replace_multi_hold.png
-  - animation_swap_cross_mid.png
-  - animation_spy_inspect_hold.png
-  - animation_opponent_action_mid.png
-  - animation_round_reveal_after_queue.png
-- Unity MCP 截图属于验证产物，不要提交 Assets/Screenshots/ 或 Assets/Screenshots.meta，除非用户明确要求。
-
-限制：
-
-- 不修改游戏规则。
-- 不修改 protobuf schema，除非先提出单独协议计划并获得确认。
-- 不修改 WebSocket transport。
-- 不修改服务器逻辑。
-- 不修改房间逻辑、结算规则、聊天/日志侧栏布局、牌桌整体布局。
-- 不要启动或构建服务器，除非用户明确要求；服务器 build/start 由用户掌控。
-- 不要一次性大规模重写。优先小步修改、小步编译、小步截图验证。
+  - cardview_replace_single_mid.png
+  - cardview_replace_multi_phase1_empty_slots.png
+  - cardview_replace_multi_phase2_survivors_incoming.png
+  - cardview_take_discard_multi_phase2.png
+  - cardview_swap_cross_mid.png
+  - cardview_round_reveal_after_queue.png
+- Unity MCP 截图是验证产物，不要提交 Assets/Screenshots/ 或 Assets/Screenshots.meta，除非用户明确要求。
 
 完成标准：
 
-- 本人动作和对手动作都能被玩家看懂。
-- 动画顺序与真实动作顺序一致。
-- 转入下一回合或结算前，上一手动作已经完整展示。
-- 4 人牌桌不变形，右侧聊天/日志不抖动。
-- 没有卡住的临时牌、残留边框、残留高亮或重复 turn 状态。
-- Unity Console 最终为 0 errors / 0 warnings，或明确记录无关的既有问题。
+- 新卡牌层使用持久化 CardView 对象驱动，不再靠替换动画中的 VisualElement clone/hide/worldBound 纠缠。
+- 单牌替换和多牌替换都能清楚渲染“旧牌进弃牌堆 -> selected 槽为空 -> survivors + incoming 到最终位置”。
+- 本人视角和对手视角都能看懂。
+- 没有卡牌重叠、无关卡消失、临时卡残留、残留高亮或重复 turn 边框。
+- 以后替换正式卡牌图片时，只需要换 Sprite/Image/provider，不需要重写动画逻辑。
 ```
 
 Asset note:
