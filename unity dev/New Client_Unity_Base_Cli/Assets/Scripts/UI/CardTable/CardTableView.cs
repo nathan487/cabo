@@ -87,6 +87,8 @@ namespace Cabo.Client.UI.CardTable
         const float SwapDuration = 0.90f;
         const float InspectHoldDuration = 1.15f;
         const float TakeDiscardOutgoingDelay = 0.08f;
+        const float DiscardRevealFlipDuration = 0.24f;
+        const float DiscardRevealFlipLead = 0.28f;
         const int DrawPileVisualDepth = 3;
         const int MaxDiscardStackOffsetDepth = 3;
         const float PileStackOffsetX = 1.0f;
@@ -941,36 +943,65 @@ namespace Cabo.Client.UI.CardTable
             if (!known)
                 card.ShowBack();
 
-            yield return MoveCardToPositionOnTop(card, discardPosition, MoveDuration);
+            yield return MoveCardToPositionOnTop(card, discardPosition, MoveDuration, revealAtLanding, value);
             card.transform.SetAsLastSibling();
-            if (revealAtLanding)
-                card.ShowFront(value, false);
             PushDiscardCard(card, value, known, discardPosition, discardSize);
 
             if (holdAfterLanding)
                 yield return new WaitForSecondsRealtime(EmptyHold);
         }
 
-        static IEnumerator MoveCardToPositionOnTop(CardView card, Vector2 target, float duration)
+        static IEnumerator MoveCardToPositionOnTop(CardView card, Vector2 target, float duration, bool revealDuringMove = false, int revealValue = -1)
         {
             if (card == null)
                 yield break;
 
             var rect = card.RectTransform;
             var start = rect.anchoredPosition;
+            var baseScale = rect.localScale;
             float elapsed = 0f;
             float safeDuration = Mathf.Max(0.01f, duration);
+            float flipStart = Mathf.Max(0f, safeDuration - DiscardRevealFlipLead);
+            float flipDuration = Mathf.Min(DiscardRevealFlipDuration, safeDuration - flipStart);
+            float flipHalf = Mathf.Max(0.01f, flipDuration * 0.5f);
+            bool revealed = !revealDuringMove;
             while (elapsed < safeDuration)
             {
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(elapsed / safeDuration);
                 t = t * t * (3f - 2f * t);
                 rect.anchoredPosition = Vector2.LerpUnclamped(start, target, t);
+                if (revealDuringMove)
+                {
+                    float flipElapsed = elapsed - flipStart;
+                    if (flipElapsed >= 0f)
+                    {
+                        if (flipElapsed < flipHalf)
+                        {
+                            float scaleT = Mathf.Clamp01(flipElapsed / flipHalf);
+                            rect.localScale = new Vector3(Mathf.Lerp(baseScale.x, baseScale.x * 0.08f, scaleT), baseScale.y, baseScale.z);
+                        }
+                        else
+                        {
+                            if (!revealed)
+                            {
+                                card.ShowFront(revealValue, false);
+                                revealed = true;
+                            }
+
+                            float scaleT = Mathf.Clamp01((flipElapsed - flipHalf) / flipHalf);
+                            rect.localScale = new Vector3(Mathf.Lerp(baseScale.x * 0.08f, baseScale.x, scaleT), baseScale.y, baseScale.z);
+                        }
+                    }
+                }
                 card.transform.SetAsLastSibling();
                 yield return null;
             }
 
             rect.anchoredPosition = target;
+            if (revealDuringMove && !revealed)
+                card.ShowFront(revealValue, false);
+            rect.localScale = baseScale;
             card.transform.SetAsLastSibling();
         }
 
