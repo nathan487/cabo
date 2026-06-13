@@ -13,10 +13,12 @@ namespace Cabo.Client.UI
     /// </summary>
     public class GameTablePanel
     {
-        const int SelfCardWidth = 70;
-        const int SelfCardHeight = 96;
-        const int OppCardWidth = 46;
-        const int OppCardHeight = 64;
+        const int TableCardWidth = 64;
+        const int TableCardHeight = 88;
+        const int SelfCardWidth = TableCardWidth;
+        const int SelfCardHeight = TableCardHeight;
+        const int OppCardWidth = TableCardWidth;
+        const int OppCardHeight = TableCardHeight;
         const int GameplayActionPanelTopMargin = 150;
         const int GameplayPileTopOffset = 14;
         const float QuickMoveDuration = 0.70f;
@@ -2682,7 +2684,7 @@ namespace Cabo.Client.UI
             wrap.style.alignItems = Align.Center;
             wrap.style.justifyContent = Justify.Center;
 
-            var card = CreateCard(faceUp, value >= 0 ? value : 0, 74, 104, false, false, null);
+            var card = CreateCard(faceUp, value >= 0 ? value : 0, TableCardWidth, TableCardHeight, false, false, null);
             SetBorderColor(card, color);
             wrap.Add(card);
 
@@ -3406,8 +3408,8 @@ namespace Cabo.Client.UI
             stack.style.marginRight = compact ? 10 : 14;
 
             var card = new VisualElement();
-            card.style.width = compact ? 54 : 70;
-            card.style.height = compact ? 70 : 92;
+            card.style.width = compact ? 54 : TableCardWidth;
+            card.style.height = compact ? 70 : TableCardHeight;
             card.style.flexShrink = 0;
             card.style.alignItems = Align.Center;
             card.style.justifyContent = Justify.Center;
@@ -3452,8 +3454,8 @@ namespace Cabo.Client.UI
             var card = stack.childCount > 0 ? stack[0] : null;
             if (card != null)
             {
-                card.style.width = compact ? 54 : 70;
-                card.style.height = compact ? 70 : 92;
+                card.style.width = compact ? 54 : TableCardWidth;
+                card.style.height = compact ? 70 : TableCardHeight;
                 card.style.flexShrink = 0;
                 card.style.alignItems = Align.Center;
                 card.style.justifyContent = Justify.Center;
@@ -4248,18 +4250,19 @@ namespace Cabo.Client.UI
 
                 if (isSelf)
                 {
-                    Root.style.minHeight = 132;
+                    Root.style.minHeight = 166;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
                 else if (name == "left" || name == "right")
                 {
                     Root.style.width = 230;
+                    Root.style.minHeight = 262;
                     Root.style.flexShrink = 0;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
                 else
                 {
-                    Root.style.minHeight = 108;
+                    Root.style.minHeight = 166;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
 
