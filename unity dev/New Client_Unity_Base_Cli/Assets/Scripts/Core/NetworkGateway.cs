@@ -282,6 +282,28 @@ namespace Cabo.Client
             });
         }
 
+        public void SendEndGameEarly(long playerId, long roomId)
+        {
+            Send(new ClientMessage
+            {
+                EndGameEarlyReq = new Game.Game.EndGameEarlyReq { RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId }
+            });
+        }
+
+        public void SendEndGameEarlyDecision(long playerId, long roomId, bool approve)
+        {
+            Send(new ClientMessage
+            {
+                EndGameEarlyDecisionReq = new Game.Game.EndGameEarlyDecisionReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    RoomId = roomId,
+                    Approve = approve
+                }
+            });
+        }
+
         public void SendSkipSkill(long playerId, long roomId)
         {
             Send(new ClientMessage

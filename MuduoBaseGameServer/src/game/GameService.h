@@ -73,6 +73,10 @@ struct GameRoom {
     // Current drawn card (during WaitingDrawDecision step)
     ::game::common::CardInfo pendingDrawnCard;
     bool pendingDrewFromDiscard = false;
+
+    // Pending early-end request (awaiting host decision)
+    int64_t pendingEndGameRequesterPlayerId = 0;
+    TcpConnectionPtr pendingEndGameRequesterConn;
 };
 
 // Authoritative game logic. One instance manages all games.
@@ -108,6 +112,10 @@ public:
                         const ::game::messages::ClientMessage& msg);
     void handleCallSteady(const TcpConnectionPtr& conn,
                           const ::game::messages::ClientMessage& msg);
+    void handleEndGameEarly(const TcpConnectionPtr& conn,
+                            const ::game::messages::ClientMessage& msg);
+    void handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
+                                    const ::game::messages::ClientMessage& msg);
 
 private:
     std::shared_ptr<GameRoom> getRoom(int64_t roomId);
@@ -143,6 +151,12 @@ private:
     void revealAndScore(GameRoom& room);
     void startNewRound(GameRoom& room);
     void nextPlayer(GameRoom& room);
+    bool canEndGameEarly(const GameRoom& room) const;
+    void clearPendingEndGameRequest(GameRoom& room);
+    void broadcastGameOver(GameRoom& room,
+                           const std::vector<std::shared_ptr<PlayerGameState>>& rankedPlayers,
+                           const std::vector<int64_t>& winnerPlayerIds);
+    void finalizeEarlyGameOver(GameRoom& room);
 
     // Skill execution
     void executePeekSelf(GameRoom& room, int64_t playerId, int32_t slotIndex);

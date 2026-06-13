@@ -35,6 +35,14 @@ namespace Cabo.Client.UI
         const float PlaybackLayoutSettleDelay = 0.03f;
         const float SurvivorMoveStagger = 0f;
 
+        enum EndGameModalKind
+        {
+            None,
+            LocalConfirm,
+            HostDecision,
+            RejectedInfo
+        }
+
         readonly VisualElement _root;
         readonly VisualElement _container;
         readonly GameFlow _flow;
@@ -59,6 +67,12 @@ namespace Cabo.Client.UI
         readonly VisualElement _buttonRow;
         readonly List<Button> _actionButtons = new();
         readonly Label _statusLine;
+        readonly Button _endGameButton;
+        readonly VisualElement _endGameModalOverlay;
+        readonly VisualElement _endGameModalCard;
+        readonly Label _endGameModalTitle;
+        readonly Label _endGameModalBody;
+        readonly VisualElement _endGameModalButtons;
         readonly VisualElement _playArea;
         readonly VisualElement _socialPanel;
         readonly VisualElement _socialContent;
@@ -102,6 +116,7 @@ namespace Cabo.Client.UI
         bool _showChat;
         bool _cardTableRefreshQueued;
         bool _layoutRefreshQueued;
+        bool _isVisible;
         Rect _lastRootBounds;
         int _lastScreenWidth;
         int _lastScreenHeight;
@@ -109,6 +124,7 @@ namespace Cabo.Client.UI
         Vector2 _inspectionReturnStart;
         Vector2 _inspectionReturnEnd;
         Color _inspectionReturnColor;
+        bool _showLocalEndGameConfirm;
 
         public GameTablePanel(VisualElement root, GameFlow flow, Transform ownerTransform = null)
         {
@@ -118,6 +134,7 @@ namespace Cabo.Client.UI
             _container = new VisualElement { name = "CaboGameTable" };
             StretchToParent(_container);
             _container.style.flexDirection = FlexDirection.Row;
+            _container.style.position = Position.Relative;
             _container.style.paddingLeft = 22;
             _container.style.paddingRight = 22;
             _container.style.paddingTop = 16;
@@ -133,6 +150,55 @@ namespace Cabo.Client.UI
             _animationLayer.style.top = 0;
             _animationLayer.style.bottom = 0;
             root.Add(_animationLayer);
+
+            _endGameModalOverlay = new VisualElement { name = "EndGameModalOverlay" };
+            StretchToParent(_endGameModalOverlay);
+            _endGameModalOverlay.style.position = Position.Absolute;
+            _endGameModalOverlay.style.left = 0;
+            _endGameModalOverlay.style.right = 0;
+            _endGameModalOverlay.style.top = 0;
+            _endGameModalOverlay.style.bottom = 0;
+            _endGameModalOverlay.style.display = DisplayStyle.None;
+            _endGameModalOverlay.style.alignItems = Align.Center;
+            _endGameModalOverlay.style.justifyContent = Justify.Center;
+            _endGameModalOverlay.style.backgroundColor = new Color(0f, 0f, 0f, 0.55f);
+            root.Add(_endGameModalOverlay);
+
+            _endGameModalCard = new VisualElement { name = "EndGameModalCard" };
+            _endGameModalCard.style.width = 360;
+            _endGameModalCard.style.maxWidth = Length.Percent(88);
+            _endGameModalCard.style.paddingLeft = 20;
+            _endGameModalCard.style.paddingRight = 20;
+            _endGameModalCard.style.paddingTop = 18;
+            _endGameModalCard.style.paddingBottom = 18;
+            _endGameModalCard.style.backgroundColor = UITheme.PanelSurface;
+            _endGameModalCard.style.borderTopLeftRadius = 8;
+            _endGameModalCard.style.borderTopRightRadius = 8;
+            _endGameModalCard.style.borderBottomLeftRadius = 8;
+            _endGameModalCard.style.borderBottomRightRadius = 8;
+            SetBorderWidth(_endGameModalCard, 1);
+            SetBorderColor(_endGameModalCard, UITheme.PanelBorder);
+            _endGameModalOverlay.Add(_endGameModalCard);
+
+            _endGameModalTitle = new Label();
+            _endGameModalTitle.style.fontSize = 18;
+            _endGameModalTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _endGameModalTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _endGameModalCard.Add(_endGameModalTitle);
+
+            _endGameModalBody = new Label();
+            _endGameModalBody.style.fontSize = 13;
+            _endGameModalBody.style.whiteSpace = WhiteSpace.Normal;
+            _endGameModalBody.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _endGameModalBody.style.marginTop = 8;
+            _endGameModalBody.style.marginBottom = 14;
+            _endGameModalCard.Add(_endGameModalBody);
+
+            _endGameModalButtons = new VisualElement { name = "EndGameModalButtons" };
+            _endGameModalButtons.style.flexDirection = FlexDirection.Row;
+            _endGameModalButtons.style.justifyContent = Justify.Center;
+            _endGameModalButtons.style.flexWrap = Wrap.Wrap;
+            _endGameModalCard.Add(_endGameModalButtons);
 
             _cardTableView = CardTableView.Create(ownerTransform);
             _cardTableView.SetVisible(false);
@@ -153,6 +219,7 @@ namespace Cabo.Client.UI
             _playArea.style.minWidth = 0;
             _playArea.style.minHeight = 0;
             _playArea.style.height = Length.Percent(100);
+            _playArea.style.position = Position.Relative;
             _container.Add(_playArea);
 
             _playArea.Add(_topSeat.Root);
@@ -324,6 +391,7 @@ namespace Cabo.Client.UI
             var socialTabs = new VisualElement();
             socialTabs.style.flexDirection = FlexDirection.Row;
             socialTabs.style.flexShrink = 0;
+            socialTabs.style.marginRight = 44;
             socialTabs.style.marginBottom = 8;
             _socialPanel.Add(socialTabs);
 
@@ -359,14 +427,46 @@ namespace Cabo.Client.UI
             _socialPanel.Add(_roomChatPanel.Root);
 
             _playArea.Add(_selfSeat.Root);
+
+            _endGameButton = new Button(() => ShowLocalEndGameConfirm())
+            {
+                text = "X",
+                tooltip = "结束游戏"
+            };
+            _endGameButton.style.position = Position.Absolute;
+            _endGameButton.style.top = 14;
+            _endGameButton.style.right = 14;
+            _endGameButton.style.width = 32;
+            _endGameButton.style.height = 32;
+            _endGameButton.style.minWidth = 32;
+            _endGameButton.style.paddingLeft = 0;
+            _endGameButton.style.paddingRight = 0;
+            _endGameButton.style.paddingTop = 0;
+            _endGameButton.style.paddingBottom = 0;
+            _endGameButton.style.fontSize = 15;
+            _endGameButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _endGameButton.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _endGameButton.style.display = DisplayStyle.None;
+            StyleTableButton(_endGameButton, true);
+            root.Add(_endGameButton);
+            _endGameButton.BringToFront();
+            _endGameModalOverlay.BringToFront();
         }
 
         public void SetVisible(bool visible)
         {
+            _isVisible = visible;
             _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            _cardTableView.SetVisible(visible);
+            _endGameButton.style.display = DisplayStyle.None;
+            _cardTableView.SetVisible(visible
+                && _flow.State.Phase == GamePhase.Playing
+                && GetEndGameModalKind(_flow.State) == EndGameModalKind.None);
             if (!visible)
+            {
+                _showLocalEndGameConfirm = false;
+                ApplyEndGameModal(EndGameModalKind.None, "", "");
                 ClearTransientAnimationState();
+            }
         }
 
         public void Dispose()
@@ -376,6 +476,8 @@ namespace Cabo.Client.UI
                 _root.UnregisterCallback(_geometryChangedHandler);
             _container?.RemoveFromHierarchy();
             _animationLayer?.RemoveFromHierarchy();
+            _endGameButton?.RemoveFromHierarchy();
+            _endGameModalOverlay?.RemoveFromHierarchy();
             if (_cardTableView != null)
                 CardTableView.DestroyView(_cardTableView);
         }
@@ -460,9 +562,8 @@ namespace Cabo.Client.UI
             RenderActionPanel(state, deferNewTurnActions, hideActionPanelForTransient);
             UpdateGameLogFromState(state);
             RenderSocialPanel(state);
-
-            _statusLine.text = "";
-            _statusLine.style.display = DisplayStyle.None;
+            RenderEndGameControls(state, true);
+            UpdateStatusLineForEarlyEnd(state);
 
             if (pendingAction != null)
             {
@@ -532,6 +633,7 @@ namespace Cabo.Client.UI
             HideSeatsForOverlay();
             RenderPiles(state);
             RenderSocialPanel(state);
+            RenderEndGameControls(state, true);
 
             _drawnCardSlot.Clear();
             _actionPanel.Clear();
@@ -555,6 +657,7 @@ namespace Cabo.Client.UI
             _actionPanel.Add(resultList);
 
             AddInterRoundControls(state);
+            UpdateStatusLineForEarlyEnd(state, true);
         }
 
         public void RenderGameOver()
@@ -571,6 +674,8 @@ namespace Cabo.Client.UI
             _drawPile.Clear();
             _discardPile.Clear();
             RenderSocialPanel(_flow.State);
+            _showLocalEndGameConfirm = false;
+            RenderEndGameControls(_flow.State, false);
 
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
@@ -602,6 +707,189 @@ namespace Cabo.Client.UI
 
             _statusLine.text = "返回房间后可重新准备并开始新对局。";
             _statusLine.style.display = DisplayStyle.Flex;
+        }
+
+        void ShowLocalEndGameConfirm()
+        {
+            if (!IsEndGameButtonEnabled(_flow.State))
+                return;
+
+            _showLocalEndGameConfirm = true;
+            Debug.Log($"[GameTablePanel] Show early-end confirm. host={_flow.State.IsMyselfHost}");
+            RenderEndGameControls(_flow.State, true);
+        }
+
+        void CancelLocalEndGameConfirm()
+        {
+            if (!_showLocalEndGameConfirm)
+                return;
+
+            _showLocalEndGameConfirm = false;
+            RenderEndGameControls(_flow.State, CanShowEndGameButton(_flow.State));
+            UpdateStatusLineForEarlyEnd(_flow.State);
+        }
+
+        void ConfirmLocalEndGame()
+        {
+            _showLocalEndGameConfirm = false;
+            Debug.Log("[GameTablePanel] Confirm early-end request.");
+            _flow.RequestEarlyEndGame();
+        }
+
+        void RenderEndGameControls(GameState state, bool allowButton)
+        {
+            bool showButton = allowButton && ShouldShowEndGameButton(state);
+            _endGameButton.BringToFront();
+            _endGameButton.style.display = showButton ? DisplayStyle.Flex : DisplayStyle.None;
+
+            bool enabled = showButton && IsEndGameButtonEnabled(state);
+            _endGameButton.SetEnabled(enabled);
+            StyleTableButton(_endGameButton, enabled);
+
+            switch (GetEndGameModalKind(state))
+            {
+                case EndGameModalKind.LocalConfirm:
+                    ApplyEndGameModal(
+                        EndGameModalKind.LocalConfirm,
+                        state.IsMyselfHost ? "结束本局" : "发起结束申请",
+                        state.IsMyselfHost ? "是否直接结束本局游戏？" : "是否发起结束游戏申请？",
+                        CreateModalButton("确认", () => ConfirmLocalEndGame(), true),
+                        CreateModalButton("取消", () => CancelLocalEndGameConfirm(), true));
+                    break;
+
+                case EndGameModalKind.HostDecision:
+                    string requesterName = string.IsNullOrEmpty(state.PendingEndGameRequesterNickname)
+                        ? "该玩家"
+                        : state.PendingEndGameRequesterNickname;
+                    ApplyEndGameModal(
+                        EndGameModalKind.HostDecision,
+                        "结束游戏申请",
+                        $"{requesterName} 请求结束本局游戏，是否确认结束？",
+                        CreateModalButton("确认结束", () => _flow.RespondEarlyEndGameRequest(true), true),
+                        CreateModalButton("取消", () => _flow.RespondEarlyEndGameRequest(false), true));
+                    break;
+
+                case EndGameModalKind.RejectedInfo:
+                    ApplyEndGameModal(
+                        EndGameModalKind.RejectedInfo,
+                        "结束申请未通过",
+                        "房主已拒绝结束申请",
+                        CreateModalButton("知道了", () => _flow.DismissEarlyEndGameRejectedPrompt(), true));
+                    break;
+
+                default:
+                    ApplyEndGameModal(EndGameModalKind.None, "", "");
+                    break;
+            }
+        }
+
+        EndGameModalKind GetEndGameModalKind(GameState state)
+        {
+            if (state.ShowEndGameRejectedPrompt)
+                return EndGameModalKind.RejectedInfo;
+
+            if (state.ShowEndGameRequestPrompt
+                && state.IsMyselfHost
+                && state.PendingEndGameRequesterPlayerId != 0
+                && state.PendingEndGameRequesterPlayerId != state.MyPlayerId)
+                return EndGameModalKind.HostDecision;
+
+            if (_showLocalEndGameConfirm)
+                return EndGameModalKind.LocalConfirm;
+
+            return EndGameModalKind.None;
+        }
+
+        bool CanShowEndGameButton(GameState state)
+        {
+            return state.Phase == GamePhase.Playing || state.Phase == GamePhase.RoundReveal;
+        }
+
+        bool IsEndGameButtonEnabled(GameState state)
+        {
+            if (!CanShowEndGameButton(state))
+                return false;
+            if (state.MyPlayerId <= 0 || state.RoomId <= 0)
+                return false;
+            if (_showLocalEndGameConfirm)
+                return false;
+            if (state.IsWaitingForEndGameRequestRsp || state.IsWaitingForEndGameDecisionRsp)
+                return false;
+            if (state.ShowEndGameRequestPrompt || state.ShowEndGameRejectedPrompt)
+                return false;
+            if (!state.IsMyselfHost && state.PendingEndGameRequesterPlayerId == state.MyPlayerId)
+                return false;
+            return true;
+        }
+
+        bool ShouldShowEndGameButton(GameState state)
+        {
+            if (!CanShowEndGameButton(state))
+                return false;
+            if (state.ShowEndGameRequestPrompt || state.ShowEndGameRejectedPrompt)
+                return false;
+            return true;
+        }
+
+        void UpdateStatusLineForEarlyEnd(GameState state, bool preserveExistingTextWhenEmpty = false)
+        {
+            string statusText = "";
+            if (state.IsMyselfHost && state.IsWaitingForEndGameRequestRsp)
+                statusText = "正在结束本局游戏...";
+            else if (state.IsWaitingForEndGameDecisionRsp)
+                statusText = "正在处理结束申请...";
+            else if (state.PendingEndGameRequesterPlayerId == state.MyPlayerId)
+                statusText = "已向房主发起结束申请";
+
+            if (string.IsNullOrEmpty(statusText))
+            {
+                if (preserveExistingTextWhenEmpty)
+                    return;
+                _statusLine.text = "";
+                _statusLine.style.display = DisplayStyle.None;
+                return;
+            }
+
+            _statusLine.text = statusText;
+            _statusLine.style.display = DisplayStyle.Flex;
+        }
+
+        void ApplyEndGameModal(EndGameModalKind kind, string title, string body, params Button[] buttons)
+        {
+            _endGameModalButtons.Clear();
+
+            if (kind == EndGameModalKind.None)
+            {
+                _endGameModalOverlay.style.display = DisplayStyle.None;
+                _cardTableView.SetVisible(_isVisible && _flow.State.Phase == GamePhase.Playing);
+                _endGameModalTitle.text = "";
+                _endGameModalBody.text = "";
+                return;
+            }
+
+            _cardTableView.SetVisible(false);
+            _endGameButton.BringToFront();
+            _endGameModalOverlay.BringToFront();
+            _endGameModalOverlay.style.display = DisplayStyle.Flex;
+            _endGameModalTitle.text = title;
+            _endGameModalBody.text = body;
+
+            if (buttons == null)
+                return;
+
+            foreach (var button in buttons)
+            {
+                if (button != null)
+                    _endGameModalButtons.Add(button);
+            }
+        }
+
+        Button CreateModalButton(string text, Action action, bool enabled)
+        {
+            var button = CreatePanelButton(text, action, enabled);
+            button.style.minWidth = 98;
+            button.style.height = 34;
+            return button;
         }
 
         void RenderSeats(GameState state, long visualCurrentPlayerId, bool holdPendingSelfExchangeView = false)

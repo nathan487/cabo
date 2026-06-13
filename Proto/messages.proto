@@ -41,12 +41,13 @@ message ClientMessage {
     .game.game.TakeFromDiscardReq take_from_discard_req = 23;
     .game.game.UseSkillReq use_skill_req = 24;
     .game.game.CallSteadyReq call_steady_req = 25;
+    .game.game.EndGameEarlyReq end_game_early_req = 26;
+    .game.game.EndGameEarlyDecisionReq end_game_early_decision_req = 27;
 
     // Sync
     .game.sync.ReconnectReq reconnect_req = 30;
     .game.sync.HeartbeatReq heartbeat_req = 31;
   }
-  reserved 26, 27; // deprecated: old blind-swap response and 13 look-and-swap flow
 }
 
 // 服务端 → 客户端
@@ -78,15 +79,18 @@ message ServerMessage {
     .game.game.TakeFromDiscardRsp take_from_discard_rsp = 35;
     .game.game.UseSkillRsp use_skill_rsp = 36;
     .game.game.CallSteadyRsp call_steady_rsp = 37;
+    .game.game.EndGameEarlyRsp end_game_early_rsp = 38;
+    .game.game.EndGameEarlyRequestNotify end_game_early_request_notify = 39;
     .game.game.ActionResultNotify action_result_notify = 40;
+    .game.game.EndGameEarlyDecisionRsp end_game_early_decision_rsp = 41;
     .game.game.RoundRevealNotify round_reveal_notify = 42;
     .game.game.ScoreUpdateNotify score_update_notify = 43;
     .game.game.GameOverNotify game_over_notify = 44;
+    .game.game.EndGameEarlyRejectedNotify end_game_early_rejected_notify = 45;
 
     // Sync
     .game.sync.ReconnectRsp reconnect_rsp = 50;
     .game.sync.StateSyncNotify state_sync_notify = 51;
     .game.sync.HeartbeatRsp heartbeat_rsp = 52;
   }
-  reserved 38, 39, 41; // deprecated: old blind-swap response, 13 look-and-swap, and skill prompt
 }

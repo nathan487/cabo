@@ -242,6 +242,70 @@ namespace Cabo.Client
             LeaveRoomToHome();
         }
 
+        public void RequestEarlyEndGame()
+        {
+            if (!Gateway.IsConnected || State.MyPlayerId <= 0 || State.RoomId <= 0)
+            {
+                Debug.LogWarning($"[GameFlow] RequestEarlyEndGame ignored. connected={Gateway.IsConnected} player={State.MyPlayerId} room={State.RoomId}");
+                return;
+            }
+            if (State.Phase != GamePhase.Playing && State.Phase != GamePhase.RoundReveal)
+            {
+                Debug.LogWarning($"[GameFlow] RequestEarlyEndGame ignored in phase {State.Phase}");
+                return;
+            }
+
+            Debug.Log($"[GameFlow] SendEndGameEarly player={State.MyPlayerId} room={State.RoomId} host={State.IsMyselfHost}");
+            Gateway.SendEndGameEarly(State.MyPlayerId, State.RoomId);
+            State.IsWaitingForEndGameRequestRsp = true;
+            State.ShowEndGameRequestPrompt = false;
+            if (!State.IsMyselfHost)
+            {
+                State.PendingEndGameRequesterPlayerId = State.MyPlayerId;
+                var me = State.Players.Find(player => player.PlayerId == State.MyPlayerId);
+                State.PendingEndGameRequesterNickname = me?.Nickname ?? "";
+            }
+            StateChanged?.Invoke();
+        }
+
+        public void RespondEarlyEndGameRequest(bool approve)
+        {
+            if (!Gateway.IsConnected || State.MyPlayerId <= 0 || State.RoomId <= 0)
+            {
+                Debug.LogWarning($"[GameFlow] RespondEarlyEndGameRequest ignored. connected={Gateway.IsConnected} player={State.MyPlayerId} room={State.RoomId}");
+                return;
+            }
+            if (!State.IsMyselfHost || State.PendingEndGameRequesterPlayerId == 0)
+            {
+                Debug.LogWarning($"[GameFlow] RespondEarlyEndGameRequest ignored. host={State.IsMyselfHost} requester={State.PendingEndGameRequesterPlayerId}");
+                return;
+            }
+
+            Debug.Log($"[GameFlow] SendEndGameEarlyDecision approve={approve} requester={State.PendingEndGameRequesterPlayerId}");
+            Gateway.SendEndGameEarlyDecision(State.MyPlayerId, State.RoomId, approve);
+            State.IsWaitingForEndGameDecisionRsp = true;
+            State.ShowEndGameRequestPrompt = false;
+            StateChanged?.Invoke();
+        }
+
+        public void DismissEarlyEndGamePrompt()
+        {
+            if (!State.ShowEndGameRequestPrompt)
+                return;
+
+            State.ShowEndGameRequestPrompt = false;
+            StateChanged?.Invoke();
+        }
+
+        public void DismissEarlyEndGameRejectedPrompt()
+        {
+            if (!State.ShowEndGameRejectedPrompt)
+                return;
+
+            State.ShowEndGameRejectedPrompt = false;
+            StateChanged?.Invoke();
+        }
+
         public void ExitGame()
         {
             _running = false;
@@ -258,6 +322,7 @@ namespace Cabo.Client
             var previousFlow = Flow;
             var previousPhase = State.Phase;
 
+            Debug.Log($"[GameFlow] ProcessServerMessage {msg.PayloadCase}");
             State.UpdateFromMessage(msg);
 
             switch (State.Phase)

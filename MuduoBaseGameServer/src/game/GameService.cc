@@ -2,9 +2,11 @@
 #include "common/WebSocketCodec.h"
 #include <mymuduo/logger.h>
 #include <algorithm>
+#include <chrono>
+#include <climits>
+#include <set>
 #include <sstream>
 #include <thread>
-#include <chrono>
 
 namespace cabogame {
 
@@ -122,10 +124,14 @@ void GameService::sendToPlayer(const TcpConnectionPtr& conn,
     else if (msg.has_take_from_discard_rsp()) msgType = "TakeFromDiscardRsp";
     else if (msg.has_use_skill_rsp()) msgType = "UseSkillRsp";
     else if (msg.has_call_steady_rsp()) msgType = "CallSteadyRsp";
+    else if (msg.has_end_game_early_rsp()) msgType = "EndGameEarlyRsp";
+    else if (msg.has_end_game_early_request_notify()) msgType = "EndGameEarlyRequestNotify";
+    else if (msg.has_end_game_early_decision_rsp()) msgType = "EndGameEarlyDecisionRsp";
     else if (msg.has_action_result_notify()) msgType = "ActionResultNotify";
     else if (msg.has_round_reveal_notify()) msgType = "RoundRevealNotify";
     else if (msg.has_score_update_notify()) msgType = "ScoreUpdateNotify";
     else if (msg.has_game_over_notify()) msgType = "GameOverNotify";
+    else if (msg.has_end_game_early_rejected_notify()) msgType = "EndGameEarlyRejectedNotify";
     else if (msg.has_state_sync_notify()) msgType = "StateSyncNotify";
 
     std::string payload;
@@ -193,6 +199,7 @@ void GameService::startNewRound(GameRoom& room) {
     room.finalRoundRemaining = 0;
     room.currentPlayerSeat = 0;
     room.turnNumber = 0;
+    clearPendingEndGameRequest(room);
 
     initDeck(room);
 
@@ -256,6 +263,9 @@ void GameService::sendGameStart(GameRoom& room) {
 }
 
 void GameService::sendTurnStart(GameRoom& room) {
+    if (room.step == GameStep::GameOver)
+        return;
+
     room.turnNumber++;
     auto current = room.players[room.currentPlayerSeat];
 
@@ -289,6 +299,9 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
                                     const ::game::common::ExchangeAttemptResult* exchangeResult,
                                     int32_t sourceSlot,
                                     int32_t targetSlot) {
+    if (room.step == GameStep::GameOver)
+        return;
+
     ::game::messages::ServerMessage msg;
     auto* ar = msg.mutable_action_result_notify();
     ar->set_room_id(room.roomId);
@@ -327,6 +340,9 @@ void GameService::endTurn(GameRoom& room) {
     // 延迟 1.5 秒再切换回合，给客户端渲染操作动画的时间窗口
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
+    if (room.step == GameStep::GameOver)
+        return;
+
     if (room.steadyCallerSeat >= 0) {
         room.finalRoundRemaining--;
         if (room.finalRoundRemaining <= 0) {
@@ -345,9 +361,84 @@ void GameService::nextPlayer(GameRoom& room) {
     } while (room.steadyCallerSeat >= 0 && room.currentPlayerSeat == room.steadyCallerSeat);
 }
 
+bool GameService::canEndGameEarly(const GameRoom& room) const {
+    switch (room.step) {
+    case GameStep::WaitingToStart:
+    case GameStep::Playing:
+    case GameStep::WaitingDrawDecision:
+    case GameStep::FinalRound:
+    case GameStep::Reveal:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void GameService::clearPendingEndGameRequest(GameRoom& room) {
+    room.pendingEndGameRequesterPlayerId = 0;
+    room.pendingEndGameRequesterConn.reset();
+}
+
+void GameService::broadcastGameOver(
+    GameRoom& room,
+    const std::vector<std::shared_ptr<PlayerGameState>>& rankedPlayers,
+    const std::vector<int64_t>& winnerPlayerIds) {
+    room.step = GameStep::GameOver;
+    clearPendingEndGameRequest(room);
+
+    ::game::messages::ServerMessage goMsg;
+    auto* go = goMsg.mutable_game_over_notify();
+    go->set_room_id(room.roomId);
+    go->set_total_rounds(room.roundNumber);
+
+    std::set<int64_t> winners(winnerPlayerIds.begin(), winnerPlayerIds.end());
+    for (size_t i = 0; i < rankedPlayers.size(); i++) {
+        auto* fr = go->add_rankings();
+        fr->set_rank(static_cast<int32_t>(i + 1));
+        fr->set_player_id(rankedPlayers[i]->playerId);
+        fr->set_nickname(rankedPlayers[i]->nickname);
+        fr->set_final_score(rankedPlayers[i]->totalScore);
+        fr->set_is_winner(winners.count(rankedPlayers[i]->playerId) > 0);
+    }
+
+    LOG_INFO("[Game] Broadcasting GameOverNotify room=%lld rankings=%zu winners=%zu",
+             static_cast<long long>(room.roomId), rankedPlayers.size(), winnerPlayerIds.size());
+    broadcastToRoom(room, goMsg);
+    if (gameFinishedFunc_)
+        gameFinishedFunc_(room.roomId);
+}
+
+void GameService::finalizeEarlyGameOver(GameRoom& room) {
+    LOG_INFO("[Game] Early end requested; finalizing current scores in room %lld",
+             static_cast<long long>(room.roomId));
+
+    int32_t lowestScore = INT32_MAX;
+    for (const auto& player : room.players)
+        lowestScore = std::min(lowestScore, player->totalScore);
+
+    std::vector<int64_t> winners;
+    for (const auto& player : room.players) {
+        if (player->totalScore == lowestScore)
+            winners.push_back(player->playerId);
+    }
+
+    auto ranked = room.players;
+    std::sort(ranked.begin(), ranked.end(),
+        [](const std::shared_ptr<PlayerGameState>& a, const std::shared_ptr<PlayerGameState>& b) {
+            if (a->totalScore != b->totalScore)
+                return a->totalScore < b->totalScore;
+            return a->playerId < b->playerId;
+        });
+
+    broadcastGameOver(room, ranked, winners);
+}
+
 // ── Reveal & Score ──
 
 void GameService::revealAndScore(GameRoom& room) {
+    if (room.step == GameStep::GameOver)
+        return;
+
     LOG_INFO("[Game] Round %d reveal — scoring...", room.roundNumber);
 
     bool hadKamikaze = false;
@@ -493,28 +584,14 @@ void GameService::revealAndScore(GameRoom& room) {
 
         LOG_INFO("[Game] Game over! Winner: %s (%d pts)", winner->nickname.c_str(), winner->totalScore);
 
-        ::game::messages::ServerMessage goMsg;
-        auto* go = goMsg.mutable_game_over_notify();
-        go->set_room_id(room.roomId);
-        go->set_total_rounds(room.roundNumber);
-
         // Rankings sorted by score
         auto ranked = room.players;
         std::sort(ranked.begin(), ranked.end(), [](const std::shared_ptr<PlayerGameState>& a, const std::shared_ptr<PlayerGameState>& b) {
-            return a->totalScore < b->totalScore;
+            if (a->totalScore != b->totalScore)
+                return a->totalScore < b->totalScore;
+            return a->playerId < b->playerId;
         });
-        for (size_t i = 0; i < ranked.size(); i++) {
-            auto* fr = go->add_rankings();
-            fr->set_rank(static_cast<int32_t>(i + 1));
-            fr->set_player_id(ranked[i]->playerId);
-            fr->set_nickname(ranked[i]->nickname);
-            fr->set_final_score(ranked[i]->totalScore);
-            fr->set_is_winner(ranked[i]->playerId == winner->playerId);
-        }
-        broadcastToRoom(room, goMsg);
-        room.step = GameStep::GameOver;
-        if (gameFinishedFunc_)
-            gameFinishedFunc_(room.roomId);
+        broadcastGameOver(room, ranked, { winner->playerId });
     } else {
         // Wait for all players to ready up and host to start before next round
         room.step = GameStep::WaitingToStart;
@@ -529,6 +606,7 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
     LOG_INFO("[Game] DrawCard req: player=%lld, room=%lld", (long long)req.player_id(), (long long)req.room_id());
     auto room = getRoom(req.room_id());
     if (!room) { LOG_INFO("[Game] DrawCard: room not found"); return; }
+    if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) { LOG_INFO("[Game] DrawCard: player not found"); return; }
@@ -585,6 +663,7 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.discard_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
     if (room->pendingDrewFromDiscard) return;
 
@@ -642,6 +721,7 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.replace_with_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
 
     auto player = getPlayer(*room, req.player_id());
@@ -798,6 +878,7 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
     const auto& req = msg.take_from_discard_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::Playing) return;
     if (room->discardPile.empty()) return;
 
@@ -944,6 +1025,7 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
     const auto& req = msg.use_skill_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
@@ -1026,6 +1108,7 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     const auto& req = msg.call_steady_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    if (room->step == GameStep::GameOver) return;
     if (room->steadyCallerSeat >= 0) return; // Already called
     if (!isCurrentPlayer(*room, req.player_id())) return;
     if (room->step != GameStep::Playing) {
@@ -1057,6 +1140,156 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
 
     nextPlayer(*room);
     sendTurnStart(*room);
+}
+
+void GameService::handleEndGameEarly(const TcpConnectionPtr& conn,
+                                      const ::game::messages::ClientMessage& msg) {
+    const auto& req = msg.end_game_early_req();
+    auto room = getRoom(req.room_id());
+    LOG_INFO("[Game] EndGameEarlyReq player=%lld room=%lld",
+             static_cast<long long>(req.player_id()), static_cast<long long>(req.room_id()));
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_end_game_early_rsp();
+    rsp->set_request_id(req.request_id());
+
+    if (!room) {
+        rsp->mutable_error()->set_code(4004);
+        rsp->mutable_error()->set_message("Room not found");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    auto player = getPlayer(*room, req.player_id());
+    if (!player) {
+        rsp->mutable_error()->set_code(4005);
+        rsp->mutable_error()->set_message("Player not found");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (player->conn.get() != conn.get()) {
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (!canEndGameEarly(*room)) {
+        rsp->mutable_error()->set_code(4007);
+        rsp->mutable_error()->set_message("Cannot end game in current step");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (req.player_id() == room->hostPlayerId) {
+        LOG_INFO("[Game] EndGameEarlyReq approved immediately by host player=%lld room=%lld",
+                 static_cast<long long>(req.player_id()), static_cast<long long>(room->roomId));
+        rsp->mutable_error()->set_code(0);
+        sendToPlayer(conn, rspMsg);
+        clearPendingEndGameRequest(*room);
+        finalizeEarlyGameOver(*room);
+        return;
+    }
+
+    if (room->pendingEndGameRequesterPlayerId != 0) {
+        rsp->mutable_error()->set_code(4008);
+        rsp->mutable_error()->set_message("Another end-game request is pending");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    room->pendingEndGameRequesterPlayerId = req.player_id();
+    room->pendingEndGameRequesterConn = conn;
+    LOG_INFO("[Game] EndGameEarlyReq pending requester=%lld host=%lld room=%lld",
+             static_cast<long long>(req.player_id()),
+             static_cast<long long>(room->hostPlayerId),
+             static_cast<long long>(room->roomId));
+
+    rsp->mutable_error()->set_code(0);
+    sendToPlayer(conn, rspMsg);
+
+    ::game::messages::ServerMessage notifyMsg;
+    auto* notify = notifyMsg.mutable_end_game_early_request_notify();
+    notify->set_room_id(room->roomId);
+    notify->set_requester_player_id(player->playerId);
+    notify->set_requester_nickname(player->nickname);
+    broadcastToRoom(*room, notifyMsg);
+}
+
+void GameService::handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
+                                              const ::game::messages::ClientMessage& msg) {
+    const auto& req = msg.end_game_early_decision_req();
+    auto room = getRoom(req.room_id());
+    LOG_INFO("[Game] EndGameEarlyDecisionReq player=%lld room=%lld approve=%d",
+             static_cast<long long>(req.player_id()), static_cast<long long>(req.room_id()), req.approve() ? 1 : 0);
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_end_game_early_decision_rsp();
+    rsp->set_request_id(req.request_id());
+
+    if (!room) {
+        rsp->mutable_error()->set_code(4004);
+        rsp->mutable_error()->set_message("Room not found");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    auto player = getPlayer(*room, req.player_id());
+    if (!player) {
+        rsp->mutable_error()->set_code(4005);
+        rsp->mutable_error()->set_message("Player not found");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (player->conn.get() != conn.get()) {
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (req.player_id() != room->hostPlayerId) {
+        rsp->mutable_error()->set_code(4009);
+        rsp->mutable_error()->set_message("Only host can decide");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (!canEndGameEarly(*room)) {
+        rsp->mutable_error()->set_code(4007);
+        rsp->mutable_error()->set_message("Cannot end game in current step");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    if (room->pendingEndGameRequesterPlayerId == 0) {
+        rsp->mutable_error()->set_code(4010);
+        rsp->mutable_error()->set_message("No pending request");
+        sendToPlayer(conn, rspMsg);
+        return;
+    }
+
+    rsp->mutable_error()->set_code(0);
+    sendToPlayer(conn, rspMsg);
+
+    auto requesterId = room->pendingEndGameRequesterPlayerId;
+    auto requesterConn = room->pendingEndGameRequesterConn;
+    clearPendingEndGameRequest(*room);
+
+    if (req.approve()) {
+        finalizeEarlyGameOver(*room);
+        return;
+    }
+
+    if (requesterConn) {
+        ::game::messages::ServerMessage rejectMsg;
+        auto* reject = rejectMsg.mutable_end_game_early_rejected_notify();
+        reject->set_room_id(room->roomId);
+        reject->set_requester_player_id(requesterId);
+        sendToPlayer(requesterConn, rejectMsg);
+    }
 }
 
 // Multi-replace placeholder (used by handleReplaceWithDrawn)

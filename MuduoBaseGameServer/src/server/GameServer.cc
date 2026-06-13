@@ -92,6 +92,16 @@ public:
                    const ::game::messages::ClientMessage& msg) {
                 gameService_.handleCallSteady(conn, msg);
             });
+        dispatcher_.registerHandler(26, // end_game_early_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleEndGameEarly(conn, msg);
+            });
+        dispatcher_.registerHandler(27, // end_game_early_decision_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                gameService_.handleEndGameEarlyDecision(conn, msg);
+            });
 
         // Wire room send function
         roomService_.setSendFunc(

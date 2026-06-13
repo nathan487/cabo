@@ -117,8 +117,17 @@ namespace Cabo.Client.Network
                 case ServerMessage.PayloadOneofCase.CallSteadyRsp:
                     InvokeHandler(message.CallSteadyRsp);
                     break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRsp:
+                    InvokeHandler(message.EndGameEarlyRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRequestNotify:
+                    InvokeHandler(message.EndGameEarlyRequestNotify);
+                    break;
                 case ServerMessage.PayloadOneofCase.ActionResultNotify:
                     InvokeHandler(message.ActionResultNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyDecisionRsp:
+                    InvokeHandler(message.EndGameEarlyDecisionRsp);
                     break;
                 case ServerMessage.PayloadOneofCase.RoundRevealNotify:
                     InvokeHandler(message.RoundRevealNotify);
@@ -128,6 +137,9 @@ namespace Cabo.Client.Network
                     break;
                 case ServerMessage.PayloadOneofCase.GameOverNotify:
                     InvokeHandler(message.GameOverNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRejectedNotify:
+                    InvokeHandler(message.EndGameEarlyRejectedNotify);
                     break;
 
                 // Sync

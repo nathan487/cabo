@@ -97,6 +97,12 @@ namespace Cabo.Client
         public bool WaitingForTakeResponse;
         public bool WaitingForCallSteadyResponse;
         public bool WaitingForSkillResponse;
+        public long PendingEndGameRequesterPlayerId;
+        public string PendingEndGameRequesterNickname = "";
+        public bool IsWaitingForEndGameRequestRsp;
+        public bool IsWaitingForEndGameDecisionRsp;
+        public bool ShowEndGameRequestPrompt;
+        public bool ShowEndGameRejectedPrompt;
 
         // Final round
         public bool IsFinalRound;
@@ -140,6 +146,7 @@ namespace Cabo.Client
 
         // Helpers
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
+        public bool IsMyselfHost => Players.Exists(player => player.PlayerId == MyPlayerId && player.IsHost);
 
         public int MyPlayerIndex
         {
@@ -208,14 +215,22 @@ namespace Cabo.Client
                     HandleUseSkill(msg.UseSkillRsp); break;
                 case ServerMessage.PayloadOneofCase.CallSteadyRsp:
                     HandleCallSteady(msg.CallSteadyRsp); break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRsp:
+                    HandleEndGameEarlyRsp(msg.EndGameEarlyRsp); break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRequestNotify:
+                    HandleEndGameEarlyRequestNotify(msg.EndGameEarlyRequestNotify); break;
                 case ServerMessage.PayloadOneofCase.ActionResultNotify:
                     HandleActionResult(msg.ActionResultNotify); break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyDecisionRsp:
+                    HandleEndGameEarlyDecisionRsp(msg.EndGameEarlyDecisionRsp); break;
                 case ServerMessage.PayloadOneofCase.RoundRevealNotify:
                     HandleRoundReveal(msg.RoundRevealNotify); break;
                 case ServerMessage.PayloadOneofCase.ScoreUpdateNotify:
                     HandleScoreUpdate(msg.ScoreUpdateNotify); break;
                 case ServerMessage.PayloadOneofCase.GameOverNotify:
                     HandleGameOver(msg.GameOverNotify); break;
+                case ServerMessage.PayloadOneofCase.EndGameEarlyRejectedNotify:
+                    HandleEndGameEarlyRejectedNotify(msg.EndGameEarlyRejectedNotify); break;
             }
         }
 
@@ -247,7 +262,7 @@ namespace Cabo.Client
             if (room == null) return;
             RoomId = room.RoomId; RoomCode = room.RoomCode;
 
-            if (Phase == GamePhase.Playing)
+            if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal)
             {
                 foreach (var p in room.Players)
                     UpsertPlayer(p.PlayerId, p.Nickname, p.SeatId, p.IsReady, p.IsHost, p.TotalScore);
@@ -347,6 +362,7 @@ namespace Cabo.Client
         void HandleGameStart(GameStartNotify notify)
         {
             Phase = GamePhase.Playing;
+            ResetEarlyEndState();
             RoundJustRevealed = false;
             GameStartConfirmed = false;
             RoundNumber = notify.RoundNumber;
@@ -544,6 +560,44 @@ namespace Cabo.Client
             WaitingForCallSteadyResponse = false;
         }
 
+        void HandleEndGameEarlyRsp(EndGameEarlyRsp rsp)
+        {
+            IsWaitingForEndGameRequestRsp = false;
+            Debug.Log($"[GameState] EndGameEarlyRsp code={rsp.Error?.Code} msg={rsp.Error?.Message}");
+            if (rsp.Error?.Code == 0)
+                return;
+
+            if (PendingEndGameRequesterPlayerId == MyPlayerId)
+            {
+                PendingEndGameRequesterPlayerId = 0;
+                PendingEndGameRequesterNickname = "";
+            }
+        }
+
+        void HandleEndGameEarlyRequestNotify(EndGameEarlyRequestNotify notify)
+        {
+            PendingEndGameRequesterPlayerId = notify.RequesterPlayerId;
+            PendingEndGameRequesterNickname = notify.RequesterNickname ?? "";
+            ShowEndGameRequestPrompt = IsMyselfHost && notify.RequesterPlayerId != MyPlayerId;
+            Debug.Log($"[GameState] EndGameEarlyRequestNotify requester={notify.RequesterPlayerId} name={notify.RequesterNickname} host={IsMyselfHost} show={ShowEndGameRequestPrompt}");
+        }
+
+        void HandleEndGameEarlyDecisionRsp(EndGameEarlyDecisionRsp rsp)
+        {
+            IsWaitingForEndGameDecisionRsp = false;
+            Debug.Log($"[GameState] EndGameEarlyDecisionRsp code={rsp.Error?.Code} msg={rsp.Error?.Message}");
+            if (rsp.Error?.Code == 0)
+            {
+                PendingEndGameRequesterPlayerId = 0;
+                PendingEndGameRequesterNickname = "";
+                ShowEndGameRequestPrompt = false;
+                return;
+            }
+
+            if (IsMyselfHost && PendingEndGameRequesterPlayerId != 0)
+                ShowEndGameRequestPrompt = true;
+        }
+
         void HandleActionResult(ActionResultNotify ar)
         {
             LastActionSequence = ar.ServerSeq != 0 ? ar.ServerSeq : LastActionSequence + 1;
@@ -677,7 +731,9 @@ namespace Cabo.Client
 
         void HandleGameOver(GameOverNotify go)
         {
+            Debug.Log($"[GameState] GameOverNotify rankings={go.Rankings.Count}");
             Phase = GamePhase.GameOver;
+            ResetEarlyEndState();
             FinalRankings.Clear();
             foreach (var r in go.Rankings)
                 FinalRankings.Add(new FinalRank
@@ -687,11 +743,34 @@ namespace Cabo.Client
                 });
         }
 
+        void HandleEndGameEarlyRejectedNotify(EndGameEarlyRejectedNotify notify)
+        {
+            if (notify.RequesterPlayerId != MyPlayerId)
+                return;
+
+            PendingEndGameRequesterPlayerId = 0;
+            PendingEndGameRequesterNickname = "";
+            IsWaitingForEndGameRequestRsp = false;
+            ShowEndGameRejectedPrompt = true;
+            Debug.Log("[GameState] EndGameEarlyRejectedNotify");
+        }
+
+        void ResetEarlyEndState()
+        {
+            PendingEndGameRequesterPlayerId = 0;
+            PendingEndGameRequesterNickname = "";
+            IsWaitingForEndGameRequestRsp = false;
+            IsWaitingForEndGameDecisionRsp = false;
+            ShowEndGameRequestPrompt = false;
+            ShowEndGameRejectedPrompt = false;
+        }
+
         public void ReturnToRoomAfterGameOver()
         {
             if (Phase != GamePhase.GameOver)
                 return;
 
+            ResetEarlyEndState();
             Phase = GamePhase.WaitingRoom;
             MyCards.Clear();
             DrawPileCount = 0;
@@ -707,6 +786,7 @@ namespace Cabo.Client
             WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false;
             WaitingForSkillResponse = false;
+            ResetEarlyEndState();
             IsFinalRound = false;
             FinalRoundRemaining = 0;
             SteadyCallerId = 0;
@@ -744,6 +824,7 @@ namespace Cabo.Client
 
         public void ReturnHome()
         {
+            ResetEarlyEndState();
             Phase = GamePhase.Lobby;
             MyPlayerId = 0;
             RoomId = 0;
@@ -763,6 +844,7 @@ namespace Cabo.Client
             WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false;
             WaitingForSkillResponse = false;
+            ResetEarlyEndState();
             IsFinalRound = false;
             FinalRoundRemaining = 0;
             SteadyCallerId = 0;
