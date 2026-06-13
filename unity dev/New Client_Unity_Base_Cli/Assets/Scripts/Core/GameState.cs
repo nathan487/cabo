@@ -25,6 +25,7 @@ namespace Cabo.Client
         public int CardCount;
         public bool IsReady;
         public bool IsHost;
+        public List<CardState> PublicCards = new();
     }
 
     public class RoundResult
@@ -147,6 +148,49 @@ namespace Cabo.Client
         // Helpers
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
         public bool IsMyselfHost => Players.Exists(player => player.PlayerId == MyPlayerId && player.IsHost);
+
+        public bool TryGetVisibleCardValue(long playerId, int slotIndex, out int value)
+        {
+            value = 0;
+            if (playerId == MyPlayerId && slotIndex >= 0 && slotIndex < MyCards.Count)
+            {
+                var ownCard = MyCards[slotIndex];
+                if (ownCard.IsKnown)
+                {
+                    value = ownCard.Value;
+                    return true;
+                }
+            }
+
+            return TryGetPublicCardValue(playerId, slotIndex, out value);
+        }
+
+        public bool TryGetPublicCardValue(long playerId, int slotIndex, out int value)
+        {
+            value = 0;
+            var player = Players.Find(p => p.PlayerId == playerId);
+            var card = player?.PublicCards.Find(c => c.SlotIndex == slotIndex);
+            if (card == null || !card.IsKnown)
+                return false;
+
+            value = card.Value;
+            return true;
+        }
+
+        public void ApplyOwnSwapVisibility(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= MyCards.Count)
+                return;
+
+            var card = MyCards[slotIndex];
+            card.IsKnown = false;
+            card.Value = 0;
+            if (TryGetPublicCardValue(MyPlayerId, slotIndex, out int publicValue))
+            {
+                card.IsKnown = true;
+                card.Value = publicValue;
+            }
+        }
 
         public int MyPlayerIndex
         {
@@ -373,7 +417,10 @@ namespace Cabo.Client
             WaitingForDrawResponse = false; WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
             foreach (var player in Players)
+            {
                 player.IsReady = false;
+                player.PublicCards.Clear();
+            }
 
             if (notify.YourView != null)
             {
@@ -406,16 +453,22 @@ namespace Cabo.Client
                 foreach (var oh in notify.YourView.OpponentHands)
                 {
                     var p = Players.Find(x => x.PlayerId == oh.PlayerId);
-                    if (p != null) p.CardCount = oh.CardCount;
+                    if (p != null)
+                    {
+                        p.CardCount = oh.CardCount;
+                        ApplyVisibleCards(p, oh.VisibleCards);
+                    }
                     else
                     {
-                        Players.Add(new PlayerInfo
+                        var opponent = new PlayerInfo
                         {
                             PlayerId = oh.PlayerId,
                             Nickname = $"玩家 {Players.Count + 1}",
                             SeatId = Players.Count,
                             CardCount = oh.CardCount
-                        });
+                        };
+                        ApplyVisibleCards(opponent, oh.VisibleCards);
+                        Players.Add(opponent);
                     }
                 }
             }
@@ -625,7 +678,7 @@ namespace Cabo.Client
             DiscardPileCount = ar.DiscardPile?.Count ?? 0;
             DiscardTopValue = ar.DiscardPile?.TopCard?.Value ?? -1;
             if (ar.PlayerHands != null && ar.PlayerHands.Count > 0)
-                ApplyPlayerHandCounts(ar.PlayerHands);
+                ApplyPlayerHandStates(ar.PlayerHands);
             else
                 ApplyFallbackActionHandCount(ar);
 
@@ -634,13 +687,11 @@ namespace Cabo.Client
             {
                 if (ar.SourcePlayerId == MyPlayerId)
                 {
-                    int slot = ar.SourceSlot;
-                    if (slot >= 0 && slot < MyCards.Count) MyCards[slot].IsKnown = false;
+                    ApplyOwnSwapVisibility(ar.SourceSlot);
                 }
                 if (ar.TargetPlayerId == MyPlayerId)
                 {
-                    int slot = ar.TargetSlot;
-                    if (slot >= 0 && slot < MyCards.Count) MyCards[slot].IsKnown = false;
+                    ApplyOwnSwapVisibility(ar.TargetSlot);
                 }
             }
 
@@ -650,13 +701,36 @@ namespace Cabo.Client
             LastActionMessage = BuildActionMessage(ar);
         }
 
-        void ApplyPlayerHandCounts(IEnumerable<OpponentHandState> hands)
+        void ApplyPlayerHandStates(IEnumerable<OpponentHandState> hands)
         {
             foreach (var hand in hands)
             {
                 var player = Players.Find(p => p.PlayerId == hand.PlayerId);
                 if (player != null)
+                {
                     player.CardCount = hand.CardCount;
+                    ApplyVisibleCards(player, hand.VisibleCards);
+                }
+            }
+        }
+
+        static void ApplyVisibleCards(PlayerInfo player, IEnumerable<OwnCardState> cards)
+        {
+            if (player == null)
+                return;
+
+            player.PublicCards.Clear();
+            if (cards == null)
+                return;
+
+            foreach (var card in cards)
+            {
+                player.PublicCards.Add(new CardState
+                {
+                    SlotIndex = card.SlotIndex,
+                    IsKnown = card.IsKnown,
+                    Value = card.IsKnown ? card.Value : 0
+                });
             }
         }
 
@@ -819,6 +893,7 @@ namespace Cabo.Client
             {
                 player.IsReady = false;
                 player.CardCount = 0;
+                player.PublicCards.Clear();
             }
         }
 

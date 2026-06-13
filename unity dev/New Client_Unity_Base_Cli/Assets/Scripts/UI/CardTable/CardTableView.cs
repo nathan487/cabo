@@ -121,6 +121,22 @@ namespace Cabo.Client.UI.CardTable
         public bool HasRenderableLayout { get; private set; }
         public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0;
 
+        public bool TryGetCardFace(long playerId, int slotIndex, out bool faceUp, out int value)
+        {
+            faceUp = false;
+            value = 0;
+            if (!_hands.TryGetValue(playerId, out var hand) || hand == null)
+                return false;
+
+            var card = hand.GetCard(slotIndex);
+            if (card == null)
+                return false;
+
+            faceUp = card.FaceUp;
+            value = card.Value;
+            return true;
+        }
+
         public static CardTableView Create(Transform parent)
         {
             DestroyAllUnder(parent);
@@ -1235,8 +1251,6 @@ namespace Cabo.Client.UI.CardTable
             PlaceCard(sourceCard, sourceSlot);
             PlaceCard(targetCard, targetSlot);
 
-            sourceCard.ShowBack();
-            targetCard.ShowBack();
             var sharedSize = GetActionDisplaySize(sourceSlot.Size, targetSlot.Size);
             if (sharedSize.x > 1f && sharedSize.y > 1f)
             {

@@ -137,6 +137,8 @@ private:
                          int64_t excludePlayerId = 0);
     void sendGameStart(GameRoom& room);
     void sendTurnStart(GameRoom& room);
+    void fillVisibleHandState(::game::common::OpponentHandState* hand,
+                              const PlayerGameState& player);
     void sendActionResult(GameRoom& room, int64_t sourcePlayerId,
                           ::game::common::ActionType actionType,
                           int64_t targetPlayerId = 0,

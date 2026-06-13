@@ -610,8 +610,7 @@ namespace Cabo.Client
                 }
                 else if (SkillTypeJustCompleted == 4) // Swap
                 {
-                    if (SkillMySlot >= 0 && SkillMySlot < State.MyCards.Count)
-                        State.MyCards[SkillMySlot].IsKnown = false;
+                    State.ApplyOwnSwapVisibility(SkillMySlot);
                 }
                 SkillTypeJustCompleted = 0;
                 SubState = GameSubState.Idle;

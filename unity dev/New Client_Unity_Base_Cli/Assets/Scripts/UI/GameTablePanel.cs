@@ -1589,10 +1589,10 @@ namespace Cabo.Client.UI
                 snapshot.SelectedSlots.Add(snapshot.SourceSlot);
             }
 
-            snapshot.SourceSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, snapshot.SelectedSlots));
-            snapshot.SourceSwapSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, new[] { snapshot.SourceSlot }));
-            snapshot.TargetSlotBounds.AddRange(CaptureSlotBounds(snapshot.TargetPlayerId, new[] { snapshot.TargetSlot }));
-            snapshot.SourceHandBounds.AddRange(CaptureAllSlotBounds(snapshot.SourcePlayerId));
+            snapshot.SourceSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, snapshot.SelectedSlots, true));
+            snapshot.SourceSwapSlotBounds.AddRange(CaptureSlotBounds(snapshot.SourcePlayerId, new[] { snapshot.SourceSlot }, true));
+            snapshot.TargetSlotBounds.AddRange(CaptureSlotBounds(snapshot.TargetPlayerId, new[] { snapshot.TargetSlot }, true));
+            snapshot.SourceHandBounds.AddRange(CaptureAllSlotBounds(snapshot.SourcePlayerId, true));
             TryApplyPendingSelfExchangeSnapshot(snapshot);
             TryApplyPendingSelfSwapSnapshot(snapshot);
             return snapshot;
@@ -1714,10 +1714,14 @@ namespace Cabo.Client.UI
                 bool selected = false;
                 bool clickable = false;
                 Action clicked = null;
+                if (_flow.State.TryGetVisibleCardValue(playerId, slot, out int visibleValue))
+                {
+                    faceUp = true;
+                    value = visibleValue;
+                }
+
                 if (isSelf && slot >= 0 && slot < _flow.State.MyCards.Count)
                 {
-                    faceUp = _flow.State.MyCards[slot].IsKnown;
-                    value = _flow.State.MyCards[slot].Value;
                     selected = _selectedOwnSlots.Contains(slot);
                     clickable = IsOwnSlotClickable(_flow.SubState);
                     int ownSlot = slot;
@@ -2895,7 +2899,7 @@ namespace Cabo.Client.UI
             card.style.visibility = visible ? Visibility.Visible : Visibility.Hidden;
         }
 
-        List<SlotSnapshot> CaptureSlotBounds(long playerId, IEnumerable<int> slots)
+        List<SlotSnapshot> CaptureSlotBounds(long playerId, IEnumerable<int> slots, bool preferRenderedFace = false)
         {
             var result = new List<SlotSnapshot>();
             if (slots == null)
@@ -2909,20 +2913,14 @@ namespace Cabo.Client.UI
                 var bounds = element?.worldBound ?? Rect.zero;
                 if (bounds.width > 1 && bounds.height > 1)
                 {
-                    bool faceUp = false;
-                    int value = 0;
-                    if (playerId == _flow.State.MyPlayerId && slot >= 0 && slot < _flow.State.MyCards.Count)
-                    {
-                        faceUp = _flow.State.MyCards[slot].IsKnown;
-                        value = _flow.State.MyCards[slot].Value;
-                    }
+                    ResolveCardFace(playerId, slot, preferRenderedFace, out bool faceUp, out int value);
                     result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds, FaceUp = faceUp, Value = value });
                 }
             }
             return result;
         }
 
-        List<SlotSnapshot> CaptureAllSlotBounds(long playerId)
+        List<SlotSnapshot> CaptureAllSlotBounds(long playerId, bool preferRenderedFace = false)
         {
             var result = new List<SlotSnapshot>();
             var row = GetCardRow(playerId);
@@ -2936,18 +2934,24 @@ namespace Cabo.Client.UI
                 Debug.Log($"  slot[{slot}]: bounds={bounds}");
                 if (bounds.width > 1 && bounds.height > 1)
                 {
-                    bool faceUp = false;
-                    int value = 0;
-                    if (playerId == _flow.State.MyPlayerId && slot >= 0 && slot < _flow.State.MyCards.Count)
-                    {
-                        faceUp = _flow.State.MyCards[slot].IsKnown;
-                        value = _flow.State.MyCards[slot].Value;
-                    }
+                    ResolveCardFace(playerId, slot, preferRenderedFace, out bool faceUp, out int value);
                     result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds, FaceUp = faceUp, Value = value });
                 }
             }
             Debug.Log($"[CaptureAllSlotBounds] result.Count={result.Count}");
             return result;
+        }
+
+        void ResolveCardFace(long playerId, int slot, bool preferRenderedFace, out bool faceUp, out int value)
+        {
+            if (preferRenderedFace
+                && _cardTableView != null
+                && _cardTableView.TryGetCardFace(playerId, slot, out faceUp, out value))
+            {
+                return;
+            }
+
+            faceUp = _flow.State.TryGetVisibleCardValue(playerId, slot, out value);
         }
 
         float EstimateActionAnimationDuration(ActionAnimationSnapshot action)

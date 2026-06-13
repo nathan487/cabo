@@ -7,6 +7,7 @@
 #include <set>
 #include <sstream>
 #include <thread>
+#include <utility>
 
 namespace cabogame {
 
@@ -72,6 +73,7 @@ void GameService::initDeck(GameRoom& room) {
             ::game::common::CardInfo c;
             c.set_card_id(nextCardId++);
             c.set_value(value);
+            c.set_publicly_known(false);
             if (value >= 7 && value <= 8) c.set_skill(::game::common::SKILL_TYPE_PEEK_SELF);
             else if (value >= 9 && value <= 10) c.set_skill(::game::common::SKILL_TYPE_SPY);
             else if (value >= 11 && value <= 12) c.set_skill(::game::common::SKILL_TYPE_SWAP);
@@ -95,7 +97,9 @@ void GameService::initDeck(GameRoom& room) {
 }
 
 void GameService::discardCard(GameRoom& room, const ::game::common::CardInfo& card) {
-    room.discardPile.push_back(card);
+    auto publicCard = card;
+    publicCard.set_publicly_known(true);
+    room.discardPile.push_back(std::move(publicCard));
 }
 
 // ── Messaging ──
@@ -234,15 +238,15 @@ void GameService::sendGameStart(GameRoom& room) {
         view->set_player_id(p->playerId);
         for (size_t i = 0; i < p->cards.size(); i++) {
             auto* own = view->add_own_cards();
+            const bool isKnown = p->knownSlots[i] || p->cards[i].publicly_known();
             own->set_slot_index(static_cast<int32_t>(i));
-            own->set_is_known(p->knownSlots[i]);
-            if (p->knownSlots[i]) own->set_value(p->cards[i].value());
+            own->set_is_known(isKnown);
+            if (isKnown) own->set_value(p->cards[i].value());
         }
         for (auto& other : room.players) {
             if (other->playerId == p->playerId) continue;
             auto* opp = view->add_opponent_hands();
-            opp->set_player_id(other->playerId);
-            opp->set_card_count(static_cast<int32_t>(other->cards.size()));
+            fillVisibleHandState(opp, *other);
         }
         auto* dp = view->mutable_draw_pile();
         dp->set_count(static_cast<int32_t>(room.drawPile.size()));
@@ -259,6 +263,21 @@ void GameService::sendGameStart(GameRoom& room) {
         }
 
         sendToPlayer(p->conn, msg);
+    }
+}
+
+void GameService::fillVisibleHandState(::game::common::OpponentHandState* hand,
+                                       const PlayerGameState& player) {
+    if (!hand) return;
+
+    hand->set_player_id(player.playerId);
+    hand->set_card_count(static_cast<int32_t>(player.cards.size()));
+    for (size_t i = 0; i < player.cards.size(); i++) {
+        auto* visible = hand->add_visible_cards();
+        const bool isPublic = player.cards[i].publicly_known();
+        visible->set_slot_index(static_cast<int32_t>(i));
+        visible->set_is_known(isPublic);
+        if (isPublic) visible->set_value(player.cards[i].value());
     }
 }
 
@@ -323,12 +342,11 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
     if (exchangeResult)
         *ar->mutable_exchange_result() = *exchangeResult;
 
-    // BUG-4 Fix: Include all players' current hand sizes so clients can
-    // update opponent card counts after failed replaces (hand grows beyond 4).
+    // Include the complete public hand snapshot so counts and public slots
+    // stay aligned after replacements, penalties, reordering, and swaps.
     for (auto& p : room.players) {
         auto* hand = ar->add_player_hands();
-        hand->set_player_id(p->playerId);
-        hand->set_card_count(static_cast<int32_t>(p->cards.size()));
+        fillVisibleHandState(hand, *p);
     }
 
     broadcastToRoom(room, msg);
@@ -850,7 +868,7 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
                 if (!room->drawPile.empty()) {
                     auto penalty = drawCard(*room);
                     player->cards.push_back(penalty);
-                    player->knownSlots.push_back(true);
+                    player->knownSlots.push_back(false);
                     exResult.set_added_card_count(2);
                     exResult.set_drew_extra_penalty_card(true);
                 }
@@ -941,7 +959,7 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
         int32_t slot = indices.Get(0);
         auto oldCard = player->cards[slot];
         player->cards[slot] = card;
-        player->knownSlots[slot] = true;
+        player->knownSlots[slot] = card.publicly_known();
         discardCard(*room, oldCard);
         exResult.set_success(true);
         exResult.set_discarded_count(1);
@@ -985,20 +1003,20 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
             }
             // Add drawn/discard card at end (known to player)
             newCards.push_back(card);
-            newKnown.push_back(true);
+            newKnown.push_back(card.publicly_known());
 
             player->cards = std::move(newCards);
             player->knownSlots = std::move(newKnown);
         } else {
             player->cards.push_back(card);
-            player->knownSlots.push_back(true);
+            player->knownSlots.push_back(card.publicly_known());
             exResult.set_success(false);
             exResult.set_discarded_count(0);
             exResult.set_added_card_count(1);
             if (indices.size() >= 3 && !room->drawPile.empty()) {
                 auto penalty = drawCard(*room);
                 player->cards.push_back(penalty);
-                player->knownSlots.push_back(true);
+                player->knownSlots.push_back(false);
                 exResult.set_added_card_count(2);
                 exResult.set_drew_extra_penalty_card(true);
             }
@@ -1071,9 +1089,9 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
         if (target && srcSlot >= 0 && srcSlot < static_cast<int32_t>(player->cards.size())
             && dstSlot >= 0 && dstSlot < static_cast<int32_t>(target->cards.size())) {
             std::swap(player->cards[srcSlot], target->cards[dstSlot]);
-            // Blind swap: neither player knows the swapped-in card value
-            player->knownSlots[srcSlot] = false;
-            target->knownSlots[dstSlot] = false;
+            // Private knowledge does not transfer, but public cards stay face-up.
+            player->knownSlots[srcSlot] = player->cards[srcSlot].publicly_known();
+            target->knownSlots[dstSlot] = target->cards[dstSlot].publicly_known();
             LOG_INFO("[Game] Swap: %s[%d] <-> %s[%d]",
                      player->nickname.c_str(), srcSlot,
                      target->nickname.c_str(), dstSlot);
