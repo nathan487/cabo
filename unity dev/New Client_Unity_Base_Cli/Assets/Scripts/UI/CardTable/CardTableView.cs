@@ -1367,20 +1367,41 @@ namespace Cabo.Client.UI.CardTable
             var start = slot != null ? slot.RectTransform.anchoredPosition : card.RectTransform.anchoredPosition;
             var size = slot != null ? slot.RectTransform.sizeDelta : card.RectTransform.sizeDelta;
             size = GetInspectionDisplaySize(size);
+            bool wasOriginallyFaceUp = card.FaceUp;
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
-            card.ShowBack();
             card.SetVisible(true);
 
             Vector2 inspect = GetInspectionTarget(action, start, size);
 
             yield return card.MoveTo(inspect, MoveDuration);
+
+            // 发动者视角：翻到牌面显示偷看内容
             if (sourcePlayerId == _myPlayerId && action.PeekedValue >= 0)
-                yield return card.FlipToFront(action.PeekedValue, 0.18f);
+            {
+                if (!card.FaceUp)
+                    yield return card.FlipToFront(action.PeekedValue, 0.18f);
+                else
+                    card.ShowFront(action.PeekedValue);
+            }
+            // 被看者视角和其他对手视角：如果原本是牌面，翻到牌背
+            else if (wasOriginallyFaceUp && card.FaceUp)
+            {
+                yield return FlipCardToBack(card, 0.18f);
+            }
             else
+            {
                 card.ShowBack();
+            }
 
             yield return new WaitForSecondsRealtime(InspectHoldDuration);
+
+            // 发动者视角：翻回牌背再移动回去
+            if (sourcePlayerId == _myPlayerId && card.FaceUp)
+            {
+                yield return FlipCardToBack(card, 0.18f);
+            }
+
             yield return card.MoveTo(start, MoveDuration);
             targetHand.AttachCard(slotIndex, card);
             UntrackTransient(card);
@@ -1401,6 +1422,33 @@ namespace Cabo.Client.UI.CardTable
             }
 
             return start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
+        }
+
+        IEnumerator FlipCardToBack(CardView card, float duration)
+        {
+            if (card == null)
+                yield break;
+
+            float half = duration * 0.5f;
+            yield return ScaleCardX(card, 1f, 0.05f, half);
+            card.ShowBack();
+            yield return ScaleCardX(card, 0.05f, 1f, half);
+        }
+
+        IEnumerator ScaleCardX(CardView card, float from, float to, float duration)
+        {
+            if (card == null)
+                yield break;
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                card.RectTransform.localScale = new Vector3(Mathf.Lerp(from, to, t), 1f, 1f);
+                yield return null;
+            }
+            card.RectTransform.localScale = new Vector3(to, 1f, 1f);
         }
 
         Vector2 GetInspectionDisplaySize(Vector2 fallback)
