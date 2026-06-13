@@ -1679,12 +1679,14 @@ namespace Cabo.Client.UI
         {
             var layout = new CardTableLayout();
             AddCardTableSlots(layout, state.MyPlayerId, _selfSeat.CardRow, true);
+            AddCardTableDrawTarget(layout, state.MyPlayerId);
 
             var opponentIndices = BuildOpponentIndices(state);
             for (int i = 0; i < opponentIndices.Count && i < _opponentSeats.Length; i++)
             {
                 var player = state.Players[opponentIndices[i]];
                 AddCardTableSlots(layout, player.PlayerId, _opponentSeats[i].CardRow, false);
+                AddCardTableDrawTarget(layout, player.PlayerId);
             }
 
             var drawBounds = GetPileCardBounds(_drawPile);
@@ -1696,6 +1698,23 @@ namespace Cabo.Client.UI
             layout.DrawPileCaption = $"\u724c\u5e93  {state.DrawPileCount}";
             layout.DiscardPileCaption = $"\u5f03\u724c\u5806  {state.DiscardPileCount}";
             return layout;
+        }
+
+        void AddCardTableDrawTarget(CardTableLayout layout, long playerId)
+        {
+            if (layout == null || playerId <= 0)
+                return;
+
+            var target = GetDrawRevealTarget(playerId, fallbackToSeat: true);
+            if (target.position == Vector2.zero || target.size.x <= 1f || target.size.y <= 1f)
+                return;
+
+            layout.DrawTargets.Add(new CardTableDrawTarget
+            {
+                PlayerId = playerId,
+                AnchoredPosition = target.position,
+                Size = target.size
+            });
         }
 
         void AddCardTableSlots(CardTableLayout layout, long playerId, VisualElement row, bool isSelf)
@@ -1854,7 +1873,7 @@ namespace Cabo.Client.UI
                         float bottomInset = Mathf.Max(size.y * 0.98f, seatSize.y * 0.23f);
                         var selfPos = seatCenter + new Vector2(seatSize.x * 0.5f - rightInset, -(seatSize.y * 0.5f - bottomInset));
                         if (IsFinite(selfPos.x) && IsFinite(selfPos.y))
-                            return (selfPos, size);
+                            return ClampDrawRevealTarget(selfPos, size);
                     }
                 }
 
@@ -1863,7 +1882,7 @@ namespace Cabo.Client.UI
                 float yBias = Mathf.Clamp(rowBounds.height * 0.18f, 12f, 28f);
                 var pos = rowPos + new Vector2(xBias, yBias);
                 if (IsFinite(pos.x) && IsFinite(pos.y))
-                    return (pos, size);
+                    return ClampDrawRevealTarget(pos, size);
             }
 
             if (HasUsableBounds(seatBounds))
@@ -1874,7 +1893,7 @@ namespace Cabo.Client.UI
                     ? seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.30f, 84f, 176f), Mathf.Clamp(seatBounds.height * 0.22f, 34f, 76f))
                     : seatPos + new Vector2(Mathf.Clamp(seatBounds.width * 0.28f, 36f, 120f), Mathf.Clamp(seatBounds.height * 0.18f, 12f, 28f));
                 if (IsFinite(pos.x) && IsFinite(pos.y))
-                    return (pos, size);
+                    return ClampDrawRevealTarget(pos, size);
             }
 
             if (fallbackToSeat)
@@ -1888,12 +1907,33 @@ namespace Cabo.Client.UI
                         var size = BoundsSize(fallback);
                         var pos = WorldBoundsToOverlayPosition(fallback) + new Vector2(Mathf.Clamp(fallback.width * 0.24f, 22f, 86f), Mathf.Clamp(fallback.height * 0.16f, 10f, 24f));
                         if (IsFinite(pos.x) && IsFinite(pos.y))
-                            return (pos, size);
+                            return ClampDrawRevealTarget(pos, size);
                     }
                 }
             }
 
             return (Vector2.zero, Vector2.zero);
+        }
+
+        (Vector2 position, Vector2 size) ClampDrawRevealTarget(Vector2 position, Vector2 size)
+        {
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            if (overlayWidth <= 1f || overlayHeight <= 1f)
+                return (position, size);
+
+            const float margin = 12f;
+            float halfWidth = Mathf.Min(size.x * 0.5f, Mathf.Max(0f, overlayWidth * 0.5f - margin));
+            float halfHeight = Mathf.Min(size.y * 0.5f, Mathf.Max(0f, overlayHeight * 0.5f - margin));
+            float minX = -overlayWidth * 0.5f + margin + halfWidth;
+            float maxX = overlayWidth * 0.5f - margin - halfWidth;
+            float minY = -overlayHeight * 0.5f + margin + halfHeight;
+            float maxY = overlayHeight * 0.5f - margin - halfHeight;
+
+            position.x = minX <= maxX ? Mathf.Clamp(position.x, minX, maxX) : 0f;
+            position.y = minY <= maxY ? Mathf.Clamp(position.y, minY, maxY) : 0f;
+            return (position, size);
         }
 
         Vector2 GetCenterInspectionTarget()

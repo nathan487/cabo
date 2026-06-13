@@ -34,9 +34,24 @@ namespace Cabo.Client.UI.CardTable
         public bool IsValid => PlayerId > 0 && SlotIndex >= 0 && Size.x > 1f && Size.y > 1f;
     }
 
+    public struct CardTableDrawTarget
+    {
+        public long PlayerId;
+        public Vector2 AnchoredPosition;
+        public Vector2 Size;
+        public bool IsValid => PlayerId > 0
+            && Size.x > 1f
+            && Size.y > 1f
+            && !float.IsNaN(AnchoredPosition.x)
+            && !float.IsNaN(AnchoredPosition.y)
+            && !float.IsInfinity(AnchoredPosition.x)
+            && !float.IsInfinity(AnchoredPosition.y);
+    }
+
     public sealed class CardTableLayout
     {
         public readonly List<CardTableSlotLayout> Slots = new();
+        public readonly List<CardTableDrawTarget> DrawTargets = new();
         public Vector2 DrawPilePosition;
         public Vector2 DrawPileSize;
         public Vector2 DiscardPilePosition;
@@ -96,6 +111,7 @@ namespace Cabo.Client.UI.CardTable
 
         readonly Dictionary<long, HandView> _hands = new();
         readonly Dictionary<long, CardView> _drawnMarkers = new();
+        readonly HashSet<long> _movingDrawnMarkers = new();
         readonly List<CardView> _transientCards = new();
         readonly List<CardView> _drawPileBackCards = new();
         readonly List<DiscardStackEntry> _discardStack = new();
@@ -285,6 +301,7 @@ namespace Cabo.Client.UI.CardTable
             }
             DestroyTransientCards();
             _drawnMarkers.Clear();
+            _movingDrawnMarkers.Clear();
             _animatingPlayers.Clear();
             _lastFreezePiles = false;
             SetDrawPileStackVisible(false);
@@ -328,6 +345,7 @@ namespace Cabo.Client.UI.CardTable
                 else
                     hand.Value.RenderAuthoritative(layout.Slots);
             }
+            RefreshDrawnMarkerLayout(layout);
         }
 
         public bool RefreshInteractions(GameState state, CardTableLayout layout, bool freezePiles = false)
@@ -353,6 +371,7 @@ namespace Cabo.Client.UI.CardTable
                 else if (!hand.Value.RefreshLayoutAndInteractions(layout.Slots))
                     return false;
             }
+            RefreshDrawnMarkerLayout(layout);
 
             return true;
         }
@@ -452,6 +471,7 @@ namespace Cabo.Client.UI.CardTable
         {
             RemoveDrawnMarker(_myPlayerId);
             var marker = GetOrCreateDrawnMarker(_myPlayerId, targetSize);
+            _movingDrawnMarkers.Add(_myPlayerId);
             marker.RectTransform.anchoredPosition = _lastLayout.DrawPilePosition;
             marker.SetSize(targetSize.x > 1f && targetSize.y > 1f ? targetSize : new Vector2(70f, 96f));
             marker.ShowBack();
@@ -459,6 +479,8 @@ namespace Cabo.Client.UI.CardTable
 
             yield return marker.MoveTo(targetPosition, MoveDuration);
             yield return marker.FlipToFront(value, 0.18f);
+            _movingDrawnMarkers.Remove(_myPlayerId);
+            SnapDrawnMarkerToCurrentLayout(_myPlayerId, marker, targetPosition, targetSize);
         }
 
         void RenderPiles(GameState state, CardTableLayout layout)
@@ -682,6 +704,7 @@ namespace Cabo.Client.UI.CardTable
         IEnumerator PlayDraw(CardTableActionSnapshot action)
         {
             var marker = GetOrCreateDrawnMarker(action.SourcePlayerId, action.DrawPileSize);
+            _movingDrawnMarkers.Add(action.SourcePlayerId);
             marker.RectTransform.anchoredPosition = action.DrawPilePosition;
             marker.SetSize(action.TargetInspectionSize.x > 1f && action.TargetInspectionSize.y > 1f
                 ? action.TargetInspectionSize
@@ -693,6 +716,8 @@ namespace Cabo.Client.UI.CardTable
                 ? action.TargetInspectionPosition
                 : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition);
             yield return marker.MoveTo(end, MoveDuration);
+            _movingDrawnMarkers.Remove(action.SourcePlayerId);
+            SnapDrawnMarkerToCurrentLayout(action.SourcePlayerId, marker, end, action.TargetInspectionSize);
         }
 
         IEnumerator PlayDiscardDrawn(CardTableActionSnapshot action)
@@ -1819,8 +1844,53 @@ namespace Cabo.Client.UI.CardTable
             return fallback;
         }
 
+        void RefreshDrawnMarkerLayout(CardTableLayout layout)
+        {
+            if (layout == null)
+                return;
+
+            for (int i = 0; i < layout.DrawTargets.Count; i++)
+            {
+                var target = layout.DrawTargets[i];
+                if (!target.IsValid
+                    || _movingDrawnMarkers.Contains(target.PlayerId)
+                    || _animatingPlayers.Contains(target.PlayerId)
+                    || !_drawnMarkers.TryGetValue(target.PlayerId, out var marker)
+                    || marker == null)
+                    continue;
+
+                marker.RectTransform.anchoredPosition = target.AnchoredPosition;
+                marker.SetSize(target.Size);
+            }
+        }
+
+        void SnapDrawnMarkerToCurrentLayout(long playerId, CardView marker, Vector2 fallbackPosition, Vector2 fallbackSize)
+        {
+            if (marker == null)
+                return;
+
+            if (_lastLayout != null)
+            {
+                for (int i = 0; i < _lastLayout.DrawTargets.Count; i++)
+                {
+                    var target = _lastLayout.DrawTargets[i];
+                    if (target.PlayerId != playerId || !target.IsValid)
+                        continue;
+
+                    marker.RectTransform.anchoredPosition = target.AnchoredPosition;
+                    marker.SetSize(target.Size);
+                    return;
+                }
+            }
+
+            marker.RectTransform.anchoredPosition = fallbackPosition;
+            if (fallbackSize.x > 1f && fallbackSize.y > 1f)
+                marker.SetSize(fallbackSize);
+        }
+
         void RemoveDrawnMarker(long playerId)
         {
+            _movingDrawnMarkers.Remove(playerId);
             if (!_drawnMarkers.TryGetValue(playerId, out var marker))
                 return;
             if (marker != null)
