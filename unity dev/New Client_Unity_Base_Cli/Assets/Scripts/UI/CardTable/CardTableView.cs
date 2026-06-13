@@ -86,10 +86,17 @@ namespace Cabo.Client.UI.CardTable
         const float IncomingLandingPause = 0.12f;
         const float SwapDuration = 0.90f;
         const float InspectHoldDuration = 1.15f;
+        const float TakeDiscardOutgoingDelay = 0.08f;
+        const int DrawPileVisualDepth = 3;
+        const int MaxDiscardStackOffsetDepth = 3;
+        const float PileStackOffsetX = 1.0f;
+        const float PileStackOffsetY = 0.85f;
 
         readonly Dictionary<long, HandView> _hands = new();
         readonly Dictionary<long, CardView> _drawnMarkers = new();
         readonly List<CardView> _transientCards = new();
+        readonly List<CardView> _drawPileBackCards = new();
+        readonly List<DiscardStackEntry> _discardStack = new();
         readonly HashSet<long> _animatingPlayers = new();
 
         RectTransform _root;
@@ -98,7 +105,6 @@ namespace Cabo.Client.UI.CardTable
         CardSlotView _drawPileSlot;
         CardSlotView _discardPileSlot;
         CardView _drawPileCard;
-        CardView _discardPileCard;
         Text _drawPileCaption;
         Text _discardPileCaption;
         GameState _lastState;
@@ -108,6 +114,7 @@ namespace Cabo.Client.UI.CardTable
         int _lastScreenWidth;
         int _lastScreenHeight;
         bool _layoutRefreshQueued;
+        bool _lastFreezePiles;
 
         public bool HasRenderableLayout { get; private set; }
         public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0;
@@ -182,10 +189,16 @@ namespace Cabo.Client.UI.CardTable
             _drawPileSlot = CardSlotView.Create(_slotRoot, "DrawPileSlot");
             _discardPileSlot = CardSlotView.Create(_slotRoot, "DiscardPileSlot");
             _drawPileCard = CardView.Create(_cardRoot, "DrawPileCard");
-            _discardPileCard = CardView.Create(_cardRoot, "DiscardPileCard");
+            for (int i = 0; i < DrawPileVisualDepth - 1; i++)
+                _drawPileBackCards.Add(CardView.Create(_cardRoot, $"DrawPileBack_{i}"));
             _drawPileCaption = CreateCaption("DrawPileCaption");
             _discardPileCaption = CreateCaption("DiscardPileCaption");
             _drawPileCard.ShowBack();
+            for (int i = 0; i < _drawPileBackCards.Count; i++)
+            {
+                _drawPileBackCards[i].ShowBack();
+                _drawPileBackCards[i].SetVisible(false);
+            }
             _lastRootBounds = _root.rect;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
@@ -255,6 +268,8 @@ namespace Cabo.Client.UI.CardTable
             DestroyTransientCards();
             _drawnMarkers.Clear();
             _animatingPlayers.Clear();
+            _lastFreezePiles = false;
+            SetDrawPileStackVisible(false);
             if (_lastState != null && _lastLayout != null)
                 Render(_lastState, _lastLayout);
         }
@@ -280,6 +295,7 @@ namespace Cabo.Client.UI.CardTable
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
             HasRenderableLayout = layout.Slots.Count > 0;
+            _lastFreezePiles = freezePiles;
 
             if (!freezePiles)
                 RenderPiles(state, layout);
@@ -299,7 +315,7 @@ namespace Cabo.Client.UI.CardTable
             }
         }
 
-        public bool RefreshInteractions(GameState state, CardTableLayout layout)
+        public bool RefreshInteractions(GameState state, CardTableLayout layout, bool freezePiles = false)
         {
             if (state == null || layout == null || !HasRenderableLayout)
                 return false;
@@ -310,8 +326,10 @@ namespace Cabo.Client.UI.CardTable
             _lastRootBounds = _root.rect;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
+            _lastFreezePiles = freezePiles;
 
-            RenderPiles(state, layout);
+            if (!freezePiles)
+                RenderPiles(state, layout);
             EnsureHands(state);
             foreach (var hand in _hands)
             {
@@ -353,7 +371,7 @@ namespace Cabo.Client.UI.CardTable
             _lastRootBounds = _root.rect;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
-            Render(_lastState, _lastLayout);
+            Render(_lastState, _lastLayout, 0, 0, HasActiveTransientAnimation || _lastFreezePiles);
         }
 
         public bool PlayAction(CardTableActionSnapshot action)
@@ -435,37 +453,179 @@ namespace Cabo.Client.UI.CardTable
             if (layout.DrawPileSize.x > 1f && layout.DrawPileSize.y > 1f)
             {
                 _drawPileSlot.Configure(0, 0, layout.DrawPilePosition, layout.DrawPileSize);
-                _drawPileCard.RectTransform.anchoredPosition = layout.DrawPilePosition;
-                _drawPileCard.SetSize(layout.DrawPileSize);
-                _drawPileCard.ShowBack();
-                _drawPileCard.SetInteraction(false, null);
-                _drawPileCard.SetVisible(true);
+                RenderDrawPileStack(state, layout);
                 PositionCaption(_drawPileCaption, layout.DrawPileCaption, layout.DrawPilePosition, layout.DrawPileSize);
             }
             else
             {
-                _drawPileCard.SetVisible(false);
+                SetDrawPileStackVisible(false);
                 _drawPileCaption.gameObject.SetActive(false);
             }
 
             if (layout.DiscardPileSize.x > 1f && layout.DiscardPileSize.y > 1f)
             {
                 _discardPileSlot.Configure(0, 1, layout.DiscardPilePosition, layout.DiscardPileSize);
-                _discardPileCard.RectTransform.anchoredPosition = layout.DiscardPilePosition;
-                _discardPileCard.SetSize(layout.DiscardPileSize);
-                if (state.DiscardTopValue >= 0)
-                    _discardPileCard.ShowFront(state.DiscardTopValue, false);
-                else
-                    _discardPileCard.ShowBack();
-                _discardPileCard.SetInteraction(false, null);
-                _discardPileCard.SetVisible(true);
+                RenderDiscardStack(state, layout);
                 PositionCaption(_discardPileCaption, layout.DiscardPileCaption, layout.DiscardPilePosition, layout.DiscardPileSize);
             }
             else
             {
-                _discardPileCard.SetVisible(false);
+                SetDiscardStackVisible(false);
                 _discardPileCaption.gameObject.SetActive(false);
             }
+        }
+
+        void RenderDrawPileStack(GameState state, CardTableLayout layout)
+        {
+            int visibleCount = Mathf.Clamp(state.DrawPileCount, 0, DrawPileVisualDepth);
+            if (visibleCount <= 0)
+            {
+                SetDrawPileStackVisible(false);
+                return;
+            }
+
+            int backCount = Mathf.Min(_drawPileBackCards.Count, visibleCount - 1);
+            for (int depth = backCount; depth >= 1; depth--)
+            {
+                var card = _drawPileBackCards[depth - 1];
+                if (card == null)
+                    continue;
+
+                card.RectTransform.anchoredPosition = layout.DrawPilePosition + GetPileStackOffset(depth);
+                card.SetSize(layout.DrawPileSize);
+                card.ShowBack();
+                card.SetInteraction(false, null);
+                card.SetVisible(true);
+                card.transform.SetAsLastSibling();
+            }
+
+            for (int i = backCount; i < _drawPileBackCards.Count; i++)
+                if (_drawPileBackCards[i] != null)
+                    _drawPileBackCards[i].SetVisible(false);
+
+            _drawPileCard.RectTransform.anchoredPosition = layout.DrawPilePosition;
+            _drawPileCard.SetSize(layout.DrawPileSize);
+            _drawPileCard.ShowBack();
+            _drawPileCard.SetInteraction(false, null);
+            _drawPileCard.SetVisible(true);
+            _drawPileCard.transform.SetAsLastSibling();
+        }
+
+        void SetDrawPileStackVisible(bool visible)
+        {
+            if (_drawPileCard != null)
+                _drawPileCard.SetVisible(visible);
+            for (int i = 0; i < _drawPileBackCards.Count; i++)
+            {
+                var card = _drawPileBackCards[i];
+                if (card != null)
+                    card.SetVisible(visible);
+            }
+        }
+
+        void RenderDiscardStack(GameState state, CardTableLayout layout)
+        {
+            int count = Mathf.Max(0, state.DiscardPileCount);
+            if (count == 0)
+            {
+                ClearDiscardStack();
+                return;
+            }
+
+            while (_discardStack.Count > count)
+                RemoveDiscardStackEntryAt(0);
+            if (_discardStack.Count == 0)
+                _discardStack.Add(CreateDiscardStackEntry(state.DiscardTopValue, state.DiscardTopValue >= 0));
+
+            if (_discardStack.Count > 0)
+            {
+                var top = _discardStack[_discardStack.Count - 1];
+                top.Value = state.DiscardTopValue;
+                top.Known = state.DiscardTopValue >= 0;
+            }
+            LayoutDiscardStack(layout.DiscardPilePosition, layout.DiscardPileSize);
+        }
+
+        void LayoutDiscardStack(Vector2 pilePosition, Vector2 pileSize)
+        {
+            for (int i = 0; i < _discardStack.Count; i++)
+            {
+                var entry = _discardStack[i];
+                if (entry?.Card == null)
+                    continue;
+
+                int depthFromTop = _discardStack.Count - 1 - i;
+                int visibleDepth = Mathf.Min(depthFromTop, MaxDiscardStackOffsetDepth);
+                entry.Card.RectTransform.anchoredPosition = pilePosition + GetPileStackOffset(visibleDepth);
+                entry.Card.SetSize(pileSize);
+                ApplyDiscardStackFace(entry);
+                entry.Card.SetInteraction(false, null);
+                entry.Card.SetVisible(true);
+                entry.Card.transform.SetAsLastSibling();
+            }
+        }
+
+        static Vector2 GetPileStackOffset(int depthFromTop)
+        {
+            if (depthFromTop <= 0)
+                return Vector2.zero;
+
+            return new Vector2(-depthFromTop * PileStackOffsetX, depthFromTop * PileStackOffsetY);
+        }
+
+        void ApplyDiscardStackFace(DiscardStackEntry entry)
+        {
+            if (entry == null || entry.Card == null)
+                return;
+
+            if (entry.Known && entry.Value >= 0)
+                entry.Card.ShowFront(entry.Value, false);
+            else
+                entry.Card.ShowBack();
+        }
+
+        void SetDiscardStackVisible(bool visible)
+        {
+            for (int i = 0; i < _discardStack.Count; i++)
+            {
+                var card = _discardStack[i]?.Card;
+                if (card != null)
+                    card.SetVisible(visible);
+            }
+        }
+
+        DiscardStackEntry CreateDiscardStackEntry(int value, bool known)
+        {
+            var card = CardView.Create(_cardRoot, $"DiscardStack_{_discardStack.Count}");
+            card.SetInteraction(false, null);
+            return new DiscardStackEntry
+            {
+                Card = card,
+                Value = value,
+                Known = known && value >= 0
+            };
+        }
+
+        void ClearDiscardStack()
+        {
+            for (int i = _discardStack.Count - 1; i >= 0; i--)
+            {
+                var card = _discardStack[i]?.Card;
+                if (card != null)
+                    DestroyCard(card);
+            }
+            _discardStack.Clear();
+        }
+
+        void RemoveDiscardStackEntryAt(int index)
+        {
+            if (index < 0 || index >= _discardStack.Count)
+                return;
+
+            var card = _discardStack[index]?.Card;
+            if (card != null)
+                DestroyCard(card);
+            _discardStack.RemoveAt(index);
         }
 
         static void PositionCaption(Text caption, string text, Vector2 pilePosition, Vector2 pileSize)
@@ -537,10 +697,10 @@ namespace Cabo.Client.UI.CardTable
             else
                 marker.ShowBack();
 
-            yield return marker.MoveTo(action.DiscardPilePosition, MoveDuration);
-            if (!revealDuringFlight && action.DiscardTopValue >= 0)
-                yield return marker.FlipToFront(action.DiscardTopValue, 0.18f);
-            RemoveDrawnMarker(action.SourcePlayerId);
+            marker.transform.SetAsLastSibling();
+            yield return MoveCardOntoDiscardStack(action, marker, 0, 1,
+                action.DiscardPilePosition, GetDiscardPileSize(action), false);
+            _drawnMarkers.Remove(action.SourcePlayerId);
             _animatingPlayers.Remove(action.SourcePlayerId);
             Reconcile();
         }
@@ -644,10 +804,10 @@ namespace Cabo.Client.UI.CardTable
                 if (!selected.Contains(slot.SlotIndex))
                     continue;
 
-                var card = hand.DetachCard(slot.SlotIndex);
-                if (card == null)
-                    card = CreateSnapshotCard(slot);
-                TrackTransient(card);
+                var card = CreateSnapshotCard(slot);
+                var liveCard = hand.DetachCard(slot.SlotIndex);
+                if (liveCard != null)
+                    DestroyCard(liveCard);
                 PlaceCard(card, slot);
                 outgoing.Add(card);
                 outgoingSlots.Add(slot.SlotIndex);
@@ -678,34 +838,55 @@ namespace Cabo.Client.UI.CardTable
                 yield break;
             }
 
-            yield return new WaitForSecondsRealtime(EmptyOriginHold);
-            for (int i = 0; i < outgoing.Count; i++)
-            {
-                var card = outgoing[i];
-                card.MoveTo(discardPosition, MoveDuration);
-                if (i < outgoing.Count - 1)
-                    yield return new WaitForSecondsRealtime(DiscardStagger);
-            }
+            if (fromDiscard)
+                yield return PlayTakeFromDiscardExchange(action, hand, selected, outgoing, discardPosition);
+            else
+                yield return PlayDrawnCardExchange(action, hand, selected, outgoing, discardPosition);
 
-            yield return new WaitForSecondsRealtime(MoveDuration + EmptyHold);
-            for (int i = 0; i < outgoing.Count; i++)
-                if (outgoing[i] != null)
-                    DestroyCard(outgoing[i]);
+            yield return new WaitForSecondsRealtime(IncomingLandingPause);
+            _animatingPlayers.Remove(action.SourcePlayerId);
+            Reconcile();
+        }
+
+        IEnumerator PlayDrawnCardExchange(CardTableActionSnapshot action, HandView hand, HashSet<int> selected, List<CardView> outgoing, Vector2 discardPosition)
+        {
+            yield return MoveOutgoingCardsToDiscardStack(action, outgoing, discardPosition, GetDiscardPileSize(action), EmptyOriginHold, true);
 
             var survivorCards = action.SelectedSlots.Count > 1
                 ? DetachSurvivors(hand, action, selected)
                 : new List<CardView>();
-            var incoming = CreateIncomingCard(action, fromDiscard);
-            if (fromDiscard)
-                incoming.RectTransform.anchoredPosition = discardPosition;
-            else
-            {
-                incoming.RectTransform.anchoredPosition = GetDrawnMarkerPosition(action.SourcePlayerId,
-                    action.TargetInspectionPosition != Vector2.zero
-                        ? action.TargetInspectionPosition
-                        : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition));
-                RemoveDrawnMarker(action.SourcePlayerId);
-            }
+            var incoming = CreateIncomingCard(action, false);
+            incoming.RectTransform.anchoredPosition = GetDrawnMarkerPosition(action.SourcePlayerId,
+                action.TargetInspectionPosition != Vector2.zero
+                    ? action.TargetInspectionPosition
+                    : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition));
+            RemoveDrawnMarker(action.SourcePlayerId);
+
+            yield return MoveIncomingCardToHand(action, hand, incoming, survivorCards);
+            for (int i = 0; i < survivorCards.Count; i++)
+                UntrackTransient(survivorCards[i]);
+        }
+
+        IEnumerator PlayTakeFromDiscardExchange(CardTableActionSnapshot action, HandView hand, HashSet<int> selected, List<CardView> outgoing, Vector2 discardPosition)
+        {
+            var incoming = PopDiscardTopCard(action);
+            var survivorCards = action.SelectedSlots.Count > 1
+                ? DetachSurvivors(hand, action, selected)
+                : new List<CardView>();
+
+            var outgoingRoutine = StartCoroutine(MoveOutgoingCardsToDiscardStack(action, outgoing, discardPosition, GetDiscardPileSize(action),
+                TakeDiscardOutgoingDelay, false));
+            yield return MoveIncomingCardToHand(action, hand, incoming, survivorCards);
+            yield return outgoingRoutine;
+
+            for (int i = 0; i < survivorCards.Count; i++)
+                UntrackTransient(survivorCards[i]);
+        }
+
+        IEnumerator MoveIncomingCardToHand(CardTableActionSnapshot action, HandView hand, CardView incoming, List<CardView> survivorCards)
+        {
+            if (incoming == null)
+                yield break;
 
             int incomingInsertIndex = GetIncomingInsertIndex(action);
             var incomingFinal = FindIncomingFinalSlot(action, incomingInsertIndex);
@@ -725,12 +906,90 @@ namespace Cabo.Client.UI.CardTable
                 yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
                 DestroyCard(incoming);
             }
+        }
 
-            for (int i = 0; i < survivorCards.Count; i++)
-                UntrackTransient(survivorCards[i]);
-            yield return new WaitForSecondsRealtime(IncomingLandingPause);
-            _animatingPlayers.Remove(action.SourcePlayerId);
-            Reconcile();
+        IEnumerator MoveOutgoingCardsToDiscardStack(CardTableActionSnapshot action, List<CardView> outgoing, Vector2 discardPosition,
+            Vector2 discardSize, float initialDelay, bool holdAfterLanding)
+        {
+            if (initialDelay > 0f)
+                yield return new WaitForSecondsRealtime(initialDelay);
+
+            var landingRoutines = new List<Coroutine>();
+            for (int i = 0; i < outgoing.Count; i++)
+            {
+                var card = outgoing[i];
+                if (card != null)
+                    landingRoutines.Add(StartCoroutine(MoveCardOntoDiscardStack(action, card, i, outgoing.Count, discardPosition, discardSize, holdAfterLanding)));
+                if (i < outgoing.Count - 1)
+                    yield return new WaitForSecondsRealtime(DiscardStagger);
+            }
+
+            for (int i = 0; i < landingRoutines.Count; i++)
+                if (landingRoutines[i] != null)
+                    yield return landingRoutines[i];
+        }
+
+        IEnumerator MoveCardOntoDiscardStack(CardTableActionSnapshot action, CardView card, int index, int count,
+            Vector2 discardPosition, Vector2 discardSize, bool holdAfterLanding)
+        {
+            if (card == null)
+                yield break;
+
+            bool known = TryGetOutgoingDiscardValue(action, card, index, count, out int value);
+            card.transform.SetAsLastSibling();
+            bool revealAtLanding = known && (!card.FaceUp || card.Value != value);
+            if (!known)
+                card.ShowBack();
+
+            yield return MoveCardToPositionOnTop(card, discardPosition, MoveDuration);
+            card.transform.SetAsLastSibling();
+            if (revealAtLanding)
+                card.ShowFront(value, false);
+            PushDiscardCard(card, value, known, discardPosition, discardSize);
+
+            if (holdAfterLanding)
+                yield return new WaitForSecondsRealtime(EmptyHold);
+        }
+
+        static IEnumerator MoveCardToPositionOnTop(CardView card, Vector2 target, float duration)
+        {
+            if (card == null)
+                yield break;
+
+            var rect = card.RectTransform;
+            var start = rect.anchoredPosition;
+            float elapsed = 0f;
+            float safeDuration = Mathf.Max(0.01f, duration);
+            while (elapsed < safeDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / safeDuration);
+                t = t * t * (3f - 2f * t);
+                rect.anchoredPosition = Vector2.LerpUnclamped(start, target, t);
+                card.transform.SetAsLastSibling();
+                yield return null;
+            }
+
+            rect.anchoredPosition = target;
+            card.transform.SetAsLastSibling();
+        }
+
+        bool TryGetOutgoingDiscardValue(CardTableActionSnapshot action, CardView card, int index, int count, out int value)
+        {
+            if (index == count - 1 && action.DiscardTopValue >= 0)
+            {
+                value = action.DiscardTopValue;
+                return true;
+            }
+
+            if (card != null && card.FaceUp)
+            {
+                value = card.Value;
+                return true;
+            }
+
+            value = -1;
+            return false;
         }
 
         void BeginSwap(CardTableActionSnapshot action)
@@ -1112,6 +1371,79 @@ namespace Cabo.Client.UI.CardTable
             return Mathf.Clamp(insertionIndex, 0, action.FinalSourceHand.Count - 1);
         }
 
+        void PushDiscardCard(CardView card, int value, bool known, Vector2 discardPosition, Vector2 discardSize)
+        {
+            if (card == null)
+                return;
+
+            UntrackTransient(card);
+            card.transform.SetParent(_cardRoot, false);
+            card.CancelAnimations();
+            card.RectTransform.localScale = Vector3.one;
+            card.SetSelected(false);
+            card.SetInteraction(false, null);
+
+            var entry = new DiscardStackEntry
+            {
+                Card = card,
+                Value = value,
+                Known = known && value >= 0
+            };
+            _discardStack.Add(entry);
+            LayoutDiscardStack(discardPosition, discardSize);
+            BringTransientCardsToFront();
+        }
+
+        CardView PopDiscardTopCard(CardTableActionSnapshot action)
+        {
+            var discardPosition = GetDiscardPilePosition(action);
+            var discardSize = GetDiscardPileSize(action);
+
+            if (_discardStack.Count == 0)
+            {
+                var fallback = CreateIncomingCard(action, true);
+                fallback.RectTransform.anchoredPosition = discardPosition;
+                return fallback;
+            }
+
+            var topIndex = _discardStack.Count - 1;
+            var entry = _discardStack[topIndex];
+            _discardStack.RemoveAt(topIndex);
+            var card = entry?.Card;
+            LayoutDiscardStack(discardPosition, discardSize);
+
+            if (card == null)
+            {
+                var fallback = CreateIncomingCard(action, true);
+                fallback.RectTransform.anchoredPosition = discardPosition;
+                return fallback;
+            }
+
+            int value = action.IncomingCardValue >= 0
+                ? action.IncomingCardValue
+                : (entry.Known ? entry.Value : -1);
+            TrackTransient(card);
+            card.transform.SetParent(_cardRoot, false);
+            card.RectTransform.anchoredPosition = discardPosition;
+            card.SetSize(discardSize);
+            if (value >= 0)
+                card.ShowFront(value);
+            else
+                card.ShowBack();
+            PrepareMovingCard(card);
+            return card;
+        }
+
+        void BringTransientCardsToFront()
+        {
+            for (int i = 0; i < _transientCards.Count; i++)
+            {
+                var card = _transientCards[i];
+                if (card != null)
+                    card.transform.SetAsLastSibling();
+            }
+        }
+
         static CardTableSlotSnapshot SnapshotFromCard(long playerId, int slotIndex, CardView card)
         {
             if (card == null)
@@ -1258,6 +1590,15 @@ namespace Cabo.Client.UI.CardTable
             return Vector2.zero;
         }
 
+        Vector2 GetDiscardPileSize(CardTableActionSnapshot action)
+        {
+            if (action != null && action.DiscardPileSize.x > 1f && action.DiscardPileSize.y > 1f)
+                return action.DiscardPileSize;
+            if (_lastLayout != null && _lastLayout.DiscardPileSize.x > 1f && _lastLayout.DiscardPileSize.y > 1f)
+                return _lastLayout.DiscardPileSize;
+            return new Vector2(70f, 96f);
+        }
+
         static bool HasUsablePile(Vector2 position, Vector2 size)
         {
             return size.x > 1f
@@ -1291,6 +1632,13 @@ namespace Cabo.Client.UI.CardTable
         {
             if (_lastState != null && _lastLayout != null)
                 Render(_lastState, _lastLayout);
+        }
+
+        sealed class DiscardStackEntry
+        {
+            public CardView Card;
+            public int Value = -1;
+            public bool Known;
         }
     }
 }

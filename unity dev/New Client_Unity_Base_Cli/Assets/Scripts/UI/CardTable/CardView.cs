@@ -1,5 +1,5 @@
-using System.Collections;
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -15,6 +15,7 @@ namespace Cabo.Client.UI.CardTable
         CanvasGroup _canvasGroup;
         Coroutine _moveRoutine;
         Coroutine _flipRoutine;
+        Coroutine _clickRoutine;
         Action _onClicked;
 
         public RectTransform RectTransform { get; private set; }
@@ -157,7 +158,22 @@ namespace Cabo.Client.UI.CardTable
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            _onClicked?.Invoke();
+            if (_onClicked == null || _clickRoutine != null)
+                return;
+
+            var click = _onClicked;
+            _clickRoutine = StartCoroutine(InvokeClickNextFrame(click));
+        }
+
+        IEnumerator InvokeClickNextFrame(Action click)
+        {
+            yield return null;
+            _clickRoutine = null;
+
+            if (this == null || !isActiveAndEnabled || click == null || click != _onClicked)
+                yield break;
+
+            click.Invoke();
         }
 
         public Coroutine MoveTo(RectTransform target, float duration)

@@ -36,6 +36,7 @@ namespace Cabo.Client.UI
         const float SwapSettleDuration = 0.16f;
         const float PlaybackLayoutSettleDelay = 0.03f;
         const float SurvivorMoveStagger = 0f;
+        const float TakeDiscardOutgoingDelay = 0.08f;
 
         enum EndGameModalKind
         {
@@ -102,6 +103,10 @@ namespace Cabo.Client.UI
         int _lastRenderedRoundNumber = -1;
         int _stableDiscardTopValue = int.MinValue;
         int _stableDiscardPileCount = -1;
+        bool _discardVisualHoldActive;
+        int _heldDiscardTopValue = int.MinValue;
+        int _heldDiscardPileCount = -1;
+        long _heldDiscardSequence;
         VisualElement _temporaryHiddenCard;
         readonly Dictionary<long, VisualElement> _drawnCardMarkers = new();
         readonly Dictionary<VisualElement, int> _pulseVersions = new();
@@ -118,6 +123,7 @@ namespace Cabo.Client.UI
         bool _showChat;
         bool _cardTableRefreshQueued;
         bool _layoutRefreshQueued;
+        bool _uiActionQueued;
         bool _isVisible;
         Rect _lastRootBounds;
         int _lastScreenWidth;
@@ -535,7 +541,7 @@ namespace Cabo.Client.UI
             bool holdingPreviousAction = IsActionAnimationHoldActive();
             long visualCurrentPlayerId = holdingPreviousAction ? _heldActionSourcePlayerId : state.CurrentPlayerId;
             bool deferNewTurnActions = holdingPreviousAction && visualCurrentPlayerId != state.CurrentPlayerId;
-            bool freezePileVisuals = pendingAction != null || _cardTableView.HasActiveTransientAnimation;
+            bool freezePileVisuals = pendingAction != null || _cardTableView.HasActiveTransientAnimation || _discardVisualHoldActive;
 
             _roundLabel.text = "";
             _roundLabel.style.display = DisplayStyle.None;
@@ -959,19 +965,152 @@ namespace Cabo.Client.UI
             ConfigurePileRowLayout(usePlaceholders);
             EnsurePileCard(_drawPile, "牌库", "CABO", state.DrawPileCount.ToString(), false, compact, usePlaceholders);
 
-            int discardTopValue = freezeDiscardPile && _stableDiscardPileCount >= 0
-                ? _stableDiscardTopValue
-                : state.DiscardTopValue;
-            int discardPileCount = freezeDiscardPile && _stableDiscardPileCount >= 0
-                ? _stableDiscardPileCount
-                : state.DiscardPileCount;
+            int discardTopValue = state.DiscardTopValue;
+            int discardPileCount = state.DiscardPileCount;
+            if (_discardVisualHoldActive && _heldDiscardPileCount >= 0)
+            {
+                discardTopValue = _heldDiscardTopValue;
+                discardPileCount = _heldDiscardPileCount;
+            }
+            else if (freezeDiscardPile && _stableDiscardPileCount >= 0)
+            {
+                discardTopValue = _stableDiscardTopValue;
+                discardPileCount = _stableDiscardPileCount;
+            }
             EnsurePileCard(_discardPile, "弃牌堆", discardTopValue >= 0 ? discardTopValue.ToString() : "-", discardPileCount.ToString(), true, compact, usePlaceholders);
 
-            if (!freezeDiscardPile)
+            if (!freezeDiscardPile && !_discardVisualHoldActive)
             {
                 _stableDiscardTopValue = state.DiscardTopValue;
                 _stableDiscardPileCount = state.DiscardPileCount;
             }
+        }
+
+        void BeginDiscardVisualHold(ActionAnimationSnapshot action)
+        {
+            if (!ShouldHoldDiscardVisual(action))
+                return;
+            if (_discardVisualHoldActive && _heldDiscardSequence == action.Sequence)
+                return;
+
+            int topValue;
+            int pileCount;
+            if (_discardVisualHoldActive && _heldDiscardPileCount >= 0)
+            {
+                topValue = _heldDiscardTopValue;
+                pileCount = _heldDiscardPileCount;
+            }
+            else if (_stableDiscardPileCount >= 0)
+            {
+                topValue = _stableDiscardTopValue;
+                pileCount = _stableDiscardPileCount;
+            }
+            else
+            {
+                topValue = _flow.State.DiscardTopValue;
+                pileCount = _flow.State.DiscardPileCount;
+            }
+
+            _discardVisualHoldActive = true;
+            _heldDiscardSequence = action.Sequence;
+            _heldDiscardTopValue = topValue;
+            _heldDiscardPileCount = Mathf.Max(0, pileCount);
+            RenderPiles(_flow.State, true);
+        }
+
+        void SetHeldDiscardVisual(int topValue, int pileCount)
+        {
+            if (!_discardVisualHoldActive)
+                return;
+
+            _heldDiscardTopValue = topValue;
+            _heldDiscardPileCount = Mathf.Max(0, pileCount);
+            RenderPiles(_flow.State, true);
+        }
+
+        void PopHeldDiscardVisual(ActionAnimationSnapshot action)
+        {
+            if (!_discardVisualHoldActive)
+                return;
+            if (action != null && _heldDiscardSequence != 0 && _heldDiscardSequence != action.Sequence)
+                return;
+
+            int newCount = Mathf.Max(0, _heldDiscardPileCount - 1);
+            SetHeldDiscardVisual(-1, newCount);
+        }
+
+        void PushHeldDiscardVisual(ActionAnimationSnapshot action, int topValue, int pileCount)
+        {
+            if (!_discardVisualHoldActive)
+                return;
+            if (action != null && _heldDiscardSequence != 0 && _heldDiscardSequence != action.Sequence)
+                return;
+
+            SetHeldDiscardVisual(topValue, pileCount);
+        }
+
+        void ReleaseDiscardVisualHold(ActionAnimationSnapshot action)
+        {
+            if (!_discardVisualHoldActive)
+                return;
+            if (action != null && _heldDiscardSequence != 0 && _heldDiscardSequence != action.Sequence)
+                return;
+
+            float remainingQueueTime = _animationQueueUntil - Time.realtimeSinceStartup;
+            if (remainingQueueTime > 0.02f)
+            {
+                ScheduleAfter(remainingQueueTime, () => ReleaseDiscardVisualHold(action));
+                return;
+            }
+
+            _discardVisualHoldActive = false;
+            _heldDiscardSequence = 0;
+            _heldDiscardTopValue = int.MinValue;
+            _heldDiscardPileCount = -1;
+            _stableDiscardTopValue = action != null ? action.DiscardTopValue : _flow.State.DiscardTopValue;
+            _stableDiscardPileCount = action != null ? action.DiscardPileCount : _flow.State.DiscardPileCount;
+            RenderPiles(_flow.State);
+        }
+
+        static bool ShouldHoldDiscardVisual(ActionAnimationSnapshot action)
+        {
+            if (action == null)
+                return false;
+            if (action.ActionType == ActionType.DiscardDrawn)
+                return true;
+            return action.ExchangeSucceeded
+                && (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard);
+        }
+
+        static bool ShouldPopDiscardVisualAtStart(ActionAnimationSnapshot action)
+        {
+            return action != null && action.ExchangeSucceeded && action.ActionType == ActionType.TakeFromDiscard;
+        }
+
+        float GetDiscardVisualRevealDelay(ActionAnimationSnapshot action)
+        {
+            if (!ShouldHoldDiscardVisual(action))
+                return -1f;
+            if (action.ActionType == ActionType.DiscardDrawn)
+                return QuickMoveDuration;
+
+            int discardedCount = GetAnimatedDiscardedCount(action);
+            float stagger = GetDiscardStagger(discardedCount - 1, discardedCount);
+            if (action.ActionType == ActionType.TakeFromDiscard)
+                return TakeDiscardOutgoingDelay + stagger + QuickMoveDuration;
+
+            return EmptyOriginHoldDuration + stagger + QuickMoveDuration;
+        }
+
+        static int GetAnimatedDiscardedCount(ActionAnimationSnapshot action)
+        {
+            if (action == null)
+                return 1;
+            if (action.SelectedSlotBounds.Count > 0)
+                return Mathf.Max(1, action.SelectedSlotBounds.Count);
+            if (action.DiscardedCount > 0)
+                return Mathf.Max(1, action.DiscardedCount);
+            return Mathf.Max(1, action.SelectedSlots.Count);
         }
 
         void ConfigurePileRowLayout(bool fixedGameplayAnchor)
@@ -1434,6 +1573,7 @@ namespace Cabo.Client.UI
                 DiscardedCount = state.LastActionDiscardedCount,
                 DrewExtraPenaltyCard = state.LastActionDrewExtraPenaltyCard,
                 DiscardTopValue = state.DiscardTopValue,
+                DiscardPileCount = state.DiscardPileCount,
                 PeekedValue = state.LastPeekedValue,
                 SourcePlayerBounds = GetPlayerBounds(state.LastActionSourcePlayerId),
                 TargetPlayerBounds = GetPlayerBounds(state.LastActionTargetPlayerId),
@@ -1478,7 +1618,7 @@ namespace Cabo.Client.UI
             long secondFrozenPlayerId = pendingAction != null && pendingAction.ActionType == ActionType.UseSkill && pendingAction.Skill == SkillType.Swap
                 ? pendingAction.TargetPlayerId
                 : 0;
-            bool freezePiles = pendingAction != null || _cardTableView.HasActiveTransientAnimation;
+            bool freezePiles = pendingAction != null || _cardTableView.HasActiveTransientAnimation || _discardVisualHoldActive;
             _cardTableView.SetVisible(true);
             _cardTableView.Render(state, layout, frozenPlayerId, secondFrozenPlayerId, freezePiles);
             if (!HasValidCardTableLayout(layout) && pendingAction == null)
@@ -1499,7 +1639,7 @@ namespace Cabo.Client.UI
             var layout = BuildCardTableLayout(_flow.State);
             if (!_cardTableView.HasRenderableLayout
                 || !HasValidCardTableLayout(layout)
-                || !_cardTableView.RefreshInteractions(_flow.State, layout))
+                || !_cardTableView.RefreshInteractions(_flow.State, layout, _discardVisualHoldActive))
             {
                 RenderCardTableLayer(_flow.State, null);
             }
@@ -1836,10 +1976,31 @@ namespace Cabo.Client.UI
             float delay = Mathf.Max(0f, _animationQueueUntil - now);
             float duration = EstimateActionAnimationDuration(action);
             float settleDelay = delay <= 0.001f ? PlaybackLayoutSettleDelay : 0f;
+            bool holdDiscard = ShouldHoldDiscardVisual(action);
+            if (holdDiscard && !_discardVisualHoldActive && delay <= 0.001f)
+                BeginDiscardVisualHold(action);
+
             _animationQueueUntil = now + delay + settleDelay + duration;
             HideAuthoritativeCardsForAnimation(action, delay + settleDelay + duration);
             HoldTurnDisplay(action, _animationQueueUntil);
-            ScheduleAnimationAfter(delay + settleDelay, () => PlayActionAnimation(action));
+            ScheduleAnimationAfter(delay + settleDelay, () =>
+            {
+                if (holdDiscard)
+                {
+                    BeginDiscardVisualHold(action);
+                    if (ShouldPopDiscardVisualAtStart(action))
+                        PopHeldDiscardVisual(action);
+                }
+                PlayActionAnimation(action);
+            });
+            if (holdDiscard)
+            {
+                float revealDelay = GetDiscardVisualRevealDelay(action);
+                if (revealDelay >= 0f)
+                    ScheduleAnimationAfter(delay + settleDelay + revealDelay,
+                        () => PushHeldDiscardVisual(action, action.DiscardTopValue, action.DiscardPileCount));
+                ScheduleAfter(delay + settleDelay + duration, () => ReleaseDiscardVisualHold(action));
+            }
             ScheduleAfter(delay + settleDelay + duration, () => ReleaseTurnDisplay(action));
         }
 
@@ -1877,6 +2038,11 @@ namespace Cabo.Client.UI
             _pendingSelfExchangeSnapshot = null;
             _pendingSelfSwapSnapshot = null;
             _cardTableRefreshQueued = false;
+            _discardVisualHoldActive = false;
+            _heldDiscardTopValue = int.MinValue;
+            _heldDiscardPileCount = -1;
+            _heldDiscardSequence = 0;
+            _uiActionQueued = false;
             _animationLayer.Clear();
             _cardTableView.ClearTransient();
             _inspectionActive = false;
@@ -2025,22 +2191,22 @@ namespace Cabo.Client.UI
             var discardBounds = GetValidBounds(action.DiscardPileBounds, GetPileCardBounds(_discardPile));
             var discardCenter = CenterOf(discardBounds);
 
-            float total = GetExchangeSuccessDuration(action);
+            float outgoingTail = GetDiscardStagger(action.SelectedSlotBounds.Count - 1, action.SelectedSlotBounds.Count);
+            float total = TakeDiscardOutgoingDelay + outgoingTail + QuickMoveDuration + IncomingLandingPause;
             HideExchangeAnimatedCards(action, total);
             ShowFrozenExchangeSourceHand(action, color, total);
 
             for (int i = 0; i < action.SelectedSlotBounds.Count; i++)
             {
                 var slot = action.SelectedSlotBounds[i];
-                float offset = EmptyOriginHoldDuration + GetDiscardStagger(i, action.SelectedSlotBounds.Count);
+                float offset = TakeDiscardOutgoingDelay + GetDiscardStagger(i, action.SelectedSlotBounds.Count);
                 ScheduleAnimationAfter(offset, () =>
                     PlayMovingCardBetweenBounds(slot.Bounds, discardBounds, false, 0, color, QuickMoveDuration, true, null));
             }
 
             int incomingValue = action.IncomingCardValue >= 0 ? action.IncomingCardValue : action.DiscardTopValue;
-            float incomingDelay = GetIncomingDelay(action);
-            ScheduleSurvivorMoves(action, color, incomingDelay);
-            ScheduleAnimationAfter(incomingDelay, () =>
+            ScheduleSurvivorMoves(action, color, 0f);
+            ScheduleAnimationAfter(0f, () =>
             {
                 var incomingTarget = GetIncomingTargetBounds(action);
                 PlayMovingCardToBounds(discardCenter, incomingTarget, true, incomingValue, color, QuickMoveDuration,
@@ -2787,6 +2953,11 @@ namespace Cabo.Client.UI
             {
                 if (!action.ExchangeSucceeded)
                     return QuickMoveDuration + EmptySlotHoldDuration + AnimationSettleDuration;
+                if (action.ActionType == ActionType.TakeFromDiscard)
+                    return QuickMoveDuration
+                        + GetDiscardStagger(action.SelectedSlotBounds.Count - 1, action.SelectedSlotBounds.Count)
+                        + TakeDiscardOutgoingDelay
+                        + IncomingLandingPause;
                 return GetExchangeSuccessDuration(action);
             }
             return QuickMoveDuration + AnimationSettleDuration;
@@ -2975,6 +3146,29 @@ namespace Cabo.Client.UI
                 if (generation == _animationGeneration)
                     action?.Invoke();
             });
+        }
+
+        void InvokeUiActionNextFrame(Action action)
+        {
+            if (action == null || _uiActionQueued)
+                return;
+
+            if (_root == null || _root.panel == null)
+            {
+                action();
+                return;
+            }
+
+            _uiActionQueued = true;
+            int generation = _animationGeneration;
+            _root.schedule.Execute(() =>
+            {
+                _uiActionQueued = false;
+                if (generation != _animationGeneration || _root == null || _root.panel == null)
+                    return;
+
+                action();
+            }).ExecuteLater(1);
         }
 
         VisualElement CreateFloatingCard(bool faceUp, int value, int width, int height, Color color, string caption)
@@ -3342,7 +3536,7 @@ namespace Cabo.Client.UI
             }
 
             if (clickable && onClick != null)
-                card.RegisterCallback<ClickEvent>(_ => onClick());
+                card.RegisterCallback<ClickEvent>(_ => InvokeUiActionNextFrame(onClick));
 
             return card;
         }
@@ -3677,7 +3871,7 @@ namespace Cabo.Client.UI
 
         Button CreatePanelButton(string text, Action action, bool enabled)
         {
-            var button = new Button(action) { text = text };
+            var button = new Button(() => InvokeUiActionNextFrame(action)) { text = text };
             button.style.minWidth = 120;
             button.style.height = 32;
             button.style.marginLeft = 5;
@@ -3709,7 +3903,7 @@ namespace Cabo.Client.UI
 
         void AddActionButton(string text, Action action, bool enabled)
         {
-            var button = new Button(action) { text = text };
+            var button = new Button(() => InvokeUiActionNextFrame(action)) { text = text };
             button.style.minWidth = 116;
             button.style.height = 32;
             button.style.marginLeft = 5;
@@ -3908,7 +4102,27 @@ namespace Cabo.Client.UI
             snapshot.SourceSlotBounds.AddRange(pending.SourceSlotBounds);
             snapshot.SourceHandBounds.Clear();
             snapshot.SourceHandBounds.AddRange(pending.SourceHandBounds);
+            ApplyPendingSelfCards(snapshot.SourceHandBounds, pending.SourceHandCards);
+            ApplyPendingSelfCards(snapshot.SourceSlotBounds, pending.SourceHandCards);
             snapshot.UsesPendingSelfExchangeSnapshot = true;
+        }
+
+        static void ApplyPendingSelfCards(List<SlotSnapshot> slots, List<CardSnapshot> cards)
+        {
+            if (slots == null || cards == null)
+                return;
+
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var slot = slots[i];
+                if (slot.Slot < 0 || slot.Slot >= cards.Count)
+                    continue;
+
+                var card = cards[slot.Slot];
+                slot.FaceUp = card.FaceUp;
+                slot.Value = card.Value;
+                slots[i] = slot;
+            }
         }
 
         static bool SameSlots(List<int> left, List<int> right)
@@ -4371,6 +4585,7 @@ namespace Cabo.Client.UI
             public int AddedCardCount;
             public bool DrewExtraPenaltyCard;
             public int DiscardTopValue;
+            public int DiscardPileCount;
             public int PeekedValue;
             public bool UsesPendingSelfExchangeSnapshot;
             public bool UsesPendingSelfSwapSnapshot;
