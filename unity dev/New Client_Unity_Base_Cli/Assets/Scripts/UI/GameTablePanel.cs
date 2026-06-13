@@ -393,7 +393,7 @@ namespace Cabo.Client.UI
             var socialTabs = new VisualElement();
             socialTabs.style.flexDirection = FlexDirection.Row;
             socialTabs.style.flexShrink = 0;
-            socialTabs.style.marginRight = 44;
+            socialTabs.style.marginRight = 8;
             socialTabs.style.marginBottom = 8;
             _socialPanel.Add(socialTabs);
 
@@ -436,11 +436,11 @@ namespace Cabo.Client.UI
                 tooltip = "结束游戏"
             };
             _endGameButton.style.position = Position.Absolute;
-            _endGameButton.style.top = 14;
-            _endGameButton.style.right = 14;
-            _endGameButton.style.width = 32;
-            _endGameButton.style.height = 32;
-            _endGameButton.style.minWidth = 32;
+            _endGameButton.style.top = 0;
+            _endGameButton.style.right = 0;
+            _endGameButton.style.width = 20;
+            _endGameButton.style.height = 20;
+            _endGameButton.style.minWidth = 20;
             _endGameButton.style.paddingLeft = 0;
             _endGameButton.style.paddingRight = 0;
             _endGameButton.style.paddingTop = 0;
