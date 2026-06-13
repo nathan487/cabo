@@ -308,10 +308,7 @@ namespace Cabo.Client.UI.CardTable
                 long playerId = hand.Key;
                 bool frozen = playerId == frozenPlayerId || playerId == secondFrozenPlayerId || _animatingPlayers.Contains(playerId);
                 if (frozen)
-                {
-                    hand.Value.SetLayout(layout.Slots);
                     hand.Value.DisableCardInteractions();
-                }
                 else
                     hand.Value.RenderAuthoritative(layout.Slots);
             }
@@ -397,14 +394,12 @@ namespace Cabo.Client.UI.CardTable
 
             if (action.ActionType == ActionType.ReplaceWithDrawn)
             {
-                BeginExchange(action, false);
-                return true;
+                return BeginExchange(action, false);
             }
 
             if (action.ActionType == ActionType.TakeFromDiscard)
             {
-                BeginExchange(action, true);
-                return true;
+                return BeginExchange(action, true);
             }
 
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
@@ -707,16 +702,43 @@ namespace Cabo.Client.UI.CardTable
             Reconcile();
         }
 
-        void BeginExchange(CardTableActionSnapshot action, bool fromDiscard)
+        bool BeginExchange(CardTableActionSnapshot action, bool fromDiscard)
         {
             EnsureSelectedSlots(action);
             if (!HasExchangePlan(action))
             {
                 Reconcile();
-                return;
+                return false;
             }
 
+            _animatingPlayers.Add(action.SourcePlayerId);
+            var hand = GetHand(action.SourcePlayerId);
+            if (hand != null)
+            {
+                var oldLayout = action.SourceHand.Count > 0 ? action.SourceHand : action.SourceSlots;
+                if (oldLayout.Count > 0)
+                {
+                    var tempLayout = new List<CardTableSlotLayout>();
+                    for (int i = 0; i < oldLayout.Count; i++)
+                    {
+                        var snap = oldLayout[i];
+                        tempLayout.Add(new CardTableSlotLayout
+                        {
+                            PlayerId = snap.PlayerId,
+                            SlotIndex = snap.SlotIndex,
+                            AnchoredPosition = snap.AnchoredPosition,
+                            Size = snap.Size,
+                            FaceUp = snap.FaceUp,
+                            Value = snap.Value,
+                            Selected = false,
+                            Clickable = false
+                        });
+                    }
+                    hand.RenderAuthoritative(tempLayout);
+                }
+            }
             StartCoroutine(PlayExchange(action, fromDiscard));
+            return true;
         }
 
         bool HasExchangePlan(CardTableActionSnapshot action)
@@ -725,7 +747,8 @@ namespace Cabo.Client.UI.CardTable
                 return false;
 
             if (!action.ExchangeSucceeded)
-                return action.SourceSlots.Count > 0 || action.SourceHand.Count > 0;
+                return (action.SourceSlots.Count > 0 || action.SourceHand.Count > 0)
+                    && action.FinalSourceHand.Count > 0;
 
             if (action.SelectedSlots.Count == 0 || !HasUsablePile(action.DiscardPilePosition, action.DiscardPileSize))
                 return false;
@@ -736,8 +759,7 @@ namespace Cabo.Client.UI.CardTable
             if (!HasAllSelectedSources(action))
                 return false;
 
-            var incomingFinal = FindIncomingFinalSlot(action, CountSurvivors(action));
-            return incomingFinal.IsValid;
+            return action.FinalSourceHand.Count > 0;
         }
 
         static void EnsureSelectedSlots(CardTableActionSnapshot action)
@@ -764,29 +786,19 @@ namespace Cabo.Client.UI.CardTable
             return true;
         }
 
-        int CountSurvivors(CardTableActionSnapshot action)
-        {
-            if (action.SelectedSlots.Count <= 1)
-                return 0;
-
-            var selected = new HashSet<int>(action.SelectedSlots);
-            int count = 0;
-            for (int i = 0; i < action.SourceHand.Count; i++)
-                if (!selected.Contains(action.SourceHand[i].SlotIndex))
-                    count++;
-            return count;
-        }
-
         IEnumerator PlayExchange(CardTableActionSnapshot action, bool fromDiscard)
         {
             if (!action.ExchangeSucceeded)
             {
-                yield return ShakeSourceSlots(action);
+                yield return PlayFailedExchange(action, fromDiscard);
+                _animatingPlayers.Remove(action.SourcePlayerId);
                 Reconcile();
+                // Wait one frame to ensure Reconcile has rendered before destroying transients
+                yield return null;
+                DestroyTransientCards();
                 yield break;
             }
 
-            _animatingPlayers.Add(action.SourcePlayerId);
             var hand = GetHand(action.SourcePlayerId);
             if (hand == null)
             {
@@ -795,68 +807,88 @@ namespace Cabo.Client.UI.CardTable
                 yield break;
             }
 
-            var selected = new HashSet<int>(action.SelectedSlots);
-            var outgoing = new List<CardView>();
-            var sourceForOutgoing = action.SourceHand.Count > 0 ? action.SourceHand : action.SourceSlots;
-            var outgoingSlots = new HashSet<int>();
-            var discardPosition = GetDiscardPilePosition(action);
-            for (int i = 0; i < sourceForOutgoing.Count; i++)
-            {
-                var slot = sourceForOutgoing[i];
-                if (!selected.Contains(slot.SlotIndex))
-                    continue;
-
-                var card = CreateSnapshotCard(slot);
-                var liveCard = hand.DetachCard(slot.SlotIndex);
-                if (liveCard != null)
-                    DestroyCard(liveCard);
-                PlaceCard(card, slot);
-                outgoing.Add(card);
-                outgoingSlots.Add(slot.SlotIndex);
-            }
-
-            foreach (var slotIndex in selected)
-            {
-                if (outgoingSlots.Contains(slotIndex))
-                    continue;
-
-                var card = hand.GetCard(slotIndex);
-                if (card == null)
-                    continue;
-
-                var slot = SnapshotFromCard(action.SourcePlayerId, slotIndex, card);
-                card = hand.DetachCard(slotIndex);
-                if (card == null)
-                    continue;
-                TrackTransient(card);
-                PlaceCard(card, slot);
-                outgoing.Add(card);
-            }
-
-            if (outgoing.Count == 0)
+            var allTransients = CreateAllTransientCardsFromSource(hand, action);
+            if (allTransients.Count == 0)
             {
                 _animatingPlayers.Remove(action.SourcePlayerId);
                 Reconcile();
                 yield break;
             }
 
+            var selected = new HashSet<int>(action.SelectedSlots);
+            var outgoing = new List<CardView>();
+            var survivors = new List<CardView>();
+            foreach (var card in allTransients)
+            {
+                int slotIndex = GetCardOriginalSlot(card);
+                if (selected.Contains(slotIndex))
+                    outgoing.Add(card);
+                else
+                    survivors.Add(card);
+            }
+
+            if (outgoing.Count == 0)
+            {
+                DestroyTransientCards();
+                _animatingPlayers.Remove(action.SourcePlayerId);
+                Reconcile();
+                yield break;
+            }
+
+            var discardPosition = GetDiscardPilePosition(action);
             if (fromDiscard)
-                yield return PlayTakeFromDiscardExchange(action, hand, selected, outgoing, discardPosition);
+                yield return PlayTakeFromDiscardExchange(action, outgoing, survivors, discardPosition);
             else
-                yield return PlayDrawnCardExchange(action, hand, selected, outgoing, discardPosition);
+                yield return PlayDrawnCardExchange(action, outgoing, survivors, discardPosition);
 
             yield return new WaitForSecondsRealtime(IncomingLandingPause);
             _animatingPlayers.Remove(action.SourcePlayerId);
             Reconcile();
+            // Wait one frame to ensure Reconcile has rendered before destroying transients
+            yield return null;
+            DestroyTransientCards();
         }
 
-        IEnumerator PlayDrawnCardExchange(CardTableActionSnapshot action, HandView hand, HashSet<int> selected, List<CardView> outgoing, Vector2 discardPosition)
+        List<CardView> CreateAllTransientCardsFromSource(HandView hand, CardTableActionSnapshot action)
+        {
+            var result = new List<CardView>();
+            var source = action.SourceHand.Count > 0 ? action.SourceHand : action.SourceSlots;
+            for (int i = 0; i < source.Count; i++)
+            {
+                var snapshot = source[i];
+                var liveCard = hand.DetachCard(snapshot.SlotIndex);
+                CardView card;
+                if (liveCard != null)
+                {
+                    card = liveCard;
+                    TrackTransient(card);
+                    PlaceCard(card, snapshot);
+                }
+                else
+                {
+                    card = CreateSnapshotCard(snapshot);
+                    PlaceCard(card, snapshot);
+                }
+                card.name = $"Transient_{action.SourcePlayerId}_{snapshot.SlotIndex}";
+                result.Add(card);
+            }
+            return result;
+        }
+
+        int GetCardOriginalSlot(CardView card)
+        {
+            if (card == null || string.IsNullOrEmpty(card.name))
+                return -1;
+            var parts = card.name.Split('_');
+            if (parts.Length >= 3 && int.TryParse(parts[2], out int slotIndex))
+                return slotIndex;
+            return -1;
+        }
+
+        IEnumerator PlayDrawnCardExchange(CardTableActionSnapshot action, List<CardView> outgoing, List<CardView> survivors, Vector2 discardPosition)
         {
             yield return MoveOutgoingCardsToDiscardStack(action, outgoing, discardPosition, GetDiscardPileSize(action), EmptyOriginHold, true);
 
-            var survivorCards = action.SelectedSlots.Count > 1
-                ? DetachSurvivors(hand, action, selected)
-                : new List<CardView>();
             var incoming = CreateIncomingCard(action, false);
             incoming.RectTransform.anchoredPosition = GetDrawnMarkerPosition(action.SourcePlayerId,
                 action.TargetInspectionPosition != Vector2.zero
@@ -864,50 +896,179 @@ namespace Cabo.Client.UI.CardTable
                     : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition));
             RemoveDrawnMarker(action.SourcePlayerId);
 
-            yield return MoveIncomingCardToHand(action, hand, incoming, survivorCards);
-            for (int i = 0; i < survivorCards.Count; i++)
-                UntrackTransient(survivorCards[i]);
+            yield return MoveTransientCardsToFinalPositions(action, incoming, survivors);
         }
 
-        IEnumerator PlayTakeFromDiscardExchange(CardTableActionSnapshot action, HandView hand, HashSet<int> selected, List<CardView> outgoing, Vector2 discardPosition)
+        IEnumerator PlayTakeFromDiscardExchange(CardTableActionSnapshot action, List<CardView> outgoing, List<CardView> survivors, Vector2 discardPosition)
         {
             var incoming = PopDiscardTopCard(action);
-            var survivorCards = action.SelectedSlots.Count > 1
-                ? DetachSurvivors(hand, action, selected)
-                : new List<CardView>();
 
             var outgoingRoutine = StartCoroutine(MoveOutgoingCardsToDiscardStack(action, outgoing, discardPosition, GetDiscardPileSize(action),
                 TakeDiscardOutgoingDelay, false));
-            yield return MoveIncomingCardToHand(action, hand, incoming, survivorCards);
+            yield return MoveTransientCardsToFinalPositions(action, incoming, survivors);
             yield return outgoingRoutine;
-
-            for (int i = 0; i < survivorCards.Count; i++)
-                UntrackTransient(survivorCards[i]);
         }
 
-        IEnumerator MoveIncomingCardToHand(CardTableActionSnapshot action, HandView hand, CardView incoming, List<CardView> survivorCards)
+        IEnumerator MoveTransientCardsToFinalPositions(CardTableActionSnapshot action, CardView incoming, List<CardView> survivorCards)
         {
             if (incoming == null)
                 yield break;
 
-            int incomingInsertIndex = GetIncomingInsertIndex(action);
-            var incomingFinal = FindIncomingFinalSlot(action, incomingInsertIndex);
-            if (incomingFinal.IsValid)
+            if (_lastLayout == null)
             {
-                incoming.SetSize(incomingFinal.Size);
-                if (action.SelectedSlots.Count > 1)
-                    StartSurvivorMoves(hand, action, survivorCards, incomingInsertIndex);
-                yield return incoming.MoveTo(incomingFinal.AnchoredPosition, MoveDuration);
-                hand.AttachCard(incomingFinal.SlotIndex, incoming);
-                UntrackTransient(incoming);
+                yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
+                yield break;
+            }
+
+            var finalLayoutMap = BuildFinalLayoutMap(action.SourcePlayerId);
+            if (finalLayoutMap.Count == 0)
+            {
+                yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
+                yield break;
+            }
+
+            if (action.SelectedSlots.Count <= 1)
+            {
+                int targetSlot = action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : action.SourceSlot;
+                if (finalLayoutMap.TryGetValue(targetSlot, out var incomingLayout))
+                {
+                    incoming.SetSize(incomingLayout.Size);
+                    yield return incoming.MoveTo(incomingLayout.AnchoredPosition, MoveDuration);
+                }
+                else
+                {
+                    yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
+                }
+                yield break;
+            }
+
+            int survivorCount = survivorCards.Count;
+            var finalSlotsByOrdinal = GetFinalSlotsByOrdinal(action.SourcePlayerId);
+            for (int i = 0; i < survivorCount && i < finalSlotsByOrdinal.Count; i++)
+            {
+                var finalLayout = finalSlotsByOrdinal[i];
+                var survivorCard = survivorCards[i];
+                survivorCard.SetSize(finalLayout.Size);
+                survivorCard.MoveTo(finalLayout.AnchoredPosition, MoveDuration);
+            }
+
+            if (survivorCount < finalSlotsByOrdinal.Count)
+            {
+                var incomingLayout = finalSlotsByOrdinal[survivorCount];
+                incoming.SetSize(incomingLayout.Size);
+                incoming.MoveTo(incomingLayout.AnchoredPosition, MoveDuration);
             }
             else
             {
-                if (action.SelectedSlots.Count > 1)
-                    StartSurvivorMoves(hand, action, survivorCards, incomingInsertIndex);
-                yield return incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
-                DestroyCard(incoming);
+                incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
             }
+
+            yield return new WaitForSecondsRealtime(MoveDuration);
+        }
+
+        Dictionary<int, CardTableSlotLayout> BuildFinalLayoutMap(long playerId)
+        {
+            var map = new Dictionary<int, CardTableSlotLayout>();
+            if (_lastLayout == null)
+                return map;
+            for (int i = 0; i < _lastLayout.Slots.Count; i++)
+            {
+                var slot = _lastLayout.Slots[i];
+                if (slot.PlayerId == playerId)
+                    map[slot.SlotIndex] = slot;
+            }
+            return map;
+        }
+
+        List<CardTableSlotLayout> GetFinalSlotsByOrdinal(long playerId)
+        {
+            var result = new List<CardTableSlotLayout>();
+            if (_lastLayout == null)
+                return result;
+            for (int i = 0; i < _lastLayout.Slots.Count; i++)
+            {
+                var slot = _lastLayout.Slots[i];
+                if (slot.PlayerId == playerId)
+                    result.Add(slot);
+            }
+            return result;
+        }
+
+        IEnumerator PlayFailedExchange(CardTableActionSnapshot action, bool fromDiscard)
+        {
+            var hand = GetHand(action.SourcePlayerId);
+            if (hand == null)
+                yield break;
+
+            var allTransients = CreateAllTransientCardsFromSource(hand, action);
+            if (allTransients.Count == 0)
+                yield break;
+
+            yield return ShakeSelectedTransients(action, allTransients);
+
+            if (action.FinalSourceHand.Count == 0)
+            {
+                DestroyTransientCards();
+                yield break;
+            }
+
+            Debug.Log($"[PlayFailedExchange] allTransients.Count={allTransients.Count}, FinalSourceHand.Count={action.FinalSourceHand.Count}");
+            for (int i = 0; i < action.FinalSourceHand.Count; i++)
+            {
+                Debug.Log($"  FinalSourceHand[{i}]: SlotIndex={action.FinalSourceHand[i].SlotIndex}, Pos={action.FinalSourceHand[i].AnchoredPosition}");
+            }
+
+            int oldHandCount = allTransients.Count;
+
+            for (int i = 0; i < oldHandCount && i < action.FinalSourceHand.Count; i++)
+            {
+                var oldCard = allTransients[i];
+                var finalSnap = action.FinalSourceHand[i];
+                oldCard.SetSize(finalSnap.Size);
+                oldCard.MoveTo(finalSnap.AnchoredPosition, MoveDuration);
+            }
+
+            CardView incoming = fromDiscard
+                ? PopDiscardTopCard(action)
+                : CreateFailedDrawnIncomingCard(action);
+
+            if (incoming != null && oldHandCount < action.FinalSourceHand.Count)
+            {
+                var incomingSnap = action.FinalSourceHand[oldHandCount];
+                Debug.Log($"[PlayFailedExchange] incoming → FinalSourceHand[{oldHandCount}]: SlotIndex={incomingSnap.SlotIndex}, Pos={incomingSnap.AnchoredPosition}");
+                incoming.SetSize(incomingSnap.Size);
+                incoming.MoveTo(incomingSnap.AnchoredPosition, MoveDuration);
+            }
+            else if (incoming != null)
+            {
+                incoming.MoveTo(action.SourcePlayerPosition, MoveDuration);
+            }
+
+            CardView penalty = null;
+            if (action.DrewExtraPenaltyCard)
+            {
+                int penaltyOrdinal = oldHandCount + 1;
+                penalty = CreatePenaltyCard(action);
+                if (penalty != null && penaltyOrdinal < action.FinalSourceHand.Count)
+                {
+                    var penaltySnap = action.FinalSourceHand[penaltyOrdinal];
+                    Debug.Log($"[PlayFailedExchange] penalty → FinalSourceHand[{penaltyOrdinal}]: SlotIndex={penaltySnap.SlotIndex}, Pos={penaltySnap.AnchoredPosition}");
+                    penalty.SetSize(penaltySnap.Size);
+                    penalty.MoveTo(penaltySnap.AnchoredPosition, MoveDuration);
+                }
+                else if (penalty != null)
+                {
+                    penalty.MoveTo(action.SourcePlayerPosition, MoveDuration);
+                }
+            }
+
+            yield return new WaitForSecondsRealtime(MoveDuration);
+            yield return new WaitForSecondsRealtime(IncomingLandingPause);
+
+            if (!fromDiscard)
+                RemoveDrawnMarker(action.SourcePlayerId);
+
+            // Don't destroy transients here - let PlayExchange handle it after Reconcile
         }
 
         IEnumerator MoveOutgoingCardsToDiscardStack(CardTableActionSnapshot action, List<CardView> outgoing, Vector2 discardPosition,
@@ -1295,14 +1456,51 @@ namespace Cabo.Client.UI.CardTable
             return Vector2.zero;
         }
 
+        IEnumerator ShakeSelectedTransients(CardTableActionSnapshot action, List<CardView> allTransients)
+        {
+            float elapsed = 0f;
+            var selected = new HashSet<int>(action.SelectedSlots);
+            var cardsToShake = new List<CardView>();
+            var starts = new List<Vector2>();
+
+            foreach (var card in allTransients)
+            {
+                int slotIndex = GetCardOriginalSlot(card);
+                if (selected.Count > 0 && !selected.Contains(slotIndex))
+                    continue;
+
+                cardsToShake.Add(card);
+                starts.Add(card.RectTransform.anchoredPosition);
+            }
+
+            while (elapsed < 0.35f)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float offset = Mathf.Sin(elapsed * 58f) * 6f;
+                for (int i = 0; i < cardsToShake.Count; i++)
+                    if (cardsToShake[i] != null)
+                        cardsToShake[i].RectTransform.anchoredPosition = starts[i] + new Vector2(offset, 0f);
+                yield return null;
+            }
+
+            for (int i = 0; i < cardsToShake.Count; i++)
+                if (cardsToShake[i] != null)
+                    cardsToShake[i].RectTransform.anchoredPosition = starts[i];
+        }
+
         IEnumerator ShakeSourceSlots(CardTableActionSnapshot action)
         {
             float elapsed = 0f;
             var cards = new List<CardView>();
             var starts = new List<Vector2>();
-            for (int i = 0; i < action.SourceSlots.Count; i++)
+            var selected = new HashSet<int>(action.SelectedSlots);
+            var source = action.SourceSlots.Count > 0 ? action.SourceSlots : action.SourceHand;
+            for (int i = 0; i < source.Count; i++)
             {
-                var slot = action.SourceSlots[i];
+                var slot = source[i];
+                if (selected.Count > 0 && !selected.Contains(slot.SlotIndex))
+                    continue;
+
                 var hand = GetHand(slot.PlayerId);
                 var card = hand?.GetCard(slot.SlotIndex);
                 if (card != null)
@@ -1344,62 +1542,9 @@ namespace Cabo.Client.UI.CardTable
             return result;
         }
 
-        void StartSurvivorMoves(HandView hand, CardTableActionSnapshot action, List<CardView> survivors, int incomingInsertIndex)
+        static int GetFailedAddedCardCount(CardTableActionSnapshot action)
         {
-            int index = 0;
-            for (int i = 0; i < action.FinalSourceHand.Count && index < survivors.Count; i++)
-            {
-                if (i == incomingInsertIndex)
-                    continue;
-
-                var finalSlot = action.FinalSourceHand[i];
-                var card = survivors[index++];
-                card.SetSize(finalSlot.Size);
-                card.MoveTo(finalSlot.AnchoredPosition, MoveDuration);
-                hand.AttachCard(finalSlot.SlotIndex, card, false);
-            }
-        }
-
-        CardTableSlotSnapshot FindIncomingFinalSlot(CardTableActionSnapshot action, int incomingInsertIndex)
-        {
-            if (action.SelectedSlots.Count <= 1)
-            {
-                int targetSlot = action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : action.SourceSlot;
-                var snapshot = FindSnapshot(action.FinalSourceHand, targetSlot);
-                if (snapshot.IsValid)
-                    return snapshot;
-                return FindSnapshot(action.SourceSlots, targetSlot);
-            }
-
-            if (incomingInsertIndex >= 0 && incomingInsertIndex < action.FinalSourceHand.Count)
-                return action.FinalSourceHand[incomingInsertIndex];
-            return default;
-        }
-
-        int GetIncomingInsertIndex(CardTableActionSnapshot action)
-        {
-            if (action == null || action.FinalSourceHand.Count == 0)
-                return -1;
-
-            if (action.SelectedSlots.Count <= 1)
-            {
-                int targetSlot = action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : action.SourceSlot;
-                for (int i = 0; i < action.FinalSourceHand.Count; i++)
-                    if (action.FinalSourceHand[i].SlotIndex == targetSlot)
-                        return i;
-                return Mathf.Clamp(targetSlot, 0, action.FinalSourceHand.Count - 1);
-            }
-
-            var selected = new HashSet<int>(action.SelectedSlots);
-            int insertionIndex = 0;
-            for (int i = 0; i < action.SourceHand.Count; i++)
-            {
-                if (selected.Contains(action.SourceHand[i].SlotIndex))
-                    break;
-                insertionIndex++;
-            }
-
-            return Mathf.Clamp(insertionIndex, 0, action.FinalSourceHand.Count - 1);
+            return action != null && action.DrewExtraPenaltyCard ? 2 : 1;
         }
 
         void PushDiscardCard(CardView card, int value, bool known, Vector2 discardPosition, Vector2 discardSize)
@@ -1505,6 +1650,77 @@ namespace Cabo.Client.UI.CardTable
                 card.ShowBack();
             PrepareMovingCard(card);
             return card;
+        }
+
+        CardView CreateFailedDrawnIncomingCard(CardTableActionSnapshot action)
+        {
+            var size = GetPreferredFailedIncomingSize(action);
+            CardView card;
+            if (_drawnMarkers.TryGetValue(action.SourcePlayerId, out var marker) && marker != null)
+            {
+                card = marker;
+                _drawnMarkers.Remove(action.SourcePlayerId);
+                TrackTransient(card);
+                card.transform.SetParent(_cardRoot, false);
+            }
+            else
+            {
+                card = CardView.Create(_cardRoot, $"FailedIncoming_{action.Sequence}");
+                TrackTransient(card);
+                card.RectTransform.anchoredPosition = GetFailedIncomingStart(action);
+            }
+
+            card.SetSize(size);
+            if (action.SourcePlayerId == _myPlayerId && action.IncomingCardValue >= 0)
+                card.ShowFront(action.IncomingCardValue);
+            else
+                card.ShowBack();
+            PrepareMovingCard(card);
+            return card;
+        }
+
+        CardView CreatePenaltyCard(CardTableActionSnapshot action)
+        {
+            var card = CardView.Create(_cardRoot, $"Penalty_{action.Sequence}");
+            TrackTransient(card);
+            card.SetSize(GetPreferredFailedIncomingSize(action));
+            card.RectTransform.anchoredPosition = HasUsablePile(action.DrawPilePosition, action.DrawPileSize)
+                ? action.DrawPilePosition
+                : action.SourcePlayerPosition;
+            card.ShowBack();
+            PrepareMovingCard(card);
+            return card;
+        }
+
+        Vector2 GetPreferredFailedIncomingSize(CardTableActionSnapshot action)
+        {
+            if (action != null)
+            {
+                if (action.TargetInspectionSize.x > 1f && action.TargetInspectionSize.y > 1f)
+                    return action.TargetInspectionSize;
+                if (action.DiscardPileSize.x > 1f && action.DiscardPileSize.y > 1f)
+                    return action.DiscardPileSize;
+                if (action.DrawPileSize.x > 1f && action.DrawPileSize.y > 1f)
+                    return action.DrawPileSize;
+            }
+
+            var preferred = GetPreferredActionCardSize();
+            return preferred.x > 1f && preferred.y > 1f ? preferred : new Vector2(56f, 78f);
+        }
+
+        Vector2 GetFailedIncomingStart(CardTableActionSnapshot action)
+        {
+            if (action == null)
+                return Vector2.zero;
+            if (action.TargetInspectionPosition != Vector2.zero)
+                return action.TargetInspectionPosition;
+            if (action.SourceInspectionPosition != Vector2.zero)
+                return action.SourceInspectionPosition;
+            if (action.SourcePlayerPosition != Vector2.zero)
+                return action.SourcePlayerPosition;
+            return HasUsablePile(action.DrawPilePosition, action.DrawPileSize)
+                ? action.DrawPilePosition
+                : Vector2.zero;
         }
 
         CardView CreateSnapshotCard(CardTableSlotSnapshot snapshot)

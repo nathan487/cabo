@@ -34,7 +34,7 @@ namespace Cabo.Client.UI
         const float IncomingLandingPause = 0.12f;
         const float SwapEmptyHoldDuration = 0.22f;
         const float SwapSettleDuration = 0.16f;
-        const float PlaybackLayoutSettleDelay = 0.03f;
+        const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
 
@@ -1605,8 +1605,8 @@ namespace Cabo.Client.UI
 
             if (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
             {
-                action.FinalSourceHandBounds.Clear();
-                action.FinalSourceHandBounds.AddRange(CaptureAllSlotBounds(action.SourcePlayerId));
+                // FinalSourceHandBounds will be captured later in PlayActionAnimation
+                // after the layout settle delay, to ensure UI Toolkit has completed layout
                 BuildExchangeMotionPlan(action);
             }
         }
@@ -2083,6 +2083,18 @@ namespace Cabo.Client.UI
 
         void PlayActionAnimation(ActionAnimationSnapshot action)
         {
+            // For exchange actions, capture FinalSourceHandBounds now after layout settle delay
+            // This ensures UI Toolkit has completed layout calculations for the new hand size
+            if ((action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
+                && action.FinalSourceHandBounds.Count == 0)
+            {
+                Debug.Log($"[PlayActionAnimation] Capturing FinalSourceHandBounds for {action.ActionType}, before capture count={action.FinalSourceHandBounds.Count}");
+                action.FinalSourceHandBounds.Clear();
+                action.FinalSourceHandBounds.AddRange(CaptureAllSlotBounds(action.SourcePlayerId));
+                Debug.Log($"[PlayActionAnimation] After capture: FinalSourceHandBounds.Count={action.FinalSourceHandBounds.Count}");
+                BuildExchangeMotionPlan(action);
+            }
+
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
                 return;
 
@@ -2917,9 +2929,11 @@ namespace Cabo.Client.UI
             if (row == null)
                 return result;
 
+            Debug.Log($"[CaptureAllSlotBounds] playerId={playerId}, row.childCount={row.childCount}");
             for (int slot = 0; slot < row.childCount; slot++)
             {
                 var bounds = row[slot]?.worldBound ?? Rect.zero;
+                Debug.Log($"  slot[{slot}]: bounds={bounds}");
                 if (bounds.width > 1 && bounds.height > 1)
                 {
                     bool faceUp = false;
@@ -2932,6 +2946,7 @@ namespace Cabo.Client.UI
                     result.Add(new SlotSnapshot { PlayerId = playerId, Slot = slot, Bounds = bounds, FaceUp = faceUp, Value = value });
                 }
             }
+            Debug.Log($"[CaptureAllSlotBounds] result.Count={result.Count}");
             return result;
         }
 
