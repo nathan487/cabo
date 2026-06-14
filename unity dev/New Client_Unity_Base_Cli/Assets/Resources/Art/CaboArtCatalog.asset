@@ -153,3 +153,12 @@ MonoBehaviour:
   seatLeftBackground: {fileID: 21300000, guid: a6ccba631e19ae541992f322e898e6df, type: 3}
   seatRightBackground: {fileID: 21300000, guid: 1caa8e9716c47bf459dcc4f7a603c1fe, type: 3}
   tableCenterBackground: {fileID: 21300000, guid: 3271a72733f8c2d4b97feb3b0b125603, type: 3}
+  drawSfx: {fileID: 8300000, guid: 3e7799b770c343f43916f3e78a1ba15b, type: 3}
+  flipSfx: {fileID: 8300000, guid: 526e0716539165645a050239158216f7, type: 3}
+  discardSfx: {fileID: 8300000, guid: bfc305f223f36d144ae4bb3d40c18465, type: 3}
+  swapSfx: {fileID: 8300000, guid: e7a9b824102d25642833686839ffad7a, type: 3}
+  skillSfx: {fileID: 8300000, guid: 2a1d60db65b5d0a43b67bb895bb4990d, type: 3}
+  caboSfx: {fileID: 8300000, guid: 2860b61f619a1194c8e9e1f78f2db0ab, type: 3}
+  eatSfx: {fileID: 8300000, guid: d17e6768d5adac341bc400744abdea7b, type: 3}
+  penaltySfx: {fileID: 8300000, guid: 227ac6094f22e7041a8ad671bbccc5a7, type: 3}
+  victorySfx: {fileID: 8300000, guid: 9c0eb4bbf109dfb43990ce443baacd02, type: 3}

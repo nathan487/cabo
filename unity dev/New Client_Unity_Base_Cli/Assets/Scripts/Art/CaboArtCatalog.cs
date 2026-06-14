@@ -3,6 +3,19 @@ using UnityEngine;
 
 namespace Cabo.Client.Art
 {
+    public enum CaboSfx
+    {
+        Draw,
+        Flip,
+        Discard,
+        Swap,
+        Skill,
+        Cabo,
+        Eat,
+        Penalty,
+        Victory
+    }
+
     public enum ConsumePose
     {
         None,
@@ -48,6 +61,15 @@ namespace Cabo.Client.Art
         public Sprite seatLeftBackground;
         public Sprite seatRightBackground;
         public Sprite tableCenterBackground;
+        public AudioClip drawSfx;
+        public AudioClip flipSfx;
+        public AudioClip discardSfx;
+        public AudioClip swapSfx;
+        public AudioClip skillSfx;
+        public AudioClip caboSfx;
+        public AudioClip eatSfx;
+        public AudioClip penaltySfx;
+        public AudioClip victorySfx;
 
         public FoodCardDefinition GetFood(int value)
         {
@@ -77,6 +99,23 @@ namespace Cabo.Client.Art
             }
 
             return null;
+        }
+
+        public AudioClip GetSfx(CaboSfx cue)
+        {
+            switch (cue)
+            {
+                case CaboSfx.Draw: return drawSfx;
+                case CaboSfx.Flip: return flipSfx;
+                case CaboSfx.Discard: return discardSfx;
+                case CaboSfx.Swap: return swapSfx;
+                case CaboSfx.Skill: return skillSfx;
+                case CaboSfx.Cabo: return caboSfx;
+                case CaboSfx.Eat: return eatSfx;
+                case CaboSfx.Penalty: return penaltySfx;
+                case CaboSfx.Victory: return victorySfx;
+                default: return null;
+            }
         }
     }
 }

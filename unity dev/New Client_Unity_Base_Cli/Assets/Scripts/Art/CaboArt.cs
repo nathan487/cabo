@@ -76,6 +76,7 @@ namespace Cabo.Client.Art
         public static Sprite SeatLeftBackground => Catalog != null ? Catalog.seatLeftBackground : null;
         public static Sprite SeatRightBackground => Catalog != null ? Catalog.seatRightBackground : null;
         public static Sprite TableCenterBackground => Catalog != null ? Catalog.tableCenterBackground : null;
+        public static AudioClip GetSfx(CaboSfx cue) => Catalog != null ? Catalog.GetSfx(cue) : null;
 
         public static Sprite GetSeatBackground(string seatName)
         {

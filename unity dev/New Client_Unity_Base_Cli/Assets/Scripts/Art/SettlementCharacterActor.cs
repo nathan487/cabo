@@ -158,10 +158,12 @@ namespace Cabo.Client.Art
             }
 
             propRenderer.transform.SetParent(visualRoot, false);
-            propRenderer.transform.localPosition = propPosition;
+            Vector3 propStart = propPosition + new Vector3(0.72f, 0.66f, 0f);
+            propRenderer.transform.localPosition = propStart;
             propRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, propRotation);
-            propRenderer.transform.localScale = propScale;
+            propRenderer.transform.localScale = propScale * 0.62f;
 
+            yield return MoveProp(propStart, propPosition, propScale * 0.62f, propScale, 0.34f);
             yield return MoveTargets(leftRestTarget, rightRestTarget, leftHold, rightHold, 0.42f);
             yield return Bounce(0.16f, 0.10f);
             mouth.sprite = mouthChew;
@@ -175,6 +177,50 @@ namespace Cabo.Client.Art
             yield return MoveTargets(leftHold, rightHold, leftRestTarget, rightRestTarget, 0.36f);
             ResetPose();
             yield return new WaitForSecondsRealtime(0.12f);
+        }
+
+        public IEnumerator PlayPenaltyReaction()
+        {
+            ResetPose();
+            if (mouth != null) mouth.sprite = mouthFail;
+            float elapsed = 0f;
+            const float duration = 0.72f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float shake = Mathf.Sin(elapsed * 34f) * 0.055f * (1f - elapsed / duration);
+                if (headBone != null)
+                    headBone.localPosition = _headStart + Vector3.right * shake;
+                yield return null;
+            }
+            ResetPose();
+        }
+
+        public IEnumerator PlayRewardReaction()
+        {
+            ResetPose();
+            if (mouth != null) mouth.sprite = mouthHappy;
+            if (leftEye != null) leftEye.sprite = leftEyeClosed;
+            if (rightEye != null) rightEye.sprite = rightEyeClosed;
+            yield return Bounce(0.18f, 0.22f);
+            yield return Bounce(0.12f, 0.18f);
+            ResetPose();
+        }
+
+        IEnumerator MoveProp(Vector3 fromPosition, Vector3 toPosition, Vector3 fromScale, Vector3 toScale, float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+                float arc = Mathf.Sin(t * Mathf.PI) * 0.18f;
+                propRenderer.transform.localPosition = Vector3.LerpUnclamped(fromPosition, toPosition, t) + Vector3.up * arc;
+                propRenderer.transform.localScale = Vector3.LerpUnclamped(fromScale, toScale, t);
+                yield return null;
+            }
+            propRenderer.transform.localPosition = toPosition;
+            propRenderer.transform.localScale = toScale;
         }
 
         void SetRaisedHands(bool leftRaised, bool rightRaised)

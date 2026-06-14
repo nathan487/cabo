@@ -1,9 +1,39 @@
 using System.Collections;
 using System.Collections.Generic;
+using System;
 using UnityEngine;
 
 namespace Cabo.Client.Art
 {
+    public enum SettlementCueType
+    {
+        FoodStarted,
+        FoodConsumed,
+        Penalty,
+        KamikazeTriggered,
+        KamikazePenalty,
+        ResultFinalized
+    }
+
+    public readonly struct SettlementCue
+    {
+        public readonly SettlementCueType Type;
+        public readonly int PlayerIndex;
+        public readonly int CardValue;
+        public readonly int RunningHandTotal;
+        public readonly int Amount;
+
+        public SettlementCue(SettlementCueType type, int playerIndex, int cardValue = 0,
+            int runningHandTotal = 0, int amount = 0)
+        {
+            Type = type;
+            PlayerIndex = playerIndex;
+            CardValue = cardValue;
+            RunningHandTotal = runningHandTotal;
+            Amount = amount;
+        }
+    }
+
     public sealed class SettlementStageRuntime : MonoBehaviour
     {
         const int TextureWidth = 1024;
@@ -15,6 +45,9 @@ namespace Cabo.Client.Art
         Coroutine _playback;
         Transform _actorRoot;
         int _roundNumber = -1;
+        int _completedRoundNumber = -1;
+        Action<SettlementCue> _cueHandler;
+        Action _completeHandler;
 
         public RenderTexture Output => _output;
 
@@ -54,12 +87,20 @@ namespace Cabo.Client.Art
             _camera.targetTexture = _output;
         }
 
-        public void Play(int roundNumber, IReadOnlyList<RoundResult> results)
+        public void Play(int roundNumber, IReadOnlyList<RoundResult> results,
+            Action<SettlementCue> cueHandler = null, Action completeHandler = null)
         {
+            _cueHandler = cueHandler;
+            _completeHandler = completeHandler;
             if (_roundNumber == roundNumber && _actors.Count > 0)
+            {
+                if (_playback == null && _completedRoundNumber == roundNumber)
+                    _completeHandler?.Invoke();
                 return;
+            }
 
             _roundNumber = roundNumber;
+            _completedRoundNumber = -1;
             RebuildActors(results?.Count ?? 0, results);
             if (_playback != null)
                 StopCoroutine(_playback);
@@ -115,41 +156,111 @@ namespace Cabo.Client.Art
                 go.transform.localPosition = new Vector3(start + spacing * i, -0.25f, 0f);
                 go.transform.localScale = Vector3.one * scale;
                 var actor = go.GetComponent<SettlementCharacterActor>();
-                if (actor != null)
-                    _actors.Add(actor);
+                _actors.Add(actor);
             }
         }
 
         IEnumerator PlayResults(IReadOnlyList<RoundResult> results)
         {
             if (results == null || results.Count == 0 || _actors.Count == 0)
+            {
+                CompletePlayback();
                 yield break;
+            }
+
+            int kamikazeIndex = -1;
+            for (int i = 0; i < results.Count; i++)
+            {
+                if (results[i].IsKamikaze)
+                {
+                    kamikazeIndex = i;
+                    break;
+                }
+            }
 
             var routines = new List<Coroutine>();
             for (int i = 0; i < _actors.Count && i < results.Count; i++)
-                routines.Add(StartCoroutine(PlayActorCards(_actors[i], results[i].CardValues)));
+                routines.Add(StartCoroutine(PlayActorResult(_actors[i], results[i], i, kamikazeIndex >= 0)));
             for (int i = 0; i < routines.Count; i++)
                 yield return routines[i];
-            _playback = null;
+
+            if (kamikazeIndex >= 0)
+            {
+                yield return new WaitForSecondsRealtime(0.25f);
+                CaboAudio.Play(CaboSfx.Skill, 0.85f);
+                Emit(new SettlementCue(SettlementCueType.KamikazeTriggered, kamikazeIndex));
+                if (kamikazeIndex < _actors.Count && _actors[kamikazeIndex] != null)
+                    yield return _actors[kamikazeIndex].PlayRewardReaction();
+
+                for (int i = 0; i < results.Count; i++)
+                {
+                    if (i == kamikazeIndex)
+                        continue;
+                    int amount = results[i].Penalty > 0 ? results[i].Penalty : 50;
+                    CaboAudio.Play(CaboSfx.Penalty, 0.78f);
+                    Emit(new SettlementCue(SettlementCueType.KamikazePenalty, i, amount: amount));
+                    if (i < _actors.Count && _actors[i] != null)
+                        yield return _actors[i].PlayPenaltyReaction();
+                }
+
+                for (int i = 0; i < results.Count; i++)
+                    Emit(new SettlementCue(SettlementCueType.ResultFinalized, i));
+            }
+
+            CompletePlayback();
         }
 
-        IEnumerator PlayActorCards(SettlementCharacterActor actor, IReadOnlyList<int> values)
+        IEnumerator PlayActorResult(SettlementCharacterActor actor, RoundResult result, int playerIndex,
+            bool suppressPenalty)
         {
-            if (actor == null || values == null)
+            if (result == null)
                 yield break;
 
             bool played = false;
-            for (int i = 0; i < values.Count; i++)
+            int runningHandTotal = 0;
+            var values = result.CardValues;
+            for (int i = 0; values != null && i < values.Count; i++)
             {
                 var food = CaboArt.GetFood(values[i]);
                 if (food?.consumeSprite == null)
                     continue;
                 played = true;
-                yield return actor.PlayFood(food);
+                Emit(new SettlementCue(SettlementCueType.FoodStarted, playerIndex, values[i], runningHandTotal));
+                if (actor != null)
+                    yield return actor.PlayFood(food);
+                else
+                    yield return new WaitForSecondsRealtime(0.2f);
+                runningHandTotal += values[i];
+                CaboAudio.Play(CaboSfx.Eat, 0.66f);
+                Emit(new SettlementCue(SettlementCueType.FoodConsumed, playerIndex, values[i], runningHandTotal));
             }
 
-            if (!played)
+            if (!played && actor != null)
                 actor.ResetPose();
+
+            if (!suppressPenalty && result.Penalty > 0)
+            {
+                yield return new WaitForSecondsRealtime(0.18f);
+                CaboAudio.Play(CaboSfx.Penalty, 0.78f);
+                Emit(new SettlementCue(SettlementCueType.Penalty, playerIndex, amount: result.Penalty));
+                if (actor != null)
+                    yield return actor.PlayPenaltyReaction();
+            }
+
+            if (!suppressPenalty)
+                Emit(new SettlementCue(SettlementCueType.ResultFinalized, playerIndex));
+        }
+
+        void Emit(SettlementCue cue)
+        {
+            _cueHandler?.Invoke(cue);
+        }
+
+        void CompletePlayback()
+        {
+            _playback = null;
+            _completedRoundNumber = _roundNumber;
+            _completeHandler?.Invoke();
         }
 
         IEnumerator PlayPilotLoop()

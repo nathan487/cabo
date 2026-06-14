@@ -87,6 +87,15 @@ namespace Cabo.Client.UI
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
         SettlementStageRuntime _settlementStage;
+        readonly List<SettlementScoreRowView> _settlementScoreRows = new();
+        Button _interRoundReadyButton;
+        Button _interRoundStartButton;
+        Label _settlementGateLabel;
+        bool _interRoundReadyCanUse;
+        bool _interRoundStartCanUse;
+        bool _settlementPlaybackComplete;
+        int _settlementRoundNumber = -1;
+        bool _victorySfxPlayed;
         EventCallback<GeometryChangedEvent> _geometryChangedHandler;
         Action _animationQueueDrained;
 
@@ -530,6 +539,7 @@ namespace Cabo.Client.UI
 
         public void RenderGame()
         {
+            _victorySfxPlayed = false;
             HideSettlementStage();
             var state = _flow.State;
             if (state.RoundNumber != _lastRenderedRoundNumber)
@@ -663,6 +673,12 @@ namespace Cabo.Client.UI
             _actionPanel.style.display = DisplayStyle.Flex;
             _actionPanel.style.marginTop = 8;
 
+            if (_settlementRoundNumber != state.RoundNumber)
+            {
+                _settlementRoundNumber = state.RoundNumber;
+                _settlementPlaybackComplete = false;
+            }
+
             var title = new Label("本轮餐盘糖能");
             StylePanelTitle(title);
             _actionPanel.Add(title);
@@ -675,8 +691,6 @@ namespace Cabo.Client.UI
             revealContent.style.flexShrink = 0;
             revealContent.style.marginBottom = 4;
             _actionPanel.Add(revealContent);
-
-            MountSettlementStage(state, revealContent);
 
             var scorePanel = new VisualElement { name = "SettlementScorePanel" };
             scorePanel.style.width = 300;
@@ -705,16 +719,27 @@ namespace Cabo.Client.UI
             resultList.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             resultList.style.flexGrow = 1;
             resultList.style.minHeight = 0;
+            _settlementScoreRows.Clear();
             foreach (var result in state.LastRoundResults)
-                resultList.Add(CreateCompactRevealRow(result));
+            {
+                var row = CreateCompactRevealRow(result);
+                _settlementScoreRows.Add(row);
+                resultList.Add(row.Root);
+            }
             scorePanel.Add(resultList);
 
-            AddInterRoundControls(state);
+            AddInterRoundControls(state, _settlementPlaybackComplete);
+            MountSettlementStage(state, revealContent);
             UpdateStatusLineForEarlyEnd(state, true);
         }
 
         public void RenderGameOver()
         {
+            if (!_victorySfxPlayed)
+            {
+                CaboAudio.Play(CaboSfx.Victory, 0.92f);
+                _victorySfxPlayed = true;
+            }
             ClearTransientAnimationState();
             HideSettlementStage();
             _cardTableView.SetVisible(false);
@@ -2237,11 +2262,16 @@ namespace Cabo.Client.UI
                 return;
 
             if (_cardTableView.PlayLocalDraw(value, target.position, target.size))
+            {
+                CaboAudio.Play(CaboSfx.Draw, 0.72f);
                 _lastLocalDrawSequence = sequence;
+            }
         }
 
         void PlayActionAnimation(ActionAnimationSnapshot action)
         {
+            PlayActionSfx(action);
+
             // For exchange actions, capture FinalSourceHandBounds now after layout settle delay
             // This ensures UI Toolkit has completed layout calculations for the new hand size
             if ((action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
@@ -2276,6 +2306,32 @@ namespace Cabo.Client.UI
                     break;
                 case ActionType.CallSteady:
                     PlayCaboCallAnimation(action.SourcePlayerId);
+                    break;
+            }
+        }
+
+        void PlayActionSfx(ActionAnimationSnapshot action)
+        {
+            switch (action.ActionType)
+            {
+                case ActionType.Draw:
+                    if (action.Sequence != _lastLocalDrawSequence)
+                        CaboAudio.Play(CaboSfx.Draw, 0.72f);
+                    break;
+                case ActionType.DiscardDrawn:
+                    CaboAudio.Play(CaboSfx.Discard, 0.78f);
+                    break;
+                case ActionType.ReplaceWithDrawn:
+                case ActionType.TakeFromDiscard:
+                    CaboAudio.Play(CaboSfx.Swap, 0.72f);
+                    break;
+                case ActionType.UseSkill:
+                    CaboAudio.Play(CaboSfx.Skill, 0.72f);
+                    if (action.Skill == SkillType.PeekSelf || action.Skill == SkillType.Spy)
+                        CaboAudio.Play(CaboSfx.Flip, 0.62f);
+                    break;
+                case ActionType.CallSteady:
+                    CaboAudio.Play(CaboSfx.Cabo, 0.92f);
                     break;
             }
         }
@@ -3995,7 +4051,7 @@ namespace Cabo.Client.UI
             return row;
         }
 
-        VisualElement CreateCompactRevealRow(RoundResult result)
+        SettlementScoreRowView CreateCompactRevealRow(RoundResult result)
         {
             var row = new VisualElement();
             row.style.minHeight = 76;
@@ -4029,8 +4085,8 @@ namespace Cabo.Client.UI
             header.Add(name);
 
             string flagText = result.IsLowest
-                ? "\u6700\u4F4E\u7CD6\u80FD"
-                : result.IsSteadyCaller ? "\u5065\u5EB7\u5BA3\u8A00" : "";
+                ? "最低糖能"
+                : result.IsSteadyCaller ? "健康宣言" : "";
             if (!string.IsNullOrEmpty(flagText))
             {
                 var flag = new Label(flagText);
@@ -4042,17 +4098,79 @@ namespace Cabo.Client.UI
             string cardValues = result.CardValues != null && result.CardValues.Count > 0
                 ? string.Join(" + ", result.CardValues)
                 : "0";
-            string penalty = result.Penalty > 0 ? $"  \u7FFB\u8F66 +{result.Penalty}" : "";
-            var score = new Label(
-                $"\u624B\u724C {cardValues}  \u00B7 \u9910\u76D8 {result.HandTotal}{penalty}\n" +
-                $"\u672C\u8F6E {result.RoundScore:+0;-0;0}  \u00B7 \u7D2F\u8BA1 {result.CumulativeScore}");
+            var score = new Label($"手牌 {cardValues}\n等待角色进食…");
             score.style.fontSize = 10;
             score.style.marginTop = 3;
             score.style.whiteSpace = WhiteSpace.Normal;
             score.style.color = UITheme.TextSecondary;
             row.Add(score);
-            return row;
+
+            var effect = new Label(result.IsKamikaze ? "反转套餐待触发" : "");
+            effect.style.fontSize = 9;
+            effect.style.marginTop = 2;
+            effect.style.color = UITheme.SelectedBorder;
+            effect.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(effect);
+            return new SettlementScoreRowView(row, score, effect, result);
         }
+
+        void HandleSettlementCue(SettlementCue cue)
+        {
+            if (cue.PlayerIndex < 0 || cue.PlayerIndex >= _settlementScoreRows.Count)
+                return;
+
+            var view = _settlementScoreRows[cue.PlayerIndex];
+            var result = view.Result;
+            switch (cue.Type)
+            {
+                case SettlementCueType.FoodStarted:
+                    var food = CaboArt.GetFood(cue.CardValue);
+                    view.Effect.text = $"正在品尝 {food?.displayName ?? cue.CardValue.ToString()}  +{cue.CardValue}";
+                    break;
+                case SettlementCueType.FoodConsumed:
+                    view.Score.text = $"餐盘糖能 {cue.RunningHandTotal} / {result.HandTotal}\n" +
+                        $"服务端本轮 {result.RoundScore:+0;-0;0}  · 累计 {result.CumulativeScore}";
+                    view.Effect.text = $"食物 +{cue.CardValue}";
+                    break;
+                case SettlementCueType.Penalty:
+                    view.Effect.text = $"翻车小点心 +{cue.Amount}";
+                    view.Effect.style.color = UITheme.CaboBorder;
+                    break;
+                case SettlementCueType.KamikazeTriggered:
+                    view.Effect.text = "糖分反转套餐！其他玩家 +50";
+                    view.Effect.style.color = UITheme.ReadyBorder;
+                    break;
+                case SettlementCueType.KamikazePenalty:
+                    view.Effect.text = $"反转套餐波及 +{cue.Amount}";
+                    view.Effect.style.color = UITheme.CaboBorder;
+                    break;
+                case SettlementCueType.ResultFinalized:
+                    ApplyServerSettlementResult(view);
+                    break;
+            }
+        }
+
+        static void ApplyServerSettlementResult(SettlementScoreRowView view)
+        {
+            var result = view.Result;
+            view.Score.text = $"餐盘 {result.HandTotal}  · 本轮 {result.RoundScore:+0;-0;0}\n" +
+                $"累计 {result.CumulativeScore}";
+            if (string.IsNullOrEmpty(view.Effect.text))
+                view.Effect.text = "结算完成";
+        }
+
+        void HandleSettlementPlaybackComplete()
+        {
+            _settlementPlaybackComplete = true;
+            for (int i = 0; i < _settlementScoreRows.Count; i++)
+                ApplyServerSettlementResult(_settlementScoreRows[i]);
+
+            _interRoundReadyButton?.SetEnabled(_interRoundReadyCanUse);
+            _interRoundStartButton?.SetEnabled(_interRoundStartCanUse);
+            if (_settlementGateLabel != null)
+                _settlementGateLabel.style.display = DisplayStyle.None;
+        }
+
 
         VisualElement CreateFinalRankRow(FinalRank rank)
         {
@@ -4126,7 +4244,11 @@ namespace Cabo.Client.UI
                 _settlementStage = SettlementStageRuntime.Create(_ownerTransform);
 
             _settlementStage.gameObject.SetActive(true);
-            _settlementStage.Play(state.RoundNumber, state.LastRoundResults);
+            _settlementStage.Play(
+                state.RoundNumber,
+                state.LastRoundResults,
+                HandleSettlementCue,
+                HandleSettlementPlaybackComplete);
 
             var stageImage = new Image
             {
@@ -4140,7 +4262,7 @@ namespace Cabo.Client.UI
             stageImage.style.flexShrink = 1;
             stageImage.style.minWidth = 0;
             stageImage.style.marginRight = 8;
-            (parent ?? _actionPanel).Add(stageImage);
+            (parent ?? _actionPanel).Insert(0, stageImage);
         }
 
         void HideSettlementStage()
@@ -4151,7 +4273,7 @@ namespace Cabo.Client.UI
             _settlementStage.gameObject.SetActive(false);
         }
 
-        void AddInterRoundControls(GameState state)
+        void AddInterRoundControls(GameState state, bool playbackComplete)
         {
             var me = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
             bool isHost = me != null && me.IsHost;
@@ -4196,12 +4318,26 @@ namespace Cabo.Client.UI
             controls.style.flexShrink = 0;
             _actionPanel.Add(controls);
 
-            controls.Add(CreatePanelButton(myReady ? "已准备" : "准备", () => _flow.SendReady(), !myReady && state.MyPlayerId > 0 && state.RoomId > 0));
+            _interRoundReadyCanUse = !myReady && state.MyPlayerId > 0 && state.RoomId > 0;
+            _interRoundReadyButton = CreatePanelButton(
+                myReady ? "已准备" : "准备",
+                () => _flow.SendReady(),
+                playbackComplete && _interRoundReadyCanUse);
+            controls.Add(_interRoundReadyButton);
 
             if (isHost)
-                controls.Add(CreatePanelButton("开始下一轮", () => _flow.SendStartGame(), allReady && state.MyPlayerId > 0 && state.RoomId > 0));
+            {
+                _interRoundStartCanUse = allReady && state.MyPlayerId > 0 && state.RoomId > 0;
+                _interRoundStartButton = CreatePanelButton(
+                    "开始下一轮",
+                    () => _flow.SendStartGame(),
+                    playbackComplete && _interRoundStartCanUse);
+                controls.Add(_interRoundStartButton);
+            }
             else
             {
+                _interRoundStartCanUse = false;
+                _interRoundStartButton = null;
                 var wait = new Label(allReady ? "等待房主开始" : "等待所有玩家准备");
                 wait.style.fontSize = 12;
                 wait.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -4211,6 +4347,14 @@ namespace Cabo.Client.UI
                 wait.style.whiteSpace = WhiteSpace.Normal;
                 controls.Add(wait);
             }
+
+            _settlementGateLabel = new Label("结算演出完成后可进入下一轮");
+            _settlementGateLabel.style.fontSize = 11;
+            _settlementGateLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _settlementGateLabel.style.marginTop = 3;
+            _settlementGateLabel.style.color = UITheme.SelectedBorder;
+            _settlementGateLabel.style.display = playbackComplete ? DisplayStyle.None : DisplayStyle.Flex;
+            _actionPanel.Add(_settlementGateLabel);
 
             _statusLine.text = isHost
                 ? $"{readyCount}/{playerCount} 已准备。全员准备后可开始。"
@@ -4825,6 +4969,22 @@ namespace Cabo.Client.UI
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
             label.style.marginBottom = 8;
+        }
+
+        sealed class SettlementScoreRowView
+        {
+            public readonly VisualElement Root;
+            public readonly Label Score;
+            public readonly Label Effect;
+            public readonly RoundResult Result;
+
+            public SettlementScoreRowView(VisualElement root, Label score, Label effect, RoundResult result)
+            {
+                Root = root;
+                Score = score;
+                Effect = effect;
+                Result = result;
+            }
         }
 
         sealed class SeatView

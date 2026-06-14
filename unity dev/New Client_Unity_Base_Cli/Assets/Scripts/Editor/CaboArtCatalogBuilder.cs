@@ -42,6 +42,7 @@ namespace Cabo.Client.Editor
         public static void RebuildCatalog()
         {
             EnsureFolder("Assets/Resources", "Art");
+            CaboAudioAssetBuilder.EnsureAudioAssets();
             ConfigureTextureImporters();
 
             var catalog = AssetDatabase.LoadAssetAtPath<CaboArtCatalog>(CatalogPath);
@@ -100,6 +101,15 @@ namespace Cabo.Client.Editor
             catalog.seatLeftBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_left_garden.png");
             catalog.seatRightBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_right_strawberry.png");
             catalog.tableCenterBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/table_center_island.png");
+            catalog.drawSfx = LoadSfx("draw");
+            catalog.flipSfx = LoadSfx("flip");
+            catalog.discardSfx = LoadSfx("discard");
+            catalog.swapSfx = LoadSfx("swap");
+            catalog.skillSfx = LoadSfx("skill");
+            catalog.caboSfx = LoadSfx("cabo");
+            catalog.eatSfx = LoadSfx("eat");
+            catalog.penaltySfx = LoadSfx("penalty");
+            catalog.victorySfx = LoadSfx("victory");
 
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
@@ -110,7 +120,7 @@ namespace Cabo.Client.Editor
             if (errors.Count > 0)
                 throw new InvalidOperationException("Cabo art catalog is incomplete:\n- " + string.Join("\n- ", errors));
 
-            Debug.Log("[Cabo] Art catalog rebuilt: 14 food cards, card back, 3 screen backgrounds, 4 player stations, and center table.");
+            Debug.Log("[Cabo] Art catalog rebuilt: 14 foods, themed table art, pomelo settlement actor, and 9 SFX clips.");
         }
 
         [MenuItem("Cabo/Validate Art Catalog")]
@@ -225,11 +235,31 @@ namespace Cabo.Client.Editor
             if (catalog.seatLeftBackground == null) errors.Add("Left player station is missing");
             if (catalog.seatRightBackground == null) errors.Add("Right player station is missing");
             if (catalog.tableCenterBackground == null) errors.Add("Center table illustration is missing");
+            ValidateSfx(catalog.drawSfx, "Draw", errors);
+            ValidateSfx(catalog.flipSfx, "Flip", errors);
+            ValidateSfx(catalog.discardSfx, "Discard", errors);
+            ValidateSfx(catalog.swapSfx, "Swap", errors);
+            ValidateSfx(catalog.skillSfx, "Skill", errors);
+            ValidateSfx(catalog.caboSfx, "CABO", errors);
+            ValidateSfx(catalog.eatSfx, "Eat", errors);
+            ValidateSfx(catalog.penaltySfx, "Penalty", errors);
+            ValidateSfx(catalog.victorySfx, "Victory", errors);
             if (catalog.characters == null || catalog.characters.Length == 0)
                 errors.Add("At least one character definition is required");
             else if (catalog.characters[0].settlementPrefab == null)
                 errors.Add("Default character settlement prefab is missing");
             return errors;
+        }
+
+        static AudioClip LoadSfx(string name)
+        {
+            return AssetDatabase.LoadAssetAtPath<AudioClip>(CaboAudioAssetBuilder.PathFor(name));
+        }
+
+        static void ValidateSfx(AudioClip clip, string label, List<string> errors)
+        {
+            if (clip == null)
+                errors.Add($"{label} SFX is missing");
         }
 
         static void EnsureFolder(string parent, string child)

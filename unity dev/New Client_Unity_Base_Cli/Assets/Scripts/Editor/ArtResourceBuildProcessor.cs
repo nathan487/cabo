@@ -23,6 +23,7 @@ namespace Cabo.Client.Editor
         public void OnPreprocessBuild(BuildReport report)
         {
             SyncArtResources();
+            ValidateSyncedResourcesOrThrow();
             CaboArtCatalogBuilder.RebuildCatalog();
             CaboArtCatalogBuilder.ValidateCatalogOrThrow();
         }
@@ -39,9 +40,33 @@ namespace Cabo.Client.Editor
             CopyAvatars(manifest);
             CopyStickers(manifest);
 
+            ValidateManifestOrThrow(manifest);
             File.WriteAllText(ToFullPath(ManifestPath), JsonUtility.ToJson(manifest, true));
             AssetDatabase.Refresh();
+            ConfigureTextureFolder(AvatarResource, 512);
+            ConfigureTextureFolder(StickerResource, 512);
+            AssetDatabase.Refresh();
+            ValidateSyncedResourcesOrThrow();
             Debug.Log($"[Cabo] Synced {manifest.avatars.Count} avatars and {manifest.stickers.Count} stickers into Resources.");
+        }
+
+        [MenuItem("Cabo/Validate Synced Art Resources")]
+        public static void ValidateSyncedResources()
+        {
+            ValidateSyncedResourcesOrThrow();
+            Debug.Log("[Cabo] Avatar/sticker manifest validation passed.");
+        }
+
+        public static void ValidateSyncedResourcesOrThrow()
+        {
+            string manifestFullPath = ToFullPath(ManifestPath);
+            if (!File.Exists(manifestFullPath))
+                throw new InvalidOperationException($"Missing art manifest: {ManifestPath}");
+
+            var manifest = JsonUtility.FromJson<ArtManifest>(File.ReadAllText(manifestFullPath));
+            ValidateManifestOrThrow(manifest);
+            ValidateEntriesExist(manifest.avatars);
+            ValidateEntriesExist(manifest.stickers);
         }
 
         static void CopyAvatars(ArtManifest manifest)
@@ -51,7 +76,9 @@ namespace Cabo.Client.Editor
                 return;
 
             Directory.CreateDirectory(ToFullPath(AvatarResource));
-            foreach (var file in Directory.GetFiles(source, "*.png", SearchOption.TopDirectoryOnly))
+            var files = Directory.GetFiles(source, "*.png", SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            foreach (var file in files)
             {
                 var name = Path.GetFileNameWithoutExtension(file);
                 var targetAssetPath = $"{AvatarResource}/{Path.GetFileName(file)}";
@@ -71,7 +98,9 @@ namespace Cabo.Client.Editor
                 return;
 
             Directory.CreateDirectory(ToFullPath(StickerResource));
-            foreach (var file in Directory.GetFiles(source, "*.png", SearchOption.AllDirectories))
+            var files = Directory.GetFiles(source, "*.png", SearchOption.AllDirectories);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+            foreach (var file in files)
             {
                 var pack = Path.GetFileName(Path.GetDirectoryName(file));
                 var name = Path.GetFileNameWithoutExtension(file);
@@ -93,6 +122,74 @@ namespace Cabo.Client.Editor
             if (Directory.Exists(fullPath))
                 Directory.Delete(fullPath, true);
             Directory.CreateDirectory(fullPath);
+        }
+
+        static void ConfigureTextureFolder(string folder, int maxTextureSize)
+        {
+            var guids = AssetDatabase.FindAssets("t:Texture2D", new[] { folder });
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null)
+                    continue;
+
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.mipmapEnabled = false;
+                importer.alphaIsTransparency = true;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.filterMode = FilterMode.Bilinear;
+                importer.maxTextureSize = maxTextureSize;
+                importer.textureCompression = TextureImporterCompression.CompressedHQ;
+                importer.SaveAndReimport();
+            }
+        }
+
+        static void ValidateManifestOrThrow(ArtManifest manifest)
+        {
+            if (manifest == null)
+                throw new InvalidOperationException("Art manifest is not readable JSON.");
+
+            manifest.avatars = manifest.avatars ?? new List<ArtEntry>();
+            manifest.stickers = manifest.stickers ?? new List<ArtEntry>();
+            var avatarIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var stickerIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < manifest.avatars.Count; i++)
+            {
+                var entry = manifest.avatars[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.name) || string.IsNullOrWhiteSpace(entry.path))
+                    throw new InvalidOperationException($"Avatar manifest entry {i} is incomplete.");
+                if (!avatarIds.Add(entry.name))
+                    throw new InvalidOperationException($"Duplicate avatar id: {entry.name}");
+            }
+
+            for (int i = 0; i < manifest.stickers.Count; i++)
+            {
+                var entry = manifest.stickers[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.pack)
+                    || string.IsNullOrWhiteSpace(entry.name) || string.IsNullOrWhiteSpace(entry.path))
+                    throw new InvalidOperationException($"Sticker manifest entry {i} is incomplete.");
+                string stableId = entry.pack + "/" + entry.name;
+                if (!stickerIds.Add(stableId))
+                    throw new InvalidOperationException($"Duplicate sticker id: {stableId}");
+            }
+        }
+
+        static void ValidateEntriesExist(List<ArtEntry> entries)
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                string assetPath = "Assets/Resources/" + entries[i].path + ".png";
+                if (!File.Exists(ToFullPath(assetPath)))
+                    throw new InvalidOperationException($"Manifest asset is missing: {assetPath}");
+
+                var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                if (importer == null || importer.textureType != TextureImporterType.Sprite
+                    || importer.mipmapEnabled || importer.maxTextureSize > 512)
+                    throw new InvalidOperationException($"Manifest asset has invalid sprite import settings: {assetPath}");
+            }
         }
 
         static string ToFullPath(string assetPath)
