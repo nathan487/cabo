@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Cabo.Client.Art;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -23,6 +24,8 @@ namespace Cabo.Client.UI
     public static class PlayerProfileStore
     {
         public const string AvatarPrefsKey = "Cabo.SelectedAvatarPath";
+        public const string CharacterPrefsKey = "Cabo.SelectedCharacterId";
+        const string CharacterPathPrefix = "character://";
         const string AvatarAssetFolder = "Assets/Art/Avatars";
         const string StickerAssetFolder = "Assets/Art/Stickers";
         const string ResourcePrefix = "res://";
@@ -42,6 +45,21 @@ namespace Cabo.Client.UI
                 PlayerPrefs.SetString(AvatarPrefsKey, value ?? "");
                 PlayerPrefs.Save();
             }
+        }
+
+        public static string SelectedCharacterId
+        {
+            get => PlayerPrefs.GetString(CharacterPrefsKey, "pomelo");
+            set
+            {
+                PlayerPrefs.SetString(CharacterPrefsKey, string.IsNullOrWhiteSpace(value) ? "pomelo" : value);
+                PlayerPrefs.Save();
+            }
+        }
+
+        public static string GetCharacterVisualPath(string characterId)
+        {
+            return CharacterPathPrefix + (string.IsNullOrWhiteSpace(characterId) ? "pomelo" : characterId);
         }
 
         public static IReadOnlyList<ArtAsset> GetAvatarAssets()
@@ -172,6 +190,20 @@ namespace Cabo.Client.UI
             avatar.style.backgroundColor = fallbackColor;
             avatar.style.alignItems = Align.Center;
             avatar.style.justifyContent = Justify.Center;
+
+            if (!string.IsNullOrEmpty(avatarPath) && avatarPath.StartsWith(CharacterPathPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var characterId = avatarPath.Substring(CharacterPathPrefix.Length);
+                var portrait = CaboArt.GetCharacter(characterId)?.portraitSprite;
+                if (portrait != null)
+                {
+                    avatar.style.backgroundImage = new StyleBackground(portrait);
+#pragma warning disable CS0618
+                    avatar.style.unityBackgroundScaleMode = ScaleMode.ScaleAndCrop;
+#pragma warning restore CS0618
+                    return avatar;
+                }
+            }
 
             var texture = LoadTexture(avatarPath);
             if (texture != null)

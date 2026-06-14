@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cabo.Client.Art;
 using Cabo.Client.UI.CardTable;
 
 namespace Cabo.Client.UI
@@ -16,6 +17,7 @@ namespace Cabo.Client.UI
         public GameTablePanel GameTablePanel { get; private set; }
 
         GameFlow _flow;
+        VisualElement _backgroundLayer;
         System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
         bool _waitingForRevealAnimationDrain;
 
@@ -63,6 +65,8 @@ namespace Cabo.Client.UI
             GameTablePanel = null;
             Root?.Clear();
             CardTableView.DestroyAllUnder(transform);
+
+            CreateBackgroundLayer();
 
             // Build panels
             RoomPanel = new RoomPanel(Root, flow);
@@ -117,6 +121,10 @@ namespace Cabo.Client.UI
                 || _flow.Flow == FlowState.WaitingRoom
                 || state.Phase == GamePhase.WaitingRoom;
 
+            ApplyScreenBackground(showReveal || showOver
+                ? CaboArt.SettlementBackground
+                : showGame ? CaboArt.TableBackground : CaboArt.HomeBackground);
+
             RoomPanel.SetVisible(showRoomPanel && !showGame && !showReveal && !showOver);
             GameTablePanel.SetVisible(showGame || showReveal || showOver);
 
@@ -126,6 +134,33 @@ namespace Cabo.Client.UI
             if (showOver) GameTablePanel.RenderGameOver();
 
             ApplyRuntimeUiFallback();
+        }
+
+        void CreateBackgroundLayer()
+        {
+            if (Root == null)
+                return;
+
+            _backgroundLayer = new VisualElement { name = "CaboScreenBackground" };
+            _backgroundLayer.style.position = Position.Absolute;
+            _backgroundLayer.style.left = 0;
+            _backgroundLayer.style.right = 0;
+            _backgroundLayer.style.top = 0;
+            _backgroundLayer.style.bottom = 0;
+            _backgroundLayer.style.backgroundColor = UITheme.AppBackground;
+            _backgroundLayer.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+            _backgroundLayer.pickingMode = PickingMode.Ignore;
+            Root.Add(_backgroundLayer);
+        }
+
+        void ApplyScreenBackground(Sprite sprite)
+        {
+            if (_backgroundLayer == null)
+                return;
+
+            _backgroundLayer.style.backgroundImage = sprite != null
+                ? new StyleBackground(sprite)
+                : new StyleBackground(StyleKeyword.None);
         }
 
         void ApplyRuntimeUiFallback()

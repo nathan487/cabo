@@ -22,6 +22,19 @@ std::string trimAsciiWhitespace(const std::string& input) {
     return input.substr(begin, end - begin);
 }
 
+std::string normalizeCharacterId(const std::string& input) {
+    const std::string value = trimAsciiWhitespace(input);
+    if (value.empty() || value.size() > 32) {
+        return "pomelo";
+    }
+    for (unsigned char ch : value) {
+        if (!(std::islower(ch) || std::isdigit(ch) || ch == '_' || ch == '-')) {
+            return "pomelo";
+        }
+    }
+    return value;
+}
+
 int64_t nowMs() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -130,6 +143,7 @@ void RoomService::sendRoomState(int64_t roomId, const TcpConnectionPtr& conn) {
         auto* ppi = rs->add_players();
         ppi->set_player_id(p->playerId);
         ppi->set_nickname(p->nickname);
+        ppi->set_character_id(p->characterId);
         ppi->set_seat_id(p->seatId);
         ppi->set_is_ready(p->isReady);
         ppi->set_is_host(p->isHost);
@@ -168,6 +182,7 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
     auto player = std::make_shared<PlayerSession>();
     player->playerId = nextPlayerId();
     player->nickname = req.nickname().empty() ? "Player" : req.nickname();
+    player->characterId = normalizeCharacterId(req.character_id());
     player->seatId = 0;
     player->isReady = false;
     player->isHost = true;
@@ -274,6 +289,7 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
     auto player = std::make_shared<PlayerSession>();
     player->playerId = nextPlayerId();
     player->nickname = req.nickname().empty() ? "Player" : req.nickname();
+    player->characterId = normalizeCharacterId(req.character_id());
     player->seatId = static_cast<int32_t>(room->players.size());
     player->isReady = false;
     player->isHost = false;
@@ -303,6 +319,7 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
     auto* jpi = jn->mutable_player();
     jpi->set_player_id(player->playerId);
     jpi->set_nickname(player->nickname);
+    jpi->set_character_id(player->characterId);
     jpi->set_seat_id(player->seatId);
     jpi->set_is_ready(false);
     jpi->set_is_host(false);

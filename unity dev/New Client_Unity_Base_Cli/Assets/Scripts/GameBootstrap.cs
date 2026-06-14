@@ -33,6 +33,7 @@ namespace Cabo.Client
         static void AutoStart()
         {
             if (_instance != null) return;
+            if (SceneManager.GetActiveScene().name == "PomeloSettlementPilot") return;
             var go = new GameObject("GameBootstrap");
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<GameBootstrap>();

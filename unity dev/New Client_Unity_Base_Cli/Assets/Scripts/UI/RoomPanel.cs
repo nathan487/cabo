@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cabo.Client.Art;
 
 namespace Cabo.Client.UI
 {
@@ -9,6 +10,7 @@ namespace Cabo.Client.UI
     public class RoomPanel
     {
         VisualElement _root, _container;
+        ScrollView _homeScroll;
         VisualElement _serverRow, _nicknameRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
         VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView, _roomContent;
         ScrollView _playerListScroll;
@@ -25,15 +27,25 @@ namespace Cabo.Client.UI
             _flow = flow;
             _root = root;
 
+            _homeScroll = new ScrollView(ScrollViewMode.Vertical);
+            _homeScroll.style.flexGrow = 1;
+            _homeScroll.style.width = Length.Percent(100);
+            _homeScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            _homeScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+            root.Add(_homeScroll);
+
             _container = new VisualElement();
             _container.style.flexGrow = 1;
+            _container.style.width = Length.Percent(100);
             _container.style.paddingTop = 20;
             _container.style.paddingBottom = 20;
             _container.style.paddingLeft = 40;
             _container.style.paddingRight = 40;
-            root.Add(_container);
+            _container.style.alignItems = Align.Center;
+            _container.style.backgroundColor = Color.clear;
+            _homeScroll.Add(_container);
 
-            _title = new Label("CABO");
+            _title = new Label("\u7CD6\u7CD6 CABO");
             _title.style.fontSize = 28;
             _title.style.unityFontStyleAndWeight = FontStyle.Bold;
             _title.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -65,6 +77,11 @@ namespace Cabo.Client.UI
             _serverRow.style.justifyContent = Justify.Center;
             _serverRow.style.alignItems = Align.Center;
             _serverRow.style.marginTop = 26;
+            _serverRow.style.paddingLeft = 18;
+            _serverRow.style.paddingRight = 18;
+            _serverRow.style.paddingTop = 4;
+            _serverRow.style.paddingBottom = 4;
+            UITheme.ApplyPanel(_serverRow, UITheme.PanelGlassStrong, UITheme.PanelBorder, 16f);
             _container.Add(_serverRow);
 
             _serverRow.Add(CreateHomeFormLabel("服务器地址"));
@@ -116,6 +133,11 @@ namespace Cabo.Client.UI
             _playerListScroll.style.maxHeight = 360;
             _playerListScroll.style.marginRight = 16;
             _playerListScroll.style.overflow = Overflow.Hidden;
+            _playerListScroll.style.paddingLeft = 10;
+            _playerListScroll.style.paddingRight = 10;
+            _playerListScroll.style.paddingTop = 10;
+            _playerListScroll.style.paddingBottom = 10;
+            UITheme.ApplyPanel(_playerListScroll, UITheme.PanelGlass, UITheme.PanelBorder, 16f);
             _playerListScroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
             _playerListScroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             _roomContent.Add(_playerListScroll);
@@ -134,7 +156,11 @@ namespace Cabo.Client.UI
             _nicknameRow.style.justifyContent = Justify.Center;
             _nicknameRow.style.alignItems = Align.Center;
             _nicknameRow.style.marginTop = 16;
-            _nicknameRow.style.marginRight = 124;
+            _nicknameRow.style.paddingLeft = 18;
+            _nicknameRow.style.paddingRight = 18;
+            _nicknameRow.style.paddingTop = 4;
+            _nicknameRow.style.paddingBottom = 4;
+            UITheme.ApplyPanel(_nicknameRow, UITheme.PanelGlassStrong, UITheme.PanelBorder, 16f);
             _container.Add(_nicknameRow);
 
             _nicknameRow.Add(CreateHomeFormLabel("昵称"));
@@ -153,10 +179,10 @@ namespace Cabo.Client.UI
             _avatarSection.style.paddingRight = 12;
             _avatarSection.style.paddingTop = 10;
             _avatarSection.style.paddingBottom = 10;
-            UITheme.ApplyPanel(_avatarSection, UITheme.PanelSurface, UITheme.PanelBorder);
+            UITheme.ApplyPanel(_avatarSection, UITheme.PanelGlassStrong, UITheme.PanelBorder, 16f);
             _container.Add(_avatarSection);
 
-            var avatarTitle = new Label("头像");
+            var avatarTitle = new Label("角色");
             avatarTitle.style.fontSize = 14;
             avatarTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             avatarTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -191,7 +217,7 @@ namespace Cabo.Client.UI
             {
                 var nickname = GetNicknameOrShowError();
                 if (nickname == null) return;
-                _flow.CreateRoom(nickname);
+                _flow.CreateRoom(nickname, PlayerProfileStore.SelectedCharacterId);
             });
             _btnCreate.text = "创建房间";
             _btnCreate.style.marginRight = 10;
@@ -212,6 +238,10 @@ namespace Cabo.Client.UI
             _btnExitGame.text = "退出游戏";
             _btnExitGame.style.fontSize = 18;
             _homeButtonRow.Add(_btnExitGame);
+
+            // Keep primary room actions visible before the optional character selector.
+            _homeButtonRow.RemoveFromHierarchy();
+            _container.Insert(_container.IndexOf(_avatarSection), _homeButtonRow);
 
             _joinFormRow = new VisualElement();
             _joinFormRow.style.flexDirection = FlexDirection.Row;
@@ -240,12 +270,15 @@ namespace Cabo.Client.UI
                     return;
                 }
 
-                _flow.JoinRoom(code, nickname);
+                _flow.JoinRoom(code, nickname, PlayerProfileStore.SelectedCharacterId);
             });
             _btnConfirmJoin.text = "确认加入";
             _btnConfirmJoin.style.fontSize = 16;
             _btnConfirmJoin.style.height = 44;
             _joinFormRow.Add(_btnConfirmJoin);
+
+            _joinFormRow.RemoveFromHierarchy();
+            _container.Insert(_container.IndexOf(_avatarSection), _joinFormRow);
 
             _roomButtonRow = new VisualElement();
             _roomButtonRow.style.flexDirection = FlexDirection.Row;
@@ -283,13 +316,13 @@ namespace Cabo.Client.UI
             _chatPanel.Root.style.paddingRight = 12;
             _chatPanel.Root.style.paddingTop = 10;
             _chatPanel.Root.style.paddingBottom = 10;
-            UITheme.ApplyPanel(_chatPanel.Root, UITheme.PanelSurface, UITheme.PanelBorder);
+            UITheme.ApplyPanel(_chatPanel.Root, UITheme.PanelGlass, UITheme.PanelBorder, 16f);
             _roomContent.Add(_chatPanel.Root);
         }
 
         public void SetVisible(bool visible)
         {
-            _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            _homeScroll.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         string GetNicknameOrShowError()
@@ -345,7 +378,7 @@ namespace Cabo.Client.UI
             bool inRoom = s.RoomId > 0 || s.Players.Count > 0;
             bool hasRoomCode = !string.IsNullOrEmpty(s.RoomCode);
 
-            _title.text = inRoom ? "CABO - 等待房间" : "CABO";
+            _title.text = inRoom ? "\u7CD6\u7CD6 CABO \u00B7 \u7B49\u5F85\u9910\u5385" : "\u7CD6\u7CD6 CABO";
             _roomCode.text = hasRoomCode ? $"房间码：{s.RoomCode}" : (inRoom ? "正在加入..." : "");
             _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
 
@@ -422,18 +455,28 @@ namespace Cabo.Client.UI
             _avatarChoices.Clear();
 
             var nickname = string.IsNullOrWhiteSpace(_nicknameInput.value) ? "你" : _nicknameInput.value.Trim();
-            _avatarPreview.Add(PlayerProfileStore.CreateAvatarVisual(nickname, PlayerProfileStore.SelectedAvatarPath, 56));
+            var selectedId = PlayerProfileStore.SelectedCharacterId;
+            _avatarPreview.Add(PlayerProfileStore.CreateAvatarVisual(
+                nickname, PlayerProfileStore.GetCharacterVisualPath(selectedId), 56));
 
-            AddAvatarChoice("默认", "", string.IsNullOrEmpty(PlayerProfileStore.SelectedAvatarPath), nickname);
+            var characters = CaboArt.Catalog?.characters;
+            if (characters != null)
+            {
+                foreach (var character in characters)
+                {
+                    if (character == null || string.IsNullOrWhiteSpace(character.characterId))
+                        continue;
+                    AddAvatarChoice(character.displayName, character.characterId,
+                        string.Equals(character.characterId, selectedId, System.StringComparison.OrdinalIgnoreCase), nickname);
+                }
+            }
 
-            var avatars = PlayerProfileStore.GetAvatarAssets();
-            foreach (var avatar in avatars)
-                AddAvatarChoice(avatar.DisplayName, avatar.AssetPath, avatar.AssetPath == PlayerProfileStore.SelectedAvatarPath, nickname);
-
-            _avatarStatus.text = avatars.Count == 0 ? "暂无可选头像，使用默认头像" : $"已找到 {avatars.Count} 个头像";
+            _avatarStatus.text = characters == null || characters.Length == 0
+                ? "暂无角色资源，使用默认角色柚柚"
+                : $"已选择：{CaboArt.GetCharacter(selectedId)?.displayName ?? selectedId}";
         }
 
-        void AddAvatarChoice(string label, string avatarPath, bool selected, string nickname)
+        void AddAvatarChoice(string label, string characterId, bool selected, string nickname)
         {
             var choice = new VisualElement();
             choice.style.width = 78;
@@ -462,7 +505,8 @@ namespace Cabo.Client.UI
             choice.style.borderRightColor = border;
             choice.style.borderBottomColor = border;
             choice.style.borderLeftColor = border;
-            choice.Add(PlayerProfileStore.CreateAvatarVisual(nickname, avatarPath, 34));
+            choice.Add(PlayerProfileStore.CreateAvatarVisual(
+                nickname, PlayerProfileStore.GetCharacterVisualPath(characterId), 34));
 
             var text = new Label(label);
             text.style.fontSize = 10;
@@ -473,7 +517,7 @@ namespace Cabo.Client.UI
 
             choice.RegisterCallback<ClickEvent>(_ =>
             {
-                PlayerProfileStore.SelectedAvatarPath = avatarPath;
+                PlayerProfileStore.SelectedCharacterId = characterId;
                 RenderAvatarSelector();
             });
             _avatarChoices.Add(choice);
@@ -505,7 +549,7 @@ namespace Cabo.Client.UI
             row.style.borderBottomColor = border;
             row.style.borderLeftColor = border;
 
-            var avatarPath = PlayerProfileStore.GetAvatarPathForPlayer(player.PlayerId, isSelf);
+            var avatarPath = PlayerProfileStore.GetCharacterVisualPath(player.CharacterId);
             var avatar = PlayerProfileStore.CreateAvatarVisual(player.Nickname, avatarPath, 38);
             avatar.style.marginRight = 10;
             row.Add(avatar);

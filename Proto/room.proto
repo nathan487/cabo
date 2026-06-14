@@ -16,6 +16,7 @@ message CreateRoomReq {
   int64 request_id = 1;  // 客户端请求ID，用于Rsp匹配
   int32 max_players = 2; // 最大玩家数 2-6，默认4
   string nickname = 3;   // 创建者的昵称
+  string character_id = 4; // 稳定角色ID，例如 pomelo
 }
 
 message CreateRoomRsp {
@@ -33,6 +34,7 @@ message JoinRoomReq {
   int64 request_id = 1;
   string room_code = 2;  // 房间码
   string nickname = 3;   // 加入者的昵称
+  string character_id = 4; // 稳定角色ID，例如 pomelo
 }
 
 message JoinRoomRsp {

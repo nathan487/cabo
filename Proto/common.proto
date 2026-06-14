@@ -141,6 +141,7 @@ message CardInfo {
   int32 card_id = 1;       // 唯一卡牌ID（服务端生成，用于追踪）
   int32 value = 2;         // 点数 0-13
   SkillType skill = 3;     // 技能类型（由value推导）
+  bool publicly_known = 4; // 一旦进入弃牌堆就永久公开，并随卡牌移动
 }
 
 // --- 玩家手中的单张卡牌状态（所有者视角） ---
@@ -151,11 +152,12 @@ message OwnCardState {
   int32 value = 3;       // 点数（仅 is_known=true 时有效）
 }
 
-// --- 对手的卡牌状态（非所有者视角，MVP 下仅暴露数量） ---
+// --- 对手的卡牌状态（非所有者视角，包含公开槽位） ---
 
 message OpponentHandState {
   int64 player_id = 1;
   int32 card_count = 2;  // 当前牌区数量，失败交换后可能超过 4
+  repeated OwnCardState visible_cards = 3; // 完整槽位快照；仅公开牌 is_known=true 且携带 value
 }
 
 // --- 弃牌堆信息 ---
@@ -181,6 +183,7 @@ message PlayerPublicInfo {
   bool is_host = 5;
   bool is_connected = 6; // 是否在线（掉线检测用）
   int32 total_score = 7; // 跨轮累计总分
+  string character_id = 8; // 客户端美术角色ID，不参与规则计算
 }
 
 // --- 技能参数：偷看自己 ---

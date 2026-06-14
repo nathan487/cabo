@@ -104,17 +104,17 @@ namespace Cabo.Client
 
         // ── Room Actions ──
 
-        public void CreateRoom(string nickname)
+        public void CreateRoom(string nickname, string characterId)
         {
             _nickname = NormalizeNickname(nickname);
-            Gateway.SendCreateRoom(_nickname);
+            Gateway.SendCreateRoom(_nickname, NormalizeCharacterId(characterId));
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
         }
 
-        public void JoinRoom(string roomCode, string nickname)
+        public void JoinRoom(string roomCode, string nickname, string characterId)
         {
             _nickname = NormalizeNickname(nickname);
-            Gateway.SendJoinRoom(roomCode, _nickname);
+            Gateway.SendJoinRoom(roomCode, _nickname, NormalizeCharacterId(characterId));
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
         }
 
@@ -122,6 +122,12 @@ namespace Cabo.Client
         {
             var trimmed = nickname?.Trim();
             return string.IsNullOrEmpty(trimmed) ? "玩家" : trimmed;
+        }
+
+        static string NormalizeCharacterId(string characterId)
+        {
+            var trimmed = characterId?.Trim().ToLowerInvariant();
+            return string.IsNullOrEmpty(trimmed) ? "pomelo" : trimmed;
         }
 
         static bool TryNormalizeServerUrl(string address, out string url)

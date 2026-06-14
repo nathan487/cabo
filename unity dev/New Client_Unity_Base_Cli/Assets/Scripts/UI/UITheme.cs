@@ -16,10 +16,16 @@ namespace Cabo.Client.UI
         public static readonly Color AppBackgroundSoft = new(0.99f, 0.94f, 0.83f, 1f);
         public static readonly Color PanelSurface = new(1.00f, 0.97f, 0.87f, 1f);
         public static readonly Color PanelSurfaceAlt = new(0.91f, 0.83f, 0.67f, 1f);
+        public static readonly Color PanelGlass = new(1.00f, 0.97f, 0.87f, 0.92f);
+        public static readonly Color PanelGlassStrong = new(1.00f, 0.98f, 0.91f, 0.97f);
         public static readonly Color PanelBorder = new(0.47f, 0.35f, 0.20f, 1f);
 
         public static readonly Color TableSurface = new(0.62f, 0.78f, 0.57f, 1f);
         public static readonly Color TableSurfaceAlt = new(0.48f, 0.68f, 0.50f, 1f);
+        public static readonly Color TableSeatGlass = new(1.00f, 0.98f, 0.90f, 0.84f);
+        public static readonly Color TableSocialGlass = new(1.00f, 0.98f, 0.90f, 0.92f);
+        public static readonly Color TableGlass = new(0.90f, 0.96f, 0.82f, 0.68f);
+        public static readonly Color TableSoftBorder = new(0.31f, 0.24f, 0.14f, 0.72f);
         public static readonly Color TableBorder = new(0.16f, 0.34f, 0.20f, 1f);
 
         public static readonly Color TextPrimary = new(0.08f, 0.12f, 0.09f, 1f);
@@ -74,7 +80,7 @@ namespace Cabo.Client.UI
         public static void ApplyRoot(VisualElement root)
         {
             if (root == null) return;
-            root.style.backgroundColor = AppBackground;
+            root.style.backgroundColor = Color.clear;
             root.style.color = TextPrimary;
         }
 

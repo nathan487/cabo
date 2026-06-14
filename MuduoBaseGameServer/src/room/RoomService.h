@@ -19,6 +19,7 @@ using TcpConnectionPtr = std::shared_ptr<TcpConnection>;
 struct PlayerSession {
     int64_t playerId = 0;
     std::string nickname;
+    std::string characterId = "pomelo";
     int32_t seatId = 0;
     bool isReady = false;
     bool isHost = false;

@@ -20,6 +20,7 @@ namespace Cabo.Client
     {
         public long PlayerId;
         public string Nickname;
+        public string CharacterId = "pomelo";
         public int SeatId;
         public int TotalScore;
         public int CardCount;
@@ -32,6 +33,7 @@ namespace Cabo.Client
     {
         public long PlayerId;
         public string Nickname;
+        public string CharacterId = "pomelo";
         public List<int> CardValues = new();
         public int HandTotal, Penalty, RoundScore, CumulativeScore;
         public bool IsSteadyCaller, IsLowest, IsKamikaze;
@@ -309,7 +311,7 @@ namespace Cabo.Client
             if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal)
             {
                 foreach (var p in room.Players)
-                    UpsertPlayer(p.PlayerId, p.Nickname, p.SeatId, p.IsReady, p.IsHost, p.TotalScore);
+                    UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore);
                 return;
             }
 
@@ -318,6 +320,7 @@ namespace Cabo.Client
                 Players.Add(new PlayerInfo
                 {
                     PlayerId = p.PlayerId, Nickname = p.Nickname,
+                    CharacterId = NormalizeCharacterId(p.CharacterId),
                     SeatId = p.SeatId, IsReady = p.IsReady,
                     IsHost = p.IsHost, TotalScore = p.TotalScore
                 });
@@ -330,6 +333,7 @@ namespace Cabo.Client
                 Players.Add(new PlayerInfo
                 {
                     PlayerId = pj.PlayerId, Nickname = pj.Nickname,
+                    CharacterId = NormalizeCharacterId(pj.CharacterId),
                     SeatId = pj.SeatId, IsReady = pj.IsReady, IsHost = pj.IsHost
                 });
         }
@@ -782,7 +786,11 @@ namespace Cabo.Client
                     IsSteadyCaller = sc.IsSteadyCaller, IsLowest = sc.IsLowest, IsKamikaze = sc.IsKamikaze
                 };
                 var pl = Players.Find(p => p.PlayerId == sc.PlayerId);
-                if (pl != null) rr.Nickname = pl.Nickname;
+                if (pl != null)
+                {
+                    rr.Nickname = pl.Nickname;
+                    rr.CharacterId = NormalizeCharacterId(pl.CharacterId);
+                }
                 foreach (var rh in rrn.RevealedHands)
                     if (rh.PlayerId == sc.PlayerId) { rr.CardValues.AddRange(rh.CardValues); break; }
                 LastRoundResults.Add(rr);
@@ -951,12 +959,13 @@ namespace Cabo.Client
             LastActionSelectedSlots.Clear();
         }
 
-        void UpsertPlayer(long playerId, string nickname, int seatId, bool isReady, bool isHost, int totalScore)
+        void UpsertPlayer(long playerId, string nickname, string characterId, int seatId, bool isReady, bool isHost, int totalScore)
         {
             var existing = Players.Find(x => x.PlayerId == playerId);
             if (existing != null)
             {
                 existing.Nickname = nickname;
+                existing.CharacterId = NormalizeCharacterId(characterId);
                 existing.SeatId = seatId;
                 existing.IsReady = isReady;
                 existing.IsHost = isHost;
@@ -968,11 +977,17 @@ namespace Cabo.Client
             {
                 PlayerId = playerId,
                 Nickname = nickname,
+                CharacterId = NormalizeCharacterId(characterId),
                 SeatId = seatId,
                 IsReady = isReady,
                 IsHost = isHost,
                 TotalScore = totalScore
             });
+        }
+
+        static string NormalizeCharacterId(string characterId)
+        {
+            return string.IsNullOrWhiteSpace(characterId) ? "pomelo" : characterId;
         }
 
         string FormatSlot(int slotIndex)

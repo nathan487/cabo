@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cabo.Client.Art;
 using Cabo.Client.UI.CardTable;
 using Game.Common;
 using UnityEngine;
@@ -49,6 +50,7 @@ namespace Cabo.Client.UI
         readonly VisualElement _root;
         readonly VisualElement _container;
         readonly GameFlow _flow;
+        readonly Transform _ownerTransform;
 
         readonly SeatView _topSeat;
         readonly SeatView _leftSeat;
@@ -84,6 +86,7 @@ namespace Cabo.Client.UI
         readonly Button _chatTabButton;
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
+        SettlementStageRuntime _settlementStage;
         EventCallback<GeometryChangedEvent> _geometryChangedHandler;
         Action _animationQueueDrained;
 
@@ -138,16 +141,17 @@ namespace Cabo.Client.UI
         {
             _root = root;
             _flow = flow;
+            _ownerTransform = ownerTransform;
 
             _container = new VisualElement { name = "CaboGameTable" };
             StretchToParent(_container);
             _container.style.flexDirection = FlexDirection.Row;
             _container.style.position = Position.Relative;
-            _container.style.paddingLeft = 22;
-            _container.style.paddingRight = 22;
-            _container.style.paddingTop = 16;
-            _container.style.paddingBottom = 16;
-            _container.style.backgroundColor = UITheme.AppBackground;
+            _container.style.paddingLeft = 14;
+            _container.style.paddingRight = 14;
+            _container.style.paddingTop = 12;
+            _container.style.paddingBottom = 12;
+            _container.style.backgroundColor = Color.clear;
             root.Add(_container);
 
             _animationLayer = new VisualElement { name = "CardAnimationLayer" };
@@ -179,11 +183,11 @@ namespace Cabo.Client.UI
             _endGameModalCard.style.paddingRight = 20;
             _endGameModalCard.style.paddingTop = 18;
             _endGameModalCard.style.paddingBottom = 18;
-            _endGameModalCard.style.backgroundColor = UITheme.PanelSurface;
-            _endGameModalCard.style.borderTopLeftRadius = 8;
-            _endGameModalCard.style.borderTopRightRadius = 8;
-            _endGameModalCard.style.borderBottomLeftRadius = 8;
-            _endGameModalCard.style.borderBottomRightRadius = 8;
+            _endGameModalCard.style.backgroundColor = UITheme.PanelGlassStrong;
+            _endGameModalCard.style.borderTopLeftRadius = 18;
+            _endGameModalCard.style.borderTopRightRadius = 18;
+            _endGameModalCard.style.borderBottomLeftRadius = 18;
+            _endGameModalCard.style.borderBottomRightRadius = 18;
             SetBorderWidth(_endGameModalCard, 1);
             SetBorderColor(_endGameModalCard, UITheme.PanelBorder);
             _endGameModalOverlay.Add(_endGameModalCard);
@@ -252,20 +256,27 @@ namespace Cabo.Client.UI
             _centerTable.style.marginRight = 16;
             _centerTable.style.alignItems = Align.Center;
             _centerTable.style.justifyContent = Justify.Center;
-            _centerTable.style.backgroundColor = UITheme.TableSurface;
-            _centerTable.style.borderTopLeftRadius = 22;
-            _centerTable.style.borderTopRightRadius = 22;
-            _centerTable.style.borderBottomLeftRadius = 22;
-            _centerTable.style.borderBottomRightRadius = 22;
+            _centerTable.style.backgroundColor = UITheme.TableGlass;
+            _centerTable.style.borderTopLeftRadius = 28;
+            _centerTable.style.borderTopRightRadius = 28;
+            _centerTable.style.borderBottomLeftRadius = 28;
+            _centerTable.style.borderBottomRightRadius = 28;
             _centerTable.style.borderTopWidth = 2;
             _centerTable.style.borderRightWidth = 2;
             _centerTable.style.borderBottomWidth = 2;
             _centerTable.style.borderLeftWidth = 2;
-            _centerTable.style.borderTopColor = UITheme.TableBorder;
-            _centerTable.style.borderRightColor = UITheme.TableBorder;
-            _centerTable.style.borderBottomColor = UITheme.TableBorder;
-            _centerTable.style.borderLeftColor = UITheme.TableBorder;
+            _centerTable.style.borderTopColor = UITheme.TableSoftBorder;
+            _centerTable.style.borderRightColor = UITheme.TableSoftBorder;
+            _centerTable.style.borderBottomColor = UITheme.TableSoftBorder;
+            _centerTable.style.borderLeftColor = UITheme.TableSoftBorder;
             _centerTable.style.position = Position.Relative;
+            _centerTable.style.overflow = Overflow.Hidden;
+            if (CaboArt.TableCenterBackground != null)
+            {
+                _centerTable.style.backgroundImage = new StyleBackground(CaboArt.TableCenterBackground);
+                _centerTable.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                _centerTable.style.backgroundColor = Color.white;
+            }
             middle.Add(_centerTable);
 
             _roundLabel = new Label();
@@ -302,11 +313,11 @@ namespace Cabo.Client.UI
             _inspectionZone.style.marginBottom = 8;
             _inspectionZone.style.alignItems = Align.Center;
             _inspectionZone.style.justifyContent = Justify.Center;
-            _inspectionZone.style.backgroundColor = UITheme.PanelSurface;
-            _inspectionZone.style.borderTopLeftRadius = 8;
-            _inspectionZone.style.borderTopRightRadius = 8;
-            _inspectionZone.style.borderBottomLeftRadius = 8;
-            _inspectionZone.style.borderBottomRightRadius = 8;
+            _inspectionZone.style.backgroundColor = UITheme.PanelGlassStrong;
+            _inspectionZone.style.borderTopLeftRadius = 14;
+            _inspectionZone.style.borderTopRightRadius = 14;
+            _inspectionZone.style.borderBottomLeftRadius = 14;
+            _inspectionZone.style.borderBottomRightRadius = 14;
             _inspectionZone.style.borderTopWidth = 1;
             _inspectionZone.style.borderRightWidth = 1;
             _inspectionZone.style.borderBottomWidth = 1;
@@ -330,11 +341,11 @@ namespace Cabo.Client.UI
             _actionPanel.style.paddingBottom = 8;
             _actionPanel.style.flexShrink = 0;
             _actionPanel.style.marginTop = GameplayActionPanelTopMargin;
-            _actionPanel.style.backgroundColor = UITheme.PanelSurface;
-            _actionPanel.style.borderTopLeftRadius = 8;
-            _actionPanel.style.borderTopRightRadius = 8;
-            _actionPanel.style.borderBottomLeftRadius = 8;
-            _actionPanel.style.borderBottomRightRadius = 8;
+            _actionPanel.style.backgroundColor = UITheme.PanelGlassStrong;
+            _actionPanel.style.borderTopLeftRadius = 14;
+            _actionPanel.style.borderTopRightRadius = 14;
+            _actionPanel.style.borderBottomLeftRadius = 14;
+            _actionPanel.style.borderBottomRightRadius = 14;
             _actionPanel.style.display = DisplayStyle.None;
             _centerTable.Add(_actionPanel);
 
@@ -373,9 +384,9 @@ namespace Cabo.Client.UI
 
             _socialPanel = new VisualElement { name = "TableSocialPanel" };
             _socialPanel.style.flexDirection = FlexDirection.Column;
-            _socialPanel.style.width = 300;
-            _socialPanel.style.minWidth = 300;
-            _socialPanel.style.maxWidth = 300;
+            _socialPanel.style.width = 280;
+            _socialPanel.style.minWidth = 280;
+            _socialPanel.style.maxWidth = 280;
             _socialPanel.style.flexGrow = 0;
             _socialPanel.style.flexShrink = 0;
             _socialPanel.style.minHeight = 0;
@@ -386,14 +397,14 @@ namespace Cabo.Client.UI
             _socialPanel.style.paddingRight = 10;
             _socialPanel.style.paddingTop = 10;
             _socialPanel.style.paddingBottom = 10;
-            _socialPanel.style.backgroundColor = UITheme.PanelSurface;
-            _socialPanel.style.borderTopLeftRadius = 8;
-            _socialPanel.style.borderTopRightRadius = 8;
-            _socialPanel.style.borderBottomLeftRadius = 8;
-            _socialPanel.style.borderBottomRightRadius = 8;
+            _socialPanel.style.backgroundColor = UITheme.TableSocialGlass;
+            _socialPanel.style.borderTopLeftRadius = 16;
+            _socialPanel.style.borderTopRightRadius = 16;
+            _socialPanel.style.borderBottomLeftRadius = 16;
+            _socialPanel.style.borderBottomRightRadius = 16;
             _socialPanel.style.overflow = Overflow.Hidden;
             SetBorderWidth(_socialPanel, 1);
-            SetBorderColor(_socialPanel, UITheme.PanelBorder);
+            SetBorderColor(_socialPanel, UITheme.TableSoftBorder);
             _container.Add(_socialPanel);
 
             var socialTabs = new VisualElement();
@@ -474,6 +485,7 @@ namespace Cabo.Client.UI
                 _showLocalEndGameConfirm = false;
                 ApplyEndGameModal(EndGameModalKind.None, "", "");
                 ClearTransientAnimationState();
+                HideSettlementStage();
             }
         }
 
@@ -488,6 +500,8 @@ namespace Cabo.Client.UI
             _endGameModalOverlay?.RemoveFromHierarchy();
             if (_cardTableView != null)
                 CardTableView.DestroyView(_cardTableView);
+            if (_settlementStage != null)
+                UnityEngine.Object.Destroy(_settlementStage.gameObject);
         }
 
         public bool HasPendingActionAnimation => Time.realtimeSinceStartup < _animationQueueUntil;
@@ -516,6 +530,7 @@ namespace Cabo.Client.UI
 
         public void RenderGame()
         {
+            HideSettlementStage();
             var state = _flow.State;
             if (state.RoundNumber != _lastRenderedRoundNumber)
             {
@@ -636,8 +651,8 @@ namespace Cabo.Client.UI
             ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
             _turnLabel.style.display = DisplayStyle.Flex;
-            _roundLabel.text = $"第 {state.RoundNumber} 轮结算";
-            _turnLabel.text = "所有手牌已翻开计分";
+            _roundLabel.text = $"第 {state.RoundNumber} 轮 · 结算小剧场";
+            _turnLabel.text = "角色吃下最终餐盘食物，糖能逐项累加";
             HideSeatsForOverlay();
             RenderPiles(state);
             RenderSocialPanel(state);
@@ -648,21 +663,51 @@ namespace Cabo.Client.UI
             _actionPanel.style.display = DisplayStyle.Flex;
             _actionPanel.style.marginTop = 8;
 
-            var title = new Label("本轮得分");
+            var title = new Label("本轮餐盘糖能");
             StylePanelTitle(title);
             _actionPanel.Add(title);
 
+            var revealContent = new VisualElement { name = "SettlementRevealContent" };
+            revealContent.style.width = Length.Percent(100);
+            revealContent.style.height = 230;
+            revealContent.style.flexDirection = FlexDirection.Row;
+            revealContent.style.alignItems = Align.Stretch;
+            revealContent.style.flexShrink = 0;
+            revealContent.style.marginBottom = 4;
+            _actionPanel.Add(revealContent);
+
+            MountSettlementStage(state, revealContent);
+
+            var scorePanel = new VisualElement { name = "SettlementScorePanel" };
+            scorePanel.style.width = 300;
+            scorePanel.style.minWidth = 270;
+            scorePanel.style.flexShrink = 1;
+            scorePanel.style.paddingLeft = 8;
+            scorePanel.style.paddingRight = 8;
+            scorePanel.style.paddingTop = 6;
+            scorePanel.style.paddingBottom = 6;
+            scorePanel.style.backgroundColor = UITheme.PanelGlass;
+            UITheme.SetRadius(scorePanel, 10);
+            SetBorderWidth(scorePanel, 1);
+            SetBorderColor(scorePanel, UITheme.PanelBorder);
+            revealContent.Add(scorePanel);
+
+            var scoreTitle = new Label("\u8BA1\u5206\u60C5\u51B5");
+            scoreTitle.style.fontSize = 13;
+            scoreTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            scoreTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            scoreTitle.style.marginBottom = 4;
+            scoreTitle.style.flexShrink = 0;
+            scorePanel.Add(scoreTitle);
+
             var resultList = new ScrollView(ScrollViewMode.Vertical);
-            resultList.verticalScrollerVisibility = ScrollerVisibility.Hidden;
+            resultList.verticalScrollerVisibility = ScrollerVisibility.Auto;
             resultList.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             resultList.style.flexGrow = 1;
-            resultList.style.flexShrink = 1;
             resultList.style.minHeight = 0;
-            resultList.style.marginTop = 2;
-            resultList.style.marginBottom = 6;
             foreach (var result in state.LastRoundResults)
-                resultList.Add(CreateRevealRow(result));
-            _actionPanel.Add(resultList);
+                resultList.Add(CreateCompactRevealRow(result));
+            scorePanel.Add(resultList);
 
             AddInterRoundControls(state);
             UpdateStatusLineForEarlyEnd(state, true);
@@ -671,12 +716,19 @@ namespace Cabo.Client.UI
         public void RenderGameOver()
         {
             ClearTransientAnimationState();
+            HideSettlementStage();
             _cardTableView.SetVisible(false);
             ConfigureActionPanelForOverlay();
+            _actionPanel.style.width = Length.Percent(70);
+            _actionPanel.style.maxWidth = 760;
+            _actionPanel.style.flexGrow = 0;
+            _actionPanel.style.minHeight = 500;
+            _actionPanel.style.paddingTop = 20;
+            _actionPanel.style.paddingBottom = 18;
             _roundLabel.style.display = DisplayStyle.Flex;
             _turnLabel.style.display = DisplayStyle.Flex;
-            _roundLabel.text = "游戏结束";
-            _turnLabel.text = "最终排名";
+            _roundLabel.text = "糖糖餐桌岛 · 宴会落幕";
+            _turnLabel.text = "累计糖能最低的玩家赢得健康餐桌冠军";
             HideSeatsForOverlay();
             _drawnCardSlot.Clear();
             _drawPile.Clear();
@@ -688,19 +740,82 @@ namespace Cabo.Client.UI
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
 
-            var title = new Label("最终得分");
+            var title = new Label("健康餐桌冠军");
             StylePanelTitle(title);
+            title.style.fontSize = 24;
+            title.style.color = UITheme.HostBadgeBorder;
+            title.style.marginBottom = 4;
             _actionPanel.Add(title);
 
+            FinalRank winner = null;
             foreach (var rank in _flow.State.FinalRankings)
             {
-                var row = new Label($"{rank.Rank}. {rank.Nickname}  {rank.FinalScore}" + (rank.IsWinner ? "  胜者" : ""));
-                row.style.fontSize = rank.IsWinner ? 18 : 15;
-                row.style.unityFontStyleAndWeight = rank.IsWinner ? FontStyle.Bold : FontStyle.Normal;
-                row.style.unityTextAlign = TextAnchor.MiddleCenter;
-                row.style.marginTop = 6;
-                _actionPanel.Add(row);
+                if (rank.IsWinner || winner == null)
+                    winner = rank.IsWinner ? rank : winner ?? rank;
             }
+
+            if (winner != null)
+            {
+                var champion = new VisualElement();
+                champion.style.flexDirection = FlexDirection.Row;
+                champion.style.alignItems = Align.Center;
+                champion.style.justifyContent = Justify.Center;
+                champion.style.marginTop = 4;
+                champion.style.marginBottom = 12;
+                champion.style.paddingLeft = 18;
+                champion.style.paddingRight = 18;
+                champion.style.paddingTop = 12;
+                champion.style.paddingBottom = 12;
+                champion.style.backgroundColor = UITheme.HostBadgeSurface;
+                champion.style.borderTopLeftRadius = 18;
+                champion.style.borderTopRightRadius = 18;
+                champion.style.borderBottomLeftRadius = 18;
+                champion.style.borderBottomRightRadius = 18;
+                SetBorderWidth(champion, 2);
+                SetBorderColor(champion, UITheme.HostBadgeBorder);
+
+                var winnerPlayer = _flow.State.Players.Find(player => player.PlayerId == winner.PlayerId);
+                var avatarPath = PlayerProfileStore.GetCharacterVisualPath(winnerPlayer?.CharacterId);
+                var avatar = PlayerProfileStore.CreateAvatarVisual(winner.Nickname, avatarPath, 58);
+                avatar.style.marginRight = 16;
+                champion.Add(avatar);
+
+                var championText = new VisualElement();
+                var championName = new Label(winner.Nickname);
+                championName.style.fontSize = 22;
+                championName.style.unityFontStyleAndWeight = FontStyle.Bold;
+                championName.style.color = UITheme.TextPrimary;
+                championText.Add(championName);
+
+                var championScore = new Label($"累计糖能 {winner.FinalScore} · 全桌最低");
+                championScore.style.fontSize = 15;
+                championScore.style.unityFontStyleAndWeight = FontStyle.Bold;
+                championScore.style.color = UITheme.HostBadgeBorder;
+                championScore.style.marginTop = 2;
+                championText.Add(championScore);
+
+                var championLine = new Label("吃得聪明，才是真的赢");
+                championLine.style.fontSize = 12;
+                championLine.style.color = UITheme.TextSecondary;
+                championLine.style.marginTop = 2;
+                championText.Add(championLine);
+                champion.Add(championText);
+                _actionPanel.Add(champion);
+            }
+
+            var rankingTitle = new Label("糖能排行榜");
+            rankingTitle.style.fontSize = 14;
+            rankingTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            rankingTitle.style.color = UITheme.TextSecondary;
+            rankingTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            rankingTitle.style.marginBottom = 4;
+            _actionPanel.Add(rankingTitle);
+
+            var rankingList = new VisualElement();
+            rankingList.style.flexShrink = 1;
+            foreach (var rank in _flow.State.FinalRankings)
+                rankingList.Add(CreateFinalRankRow(rank));
+            _actionPanel.Add(rankingList);
 
             var controls = new VisualElement();
             controls.style.flexDirection = FlexDirection.Row;
@@ -713,7 +828,7 @@ namespace Cabo.Client.UI
                 _flow.State.MyPlayerId > 0 && _flow.State.RoomId > 0));
             controls.Add(CreatePanelButton("退出游戏", () => _flow.ExitGame(), true));
 
-            _statusLine.text = "返回房间后可重新准备并开始新对局。";
+            _statusLine.text = "本桌宴会已结束，返回房间即可重新准备下一局。";
             _statusLine.style.display = DisplayStyle.Flex;
         }
 
@@ -911,7 +1026,7 @@ namespace Cabo.Client.UI
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
             bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
             _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, visualCurrentPlayerId == state.MyPlayerId, selfCabo ? "CABO" : "你", selfCabo,
-                PlayerProfileStore.GetAvatarPathForPlayer(state.MyPlayerId, true));
+                PlayerProfileStore.GetCharacterVisualPath(myInfo?.CharacterId));
             int selfCardCount = holdPendingSelfExchangeView && _pendingSelfExchangeSnapshot != null
                 ? _pendingSelfExchangeSnapshot.SourceHandCards.Count
                 : state.MyCards.Count;
@@ -932,7 +1047,7 @@ namespace Cabo.Client.UI
                 bool selected = _selectedOpponentPlayerId == player.PlayerId;
                 bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
                 _opponentSeats[i].RenderHeader(player.Nickname, player.TotalScore, current, cabo ? "CABO" : selected ? "目标" : "对手", cabo,
-                    PlayerProfileStore.GetAvatarPathForPlayer(player.PlayerId, false));
+                    PlayerProfileStore.GetCharacterVisualPath(player.CharacterId));
                 EnsureCardAnchors(_opponentSeats[i].CardRow, Mathf.Max(0, player.CardCount), OppCardWidth, OppCardHeight);
             }
         }
@@ -1506,7 +1621,7 @@ namespace Cabo.Client.UI
             _chatEntries.Add(new TableFeedEntry
             {
                 PlayerName = name,
-                AvatarPath = PlayerProfileStore.GetAvatarPathForPlayer(_flow.State.MyPlayerId, true),
+                AvatarPath = PlayerProfileStore.GetCharacterVisualPath(me?.CharacterId),
                 Message = text
             });
             TrimFeed(_chatEntries, 40);
@@ -1522,7 +1637,7 @@ namespace Cabo.Client.UI
             _chatEntries.Add(new TableFeedEntry
             {
                 PlayerName = name,
-                AvatarPath = PlayerProfileStore.GetAvatarPathForPlayer(_flow.State.MyPlayerId, true),
+                AvatarPath = PlayerProfileStore.GetCharacterVisualPath(me?.CharacterId),
                 Message = sticker.DisplayName,
                 StickerPath = sticker.AssetPath,
                 IsSticker = true
@@ -3563,10 +3678,10 @@ namespace Cabo.Client.UI
             card.style.marginBottom = 4;
             card.style.alignItems = Align.Center;
             card.style.justifyContent = Justify.Center;
-            card.style.borderTopLeftRadius = 7;
-            card.style.borderTopRightRadius = 7;
-            card.style.borderBottomLeftRadius = 7;
-            card.style.borderBottomRightRadius = 7;
+            card.style.borderTopLeftRadius = 9;
+            card.style.borderTopRightRadius = 9;
+            card.style.borderBottomLeftRadius = 9;
+            card.style.borderBottomRightRadius = 9;
             card.style.borderTopWidth = selected ? 4 : 2;
             card.style.borderRightWidth = selected ? 4 : 2;
             card.style.borderBottomWidth = selected ? 4 : 2;
@@ -3575,22 +3690,45 @@ namespace Cabo.Client.UI
             card.style.borderRightColor = card.style.borderTopColor.value;
             card.style.borderBottomColor = card.style.borderTopColor.value;
             card.style.borderLeftColor = card.style.borderTopColor.value;
-            card.style.backgroundColor = faceUp ? GetFaceColor(value) : UITheme.CardBack;
+            bool hasArtwork = ApplyCardArtwork(card, faceUp, value);
             card.style.opacity = clickable ? 1f : 0.96f;
 
-            var valueLabel = new Label(faceUp ? value.ToString() : "CABO");
-            valueLabel.style.fontSize = faceUp ? Mathf.RoundToInt(height * 0.34f) : Mathf.RoundToInt(height * 0.16f);
+            var valueLabel = new Label(faceUp ? value.ToString() : hasArtwork ? "" : "CABO");
+            valueLabel.style.fontSize = faceUp ? Mathf.Max(11, Mathf.RoundToInt(height * 0.18f)) : Mathf.RoundToInt(height * 0.16f);
             valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            valueLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            valueLabel.style.unityTextAlign = faceUp ? TextAnchor.UpperLeft : TextAnchor.MiddleCenter;
             valueLabel.style.color = faceUp ? UITheme.TextPrimary : Color.white;
+            if (faceUp)
+            {
+                valueLabel.style.position = Position.Absolute;
+                valueLabel.style.left = 3;
+                valueLabel.style.top = 3;
+                valueLabel.style.paddingLeft = 3;
+                valueLabel.style.paddingRight = 3;
+                valueLabel.style.backgroundColor = new Color(1f, 0.98f, 0.90f, 0.86f);
+                valueLabel.style.borderTopLeftRadius = 5;
+                valueLabel.style.borderTopRightRadius = 5;
+                valueLabel.style.borderBottomLeftRadius = 5;
+                valueLabel.style.borderBottomRightRadius = 5;
+            }
             card.Add(valueLabel);
 
             if (showSkillBadge && faceUp && value >= 7 && value <= 12)
             {
                 var badge = new Label(GetSkillShortName(value));
-                badge.style.fontSize = 10;
+                badge.style.position = Position.Absolute;
+                badge.style.right = 3;
+                badge.style.bottom = 3;
+                badge.style.fontSize = 9;
                 badge.style.unityTextAlign = TextAnchor.MiddleCenter;
                 badge.style.color = UITheme.TextOnAccent;
+                badge.style.backgroundColor = new Color(1f, 0.86f, 0.45f, 0.90f);
+                badge.style.paddingLeft = 3;
+                badge.style.paddingRight = 3;
+                badge.style.borderTopLeftRadius = 4;
+                badge.style.borderTopRightRadius = 4;
+                badge.style.borderBottomLeftRadius = 4;
+                badge.style.borderBottomRightRadius = 4;
                 card.Add(badge);
             }
 
@@ -3598,6 +3736,22 @@ namespace Cabo.Client.UI
                 card.RegisterCallback<ClickEvent>(_ => InvokeUiActionNextFrame(onClick));
 
             return card;
+        }
+
+        static bool ApplyCardArtwork(VisualElement card, bool faceUp, int value)
+        {
+            Sprite sprite = faceUp ? CaboArt.GetFood(value).foodSprite : CaboArt.CardBack;
+            if (sprite != null)
+            {
+                card.style.backgroundImage = new StyleBackground(sprite);
+                card.style.backgroundColor = Color.white;
+                card.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                return true;
+            }
+
+            card.style.backgroundImage = StyleKeyword.None;
+            card.style.backgroundColor = faceUp ? GetFaceColor(value) : UITheme.CardBack;
+            return false;
         }
 
         static void StyleCardTablePlaceholder(VisualElement card)
@@ -3678,9 +3832,10 @@ namespace Cabo.Client.UI
             card.style.borderRightColor = UITheme.CardBorder;
             card.style.borderBottomColor = UITheme.CardBorder;
             card.style.borderLeftColor = UITheme.CardBorder;
-            card.style.backgroundColor = faceUp ? UITheme.CardMid : UITheme.CardBack;
+            int value = ParseCardValue(face);
+            bool hasArtwork = ApplyCardArtwork(card, faceUp, value);
 
-            var label = new Label(face);
+            var label = new Label(faceUp ? face : hasArtwork ? "" : face);
             label.style.fontSize = compact ? faceUp ? 22 : 11 : faceUp ? 26 : 14;
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.color = faceUp ? UITheme.TextPrimary : Color.white;
@@ -3724,11 +3879,12 @@ namespace Cabo.Client.UI
                 card.style.borderRightColor = UITheme.CardBorder;
                 card.style.borderBottomColor = UITheme.CardBorder;
                 card.style.borderLeftColor = UITheme.CardBorder;
-                card.style.backgroundColor = faceUp ? UITheme.CardMid : UITheme.CardBack;
+                int value = ParseCardValue(face);
+                bool hasArtwork = ApplyCardArtwork(card, faceUp, value);
 
                 if (card.childCount > 0 && card[0] is Label label)
                 {
-                    label.text = face;
+                    label.text = faceUp ? face : hasArtwork ? "" : face;
                     label.style.fontSize = compact ? faceUp ? 22 : 11 : faceUp ? 26 : 14;
                     label.style.unityFontStyleAndWeight = FontStyle.Bold;
                     label.style.color = faceUp ? UITheme.TextPrimary : Color.white;
@@ -3742,6 +3898,11 @@ namespace Cabo.Client.UI
                 caption.style.unityTextAlign = TextAnchor.MiddleCenter;
                 caption.style.marginTop = compact ? 3 : 6;
             }
+        }
+
+        static int ParseCardValue(string face)
+        {
+            return int.TryParse(face, out int value) ? Mathf.Clamp(value, 0, 13) : 0;
         }
 
         static void RestorePileCardVisibility(VisualElement stack)
@@ -3767,19 +3928,50 @@ namespace Cabo.Client.UI
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
             row.style.justifyContent = Justify.SpaceBetween;
-            row.style.minHeight = 58;
-            row.style.marginTop = 2;
+            row.style.minHeight = 60;
+            row.style.marginTop = 1;
+            row.style.marginBottom = 2;
+            row.style.paddingLeft = 8;
+            row.style.paddingRight = 8;
             row.style.paddingTop = 3;
             row.style.paddingBottom = 3;
-            row.style.borderBottomWidth = 1;
-            row.style.borderBottomColor = UITheme.PanelBorder;
+            row.style.backgroundColor = result.IsLowest ? UITheme.ReadySurface : UITheme.PanelGlass;
+            row.style.borderTopLeftRadius = 10;
+            row.style.borderTopRightRadius = 10;
+            row.style.borderBottomLeftRadius = 10;
+            row.style.borderBottomRightRadius = 10;
+            SetBorderWidth(row, result.IsLowest ? 2 : 1);
+            SetBorderColor(row, result.IsLowest ? UITheme.ReadyBorder : UITheme.PanelBorder);
 
-            var name = new Label(result.Nickname + (result.IsSteadyCaller ? "  CABO" : "") + (result.IsLowest ? "  最低" : ""));
-            name.style.width = 150;
-            name.style.flexShrink = 0;
+            var identity = new VisualElement();
+            identity.style.width = 174;
+            identity.style.flexShrink = 0;
+            identity.style.flexDirection = FlexDirection.Row;
+            identity.style.alignItems = Align.Center;
+
+            var avatarPath = PlayerProfileStore.GetCharacterVisualPath(result.CharacterId);
+            var avatar = PlayerProfileStore.CreateAvatarVisual(result.Nickname, avatarPath, 34);
+            avatar.style.marginRight = 8;
+            identity.Add(avatar);
+
+            var nameBlock = new VisualElement();
+            var name = new Label(result.Nickname);
             name.style.fontSize = 13;
-            name.style.whiteSpace = WhiteSpace.Normal;
-            row.Add(name);
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.style.color = UITheme.TextPrimary;
+            nameBlock.Add(name);
+
+            string flags = result.IsLowest ? "最低糖能" : result.IsSteadyCaller ? "健康宣言" : "餐盘结算";
+            if (result.IsSteadyCaller && result.IsLowest)
+                flags = "健康宣言 · 最低糖能";
+            var flag = new Label(flags);
+            flag.style.fontSize = 10;
+            flag.style.color = result.IsLowest ? UITheme.ReadyBorder : UITheme.TextSecondary;
+            flag.style.marginTop = 2;
+            flag.style.whiteSpace = WhiteSpace.Normal;
+            nameBlock.Add(flag);
+            identity.Add(nameBlock);
+            row.Add(identity);
 
             var cards = new VisualElement();
             cards.style.flexDirection = FlexDirection.Row;
@@ -3791,12 +3983,129 @@ namespace Cabo.Client.UI
                 cards.Add(CreateRevealCard(value));
             row.Add(cards);
 
-            var score = new Label($"{result.HandTotal} + {result.Penalty} = {result.RoundScore}    总分 {result.CumulativeScore}");
-            score.style.width = 170;
+            string penalty = result.Penalty > 0 ? $"翻车小点心 +{result.Penalty}" : "无翻车点心";
+            var score = new Label($"餐盘 {result.HandTotal} · {penalty}\n本轮糖能 {result.RoundScore}　累计 {result.CumulativeScore}");
+            score.style.width = 218;
             score.style.flexShrink = 0;
-            score.style.fontSize = 13;
+            score.style.fontSize = 12;
+            score.style.color = UITheme.TextSecondary;
             score.style.unityTextAlign = TextAnchor.MiddleRight;
             score.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(score);
+            return row;
+        }
+
+        VisualElement CreateCompactRevealRow(RoundResult result)
+        {
+            var row = new VisualElement();
+            row.style.minHeight = 76;
+            row.style.marginTop = 1;
+            row.style.marginBottom = 3;
+            row.style.paddingLeft = 6;
+            row.style.paddingRight = 6;
+            row.style.paddingTop = 5;
+            row.style.paddingBottom = 5;
+            row.style.backgroundColor = result.IsLowest ? UITheme.ReadySurface : UITheme.PanelGlassStrong;
+            UITheme.SetRadius(row, 8);
+            SetBorderWidth(row, result.IsLowest ? 2 : 1);
+            SetBorderColor(row, result.IsLowest ? UITheme.ReadyBorder : UITheme.PanelBorder);
+
+            var header = new VisualElement();
+            header.style.flexDirection = FlexDirection.Row;
+            header.style.alignItems = Align.Center;
+            header.style.flexShrink = 0;
+            row.Add(header);
+
+            var avatarPath = PlayerProfileStore.GetCharacterVisualPath(result.CharacterId);
+            var avatar = PlayerProfileStore.CreateAvatarVisual(result.Nickname, avatarPath, 24);
+            avatar.style.marginRight = 6;
+            header.Add(avatar);
+
+            var name = new Label(result.Nickname);
+            name.style.fontSize = 11;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.style.flexGrow = 1;
+            name.style.color = UITheme.TextPrimary;
+            header.Add(name);
+
+            string flagText = result.IsLowest
+                ? "\u6700\u4F4E\u7CD6\u80FD"
+                : result.IsSteadyCaller ? "\u5065\u5EB7\u5BA3\u8A00" : "";
+            if (!string.IsNullOrEmpty(flagText))
+            {
+                var flag = new Label(flagText);
+                flag.style.fontSize = 9;
+                flag.style.color = result.IsLowest ? UITheme.ReadyBorder : UITheme.TextSecondary;
+                header.Add(flag);
+            }
+
+            string cardValues = result.CardValues != null && result.CardValues.Count > 0
+                ? string.Join(" + ", result.CardValues)
+                : "0";
+            string penalty = result.Penalty > 0 ? $"  \u7FFB\u8F66 +{result.Penalty}" : "";
+            var score = new Label(
+                $"\u624B\u724C {cardValues}  \u00B7 \u9910\u76D8 {result.HandTotal}{penalty}\n" +
+                $"\u672C\u8F6E {result.RoundScore:+0;-0;0}  \u00B7 \u7D2F\u8BA1 {result.CumulativeScore}");
+            score.style.fontSize = 10;
+            score.style.marginTop = 3;
+            score.style.whiteSpace = WhiteSpace.Normal;
+            score.style.color = UITheme.TextSecondary;
+            row.Add(score);
+            return row;
+        }
+
+        VisualElement CreateFinalRankRow(FinalRank rank)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.minHeight = 48;
+            row.style.marginTop = 2;
+            row.style.marginBottom = 2;
+            row.style.paddingLeft = 10;
+            row.style.paddingRight = 12;
+            row.style.paddingTop = 5;
+            row.style.paddingBottom = 5;
+            row.style.backgroundColor = rank.IsWinner ? UITheme.HostBadgeSurface : UITheme.PanelGlass;
+            row.style.borderTopLeftRadius = 10;
+            row.style.borderTopRightRadius = 10;
+            row.style.borderBottomLeftRadius = 10;
+            row.style.borderBottomRightRadius = 10;
+            SetBorderWidth(row, rank.IsWinner ? 2 : 1);
+            SetBorderColor(row, rank.IsWinner ? UITheme.HostBadgeBorder : UITheme.PanelBorder);
+
+            var badge = new Label(rank.Rank.ToString());
+            badge.style.width = 32;
+            badge.style.height = 32;
+            badge.style.marginRight = 10;
+            badge.style.fontSize = 15;
+            badge.style.unityFontStyleAndWeight = FontStyle.Bold;
+            badge.style.unityTextAlign = TextAnchor.MiddleCenter;
+            badge.style.color = UITheme.TextPrimary;
+            badge.style.backgroundColor = rank.IsWinner ? UITheme.TurnHighlight : UITheme.PanelSurfaceAlt;
+            badge.style.borderTopLeftRadius = 16;
+            badge.style.borderTopRightRadius = 16;
+            badge.style.borderBottomLeftRadius = 16;
+            badge.style.borderBottomRightRadius = 16;
+            row.Add(badge);
+
+            var rankedPlayer = _flow.State.Players.Find(player => player.PlayerId == rank.PlayerId);
+            var avatarPath = PlayerProfileStore.GetCharacterVisualPath(rankedPlayer?.CharacterId);
+            var avatar = PlayerProfileStore.CreateAvatarVisual(rank.Nickname, avatarPath, 34);
+            avatar.style.marginRight = 10;
+            row.Add(avatar);
+
+            var name = new Label(rank.Nickname + (rank.IsWinner ? " · 冠军" : ""));
+            name.style.flexGrow = 1;
+            name.style.fontSize = 14;
+            name.style.unityFontStyleAndWeight = rank.IsWinner ? FontStyle.Bold : FontStyle.Normal;
+            name.style.color = UITheme.TextPrimary;
+            row.Add(name);
+
+            var score = new Label($"累计糖能 {rank.FinalScore}");
+            score.style.fontSize = 14;
+            score.style.unityFontStyleAndWeight = FontStyle.Bold;
+            score.style.color = rank.IsWinner ? UITheme.HostBadgeBorder : UITheme.TextSecondary;
             row.Add(score);
             return row;
         }
@@ -3809,6 +4118,37 @@ namespace Cabo.Client.UI
             card.style.marginTop = 2;
             card.style.marginBottom = 2;
             return card;
+        }
+
+        void MountSettlementStage(GameState state, VisualElement parent = null)
+        {
+            if (_settlementStage == null)
+                _settlementStage = SettlementStageRuntime.Create(_ownerTransform);
+
+            _settlementStage.gameObject.SetActive(true);
+            _settlementStage.Play(state.RoundNumber, state.LastRoundResults);
+
+            var stageImage = new Image
+            {
+                name = "SettlementCharacterStageImage",
+                image = _settlementStage.Output,
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore
+            };
+            stageImage.style.height = 230;
+            stageImage.style.flexGrow = 1;
+            stageImage.style.flexShrink = 1;
+            stageImage.style.minWidth = 0;
+            stageImage.style.marginRight = 8;
+            (parent ?? _actionPanel).Add(stageImage);
+        }
+
+        void HideSettlementStage()
+        {
+            if (_settlementStage == null)
+                return;
+            _settlementStage.StopPlayback();
+            _settlementStage.gameObject.SetActive(false);
         }
 
         void AddInterRoundControls(GameState state)
@@ -4501,11 +4841,11 @@ namespace Cabo.Client.UI
             public SeatView(string name, bool isSelf)
             {
                 Root = new VisualElement { name = $"Seat-{name}" };
-                Root.style.backgroundColor = UITheme.PanelSurface;
-                Root.style.borderTopLeftRadius = 8;
-                Root.style.borderTopRightRadius = 8;
-                Root.style.borderBottomLeftRadius = 8;
-                Root.style.borderBottomRightRadius = 8;
+                Root.style.backgroundColor = UITheme.TableSeatGlass;
+                Root.style.borderTopLeftRadius = 16;
+                Root.style.borderTopRightRadius = 16;
+                Root.style.borderBottomLeftRadius = 16;
+                Root.style.borderBottomRightRadius = 16;
                 Root.style.borderTopWidth = 1;
                 Root.style.borderRightWidth = 1;
                 Root.style.borderBottomWidth = 1;
@@ -4514,6 +4854,14 @@ namespace Cabo.Client.UI
                 Root.style.borderRightColor = UITheme.PanelBorder;
                 Root.style.borderBottomColor = UITheme.PanelBorder;
                 Root.style.borderLeftColor = UITheme.PanelBorder;
+                Root.style.overflow = Overflow.Hidden;
+                var stationArt = CaboArt.GetSeatBackground(name);
+                if (stationArt != null)
+                {
+                    Root.style.backgroundImage = new StyleBackground(stationArt);
+                    Root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                    Root.style.backgroundColor = Color.white;
+                }
                 Root.style.paddingLeft = 12;
                 Root.style.paddingRight = 12;
                 Root.style.paddingTop = 8;
@@ -4523,19 +4871,19 @@ namespace Cabo.Client.UI
 
                 if (isSelf)
                 {
-                    Root.style.minHeight = 166;
+                    Root.style.minHeight = 150;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
                 else if (name == "left" || name == "right")
                 {
-                    Root.style.width = 230;
-                    Root.style.minHeight = 262;
+                    Root.style.width = 210;
+                    Root.style.minHeight = 246;
                     Root.style.flexShrink = 0;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
                 else
                 {
-                    Root.style.minHeight = 166;
+                    Root.style.minHeight = 150;
                     Root.style.flexDirection = FlexDirection.Column;
                 }
 
@@ -4604,8 +4952,8 @@ namespace Cabo.Client.UI
                 _tag.text = isCurrentTurn && isCaboCaller ? "CABO 回合" : isCurrentTurn ? "回合" : tag;
                 _tag.style.color = isCaboCaller ? UITheme.TextOnDanger : isCurrentTurn ? UITheme.TextOnAccent : UITheme.TextSecondary;
                 _tag.style.backgroundColor = isCaboCaller ? UITheme.CaboDanger : isCurrentTurn ? UITheme.TurnHighlight : Color.clear;
-                Root.style.backgroundColor = isCaboCaller ? UITheme.CaboSurface : UITheme.PanelSurface;
-                var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnBorder : UITheme.PanelBorder;
+                Root.style.backgroundColor = isCaboCaller ? UITheme.CaboSurface : UITheme.TableSeatGlass;
+                var borderColor = isCaboCaller ? UITheme.CaboBorder : isCurrentTurn ? UITheme.TurnBorder : UITheme.TableSoftBorder;
                 Root.style.borderTopColor = borderColor;
                 Root.style.borderRightColor = Root.style.borderTopColor.value;
                 Root.style.borderBottomColor = Root.style.borderTopColor.value;

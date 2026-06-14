@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using Cabo.Client.Art;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -9,7 +10,9 @@ namespace Cabo.Client.UI.CardTable
     public sealed class CardView : MonoBehaviour, IPointerClickHandler
     {
         Image _background;
+        Image _foodArt;
         Text _label;
+        Text _foodName;
         Text _skillBadge;
         Outline _outline;
         CanvasGroup _canvasGroup;
@@ -49,6 +52,18 @@ namespace Cabo.Client.UI.CardTable
 
             _background = GetComponent<Image>();
             _background.raycastTarget = false;
+            _background.type = Image.Type.Simple;
+
+            var artGo = new GameObject("FoodArt", typeof(RectTransform), typeof(Image));
+            artGo.transform.SetParent(transform, false);
+            var artRect = artGo.GetComponent<RectTransform>();
+            artRect.anchorMin = new Vector2(0.06f, 0.22f);
+            artRect.anchorMax = new Vector2(0.94f, 0.93f);
+            artRect.offsetMin = Vector2.zero;
+            artRect.offsetMax = Vector2.zero;
+            _foodArt = artGo.GetComponent<Image>();
+            _foodArt.preserveAspect = true;
+            _foodArt.raycastTarget = false;
 
             _outline = gameObject.GetComponent<Outline>();
             if (_outline == null)
@@ -58,32 +73,52 @@ namespace Cabo.Client.UI.CardTable
             var labelGo = new GameObject("Label", typeof(RectTransform), typeof(Text));
             labelGo.transform.SetParent(transform, false);
             var labelRect = labelGo.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(4f, 12f);
-            labelRect.offsetMax = new Vector2(-4f, -8f);
+            labelRect.anchorMin = new Vector2(0.04f, 0.70f);
+            labelRect.anchorMax = new Vector2(0.38f, 0.97f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
 
             _label = labelGo.GetComponent<Text>();
-            _label.alignment = TextAnchor.MiddleCenter;
+            _label.alignment = TextAnchor.UpperLeft;
             _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _label.fontStyle = FontStyle.Bold;
             _label.raycastTarget = false;
+            var valueOutline = labelGo.AddComponent<Outline>();
+            valueOutline.effectColor = new Color(1f, 1f, 1f, 0.95f);
+            valueOutline.effectDistance = new Vector2(1f, -1f);
+
+            var nameGo = new GameObject("FoodName", typeof(RectTransform), typeof(Text));
+            nameGo.transform.SetParent(transform, false);
+            var nameRect = nameGo.GetComponent<RectTransform>();
+            nameRect.anchorMin = new Vector2(0.03f, 0.015f);
+            nameRect.anchorMax = new Vector2(0.97f, 0.25f);
+            nameRect.offsetMin = Vector2.zero;
+            nameRect.offsetMax = Vector2.zero;
+
+            _foodName = nameGo.GetComponent<Text>();
+            _foodName.alignment = TextAnchor.MiddleCenter;
+            _foodName.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _foodName.fontStyle = FontStyle.Bold;
+            _foodName.raycastTarget = false;
 
             var badgeGo = new GameObject("SkillBadge", typeof(RectTransform), typeof(Text));
             badgeGo.transform.SetParent(transform, false);
             var badgeRect = badgeGo.GetComponent<RectTransform>();
-            badgeRect.anchorMin = new Vector2(0f, 0f);
-            badgeRect.anchorMax = new Vector2(1f, 0.34f);
-            badgeRect.offsetMin = new Vector2(4f, 4f);
-            badgeRect.offsetMax = new Vector2(-4f, -2f);
+            badgeRect.anchorMin = new Vector2(0.56f, 0.72f);
+            badgeRect.anchorMax = new Vector2(0.96f, 0.96f);
+            badgeRect.offsetMin = Vector2.zero;
+            badgeRect.offsetMax = Vector2.zero;
 
             _skillBadge = badgeGo.GetComponent<Text>();
-            _skillBadge.alignment = TextAnchor.MiddleCenter;
+            _skillBadge.alignment = TextAnchor.UpperRight;
             _skillBadge.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _skillBadge.fontStyle = FontStyle.Bold;
             _skillBadge.raycastTarget = false;
-            _skillBadge.color = UITheme.TextOnAccent;
+            _skillBadge.color = UITheme.SkillSpy;
             _skillBadge.gameObject.SetActive(false);
+            var badgeOutline = badgeGo.AddComponent<Outline>();
+            badgeOutline.effectColor = new Color(1f, 1f, 1f, 0.95f);
+            badgeOutline.effectDistance = new Vector2(1f, -1f);
 
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null)
@@ -95,22 +130,39 @@ namespace Cabo.Client.UI.CardTable
         public void SetSize(Vector2 size)
         {
             RectTransform.sizeDelta = new Vector2(Mathf.Max(24f, size.x), Mathf.Max(32f, size.y));
-            _label.fontSize = Mathf.RoundToInt(FaceUp ? RectTransform.sizeDelta.y * 0.34f : RectTransform.sizeDelta.y * 0.16f);
-            _skillBadge.fontSize = Mathf.Max(8, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.11f));
+            _label.fontSize = Mathf.Max(10, Mathf.RoundToInt(RectTransform.sizeDelta.y * (FaceUp ? 0.22f : 0.16f)));
+            _foodName.fontSize = Mathf.Max(7, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.105f));
+            _skillBadge.fontSize = Mathf.Max(7, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.095f));
         }
 
         public void ShowFront(int value, bool showSkillBadge = true)
         {
             Value = value;
             FaceUp = true;
-            _background.color = UITheme.CardFace(value);
+            var food = CaboArt.GetFood(value);
+            _background.sprite = null;
+            _background.color = Color.Lerp(UITheme.PanelSurface, food.accentColor, 0.13f);
+            _foodArt.sprite = food.foodSprite;
+            _foodArt.color = Color.white;
+            _foodArt.gameObject.SetActive(food.foodSprite != null);
             _label.text = value.ToString();
             _label.color = UITheme.TextPrimary;
-            _label.fontSize = Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.34f);
-            _outline.effectColor = UITheme.CardBorder;
+            _label.alignment = TextAnchor.UpperLeft;
+            var labelRect = _label.rectTransform;
+            labelRect.anchorMin = new Vector2(0.04f, 0.70f);
+            labelRect.anchorMax = new Vector2(0.38f, 0.97f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            _label.fontSize = Mathf.Max(10, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.22f));
+            _label.gameObject.SetActive(true);
+            _foodName.text = food.displayName;
+            _foodName.color = UITheme.TextPrimary;
+            _foodName.gameObject.SetActive(true);
+            _outline.effectColor = Color.Lerp(UITheme.CardBorder, food.accentColor, 0.45f);
 
-            string skillName = showSkillBadge ? GetSkillShortName(value) : "";
+            string skillName = showSkillBadge ? food.skillLabel : "";
             _skillBadge.text = skillName;
+            _skillBadge.color = SkillBadgeColor(value);
             _skillBadge.gameObject.SetActive(!string.IsNullOrEmpty(skillName));
         }
 
@@ -118,10 +170,18 @@ namespace Cabo.Client.UI.CardTable
         {
             Value = 0;
             FaceUp = false;
-            _background.color = UITheme.CardBack;
-            _label.text = "CABO";
+            _background.sprite = CaboArt.CardBack;
+            _background.color = _background.sprite != null ? Color.white : UITheme.CardBack;
+            _foodArt.gameObject.SetActive(false);
+            _foodName.gameObject.SetActive(false);
+            _label.text = _background.sprite == null ? "CABO" : "";
             _label.color = Color.white;
+            _label.alignment = TextAnchor.MiddleCenter;
+            var labelRect = _label.rectTransform;
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
             _label.fontSize = Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.16f);
+            _label.gameObject.SetActive(_background.sprite == null);
             _outline.effectColor = UITheme.CardBorder;
             _skillBadge.gameObject.SetActive(false);
         }
@@ -241,12 +301,12 @@ namespace Cabo.Client.UI.CardTable
             RectTransform.localScale = new Vector3(to, 1f, 1f);
         }
 
-        static string GetSkillShortName(int value)
+        static Color SkillBadgeColor(int value)
         {
-            if (value == 7 || value == 8) return "\u770b\u724c";
-            if (value == 9 || value == 10) return "\u5077\u770b";
-            if (value == 11 || value == 12) return "\u6362\u724c";
-            return "";
+            if (value == 7 || value == 8) return UITheme.SkillPeek;
+            if (value == 9 || value == 10) return UITheme.SkillSpy;
+            if (value == 11 || value == 12) return UITheme.SkillSwap;
+            return UITheme.TextSecondary;
         }
     }
 }

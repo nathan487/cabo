@@ -366,9 +366,10 @@ namespace Cabo.Client.UI
             row.style.overflow = Overflow.Hidden;
 
             var senderName = string.IsNullOrWhiteSpace(message.SenderNickname) ? "Player" : message.SenderNickname;
+            var sender = _flow.State.Players.Find(player => player.PlayerId == message.SenderPlayerId);
             var avatar = PlayerProfileStore.CreateAvatarVisual(
                 senderName,
-                PlayerProfileStore.GetAvatarPathForPlayer(message.SenderPlayerId, message.SenderPlayerId == _flow.State.MyPlayerId),
+                PlayerProfileStore.GetCharacterVisualPath(sender?.CharacterId),
                 _compact ? 26 : 30);
             avatar.style.marginRight = 7;
             row.Add(avatar);

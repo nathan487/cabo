@@ -1,0 +1,155 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 28942df45902d714daa02a9d6ecd0be3, type: 3}
+  m_Name: CaboArtCatalog
+  m_EditorClassIdentifier: 
+  foods:
+  - value: 0
+    displayName: "\u6E05\u6C34\u676F"
+    category: "\u96F6\u8D1F\u62C5"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 3637a0c628a7ab84c87ddc7b66cf0ee3, type: 3}
+    consumeSprite: {fileID: 21300000, guid: b364647f65b6dc640a7ddad886e06850, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 33cf172d92864d0489886ee97be0713d, type: 3}
+    consumePose: 3
+    accentColor: {r: 0.49, g: 0.7, b: 0.39, a: 1}
+  - value: 1
+    displayName: "\u9EC4\u74DC\u7247"
+    category: "\u6E05\u723D\u852C\u83DC"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 36a5ffacc98b93b44a63828b45a61fff, type: 3}
+    consumeSprite: {fileID: 21300000, guid: a61853881d54fcb44a007e20d8625646, type: 3}
+    consumedSprite: {fileID: 21300000, guid: c2da82bbd608b6245bd74dab5e33bfd6, type: 3}
+    consumePose: 1
+    accentColor: {r: 0.49, g: 0.7, b: 0.39, a: 1}
+  - value: 2
+    displayName: "\u6C34\u716E\u86CB"
+    category: "\u8F7B\u86CB\u767D"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 318311bf1e5e5e84c8add4cd1f55f1f7, type: 3}
+    consumeSprite: {fileID: 21300000, guid: fa6128d94c49b114095a8f31ad0b9014, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 8cc770be61f3a854ea57ca7a0f4c4e3e, type: 3}
+    consumePose: 1
+    accentColor: {r: 0.49, g: 0.7, b: 0.39, a: 1}
+  - value: 3
+    displayName: "\u65E0\u7CD6\u9178\u5976"
+    category: "\u8F7B\u4E73\u5236\u54C1"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 9a67c44b5e589ac4a8a70790f67b4e88, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 9c45228be0ee2c747bd80acfbe86fd74, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 4ebdac8b96eeb7148b053d40c28336b3, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.49, g: 0.7, b: 0.39, a: 1}
+  - value: 4
+    displayName: "\u7389\u7C73\u676F"
+    category: "\u4E3B\u98DF\u5C11\u91CF"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: c5909b4571186374f8c3961dc3f51891, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 75ba395800b4b684a80f3944ff50520d, type: 3}
+    consumedSprite: {fileID: 21300000, guid: fc4b304f5a6d8e54ebc9465258741c61, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.88, g: 0.68, b: 0.28, a: 1}
+  - value: 5
+    displayName: "\u9E21\u80F8\u8089\u6C99\u62C9"
+    category: "\u5747\u8861\u8F7B\u98DF"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 8cd46d094727f49488fecb984bcb4a34, type: 3}
+    consumeSprite: {fileID: 21300000, guid: d25f174f7f1dd8040ae547ad9eefec66, type: 3}
+    consumedSprite: {fileID: 21300000, guid: e9481b6977d966d4b85c3585712ef9b7, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.88, g: 0.68, b: 0.28, a: 1}
+  - value: 6
+    displayName: "\u5168\u9EA6\u4E09\u660E\u6CBB"
+    category: "\u9971\u8179\u4E3B\u98DF"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 3cb2becdb783b5a45bb850494ebbbfe4, type: 3}
+    consumeSprite: {fileID: 21300000, guid: a7d4e55d067cee340b4d95c4edf14e4e, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 63b587ff4ebffb5419718afd49c19e37, type: 3}
+    consumePose: 1
+    accentColor: {r: 0.88, g: 0.68, b: 0.28, a: 1}
+  - value: 7
+    displayName: "\u84DD\u8393\u71D5\u9EA6\u676F"
+    category: "\u8F7B\u751C\u70B9"
+    skillLabel: "\u81EA\u68C0"
+    foodSprite: {fileID: 21300000, guid: a19e550a2501c8545b0bb20fbb3c9ee3, type: 3}
+    consumeSprite: {fileID: 21300000, guid: fcf8a1d0b73a5d04c825ef9bc22f1bc6, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 32e69a3631bb19347b2842cd1f2a3e54, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.94, g: 0.52, b: 0.24, a: 1}
+  - value: 8
+    displayName: "\u852C\u83DC\u80FD\u91CF\u6C64"
+    category: "\u6696\u5FC3\u8F7B\u98DF"
+    skillLabel: "\u81EA\u68C0"
+    foodSprite: {fileID: 21300000, guid: a38e86ae44d8307499ea0e34b3291f37, type: 3}
+    consumeSprite: {fileID: 21300000, guid: d42e28bceddf339439e2b66a56410d77, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 9fc6ffaa468a1274396132dddf9ba3db, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.94, g: 0.52, b: 0.24, a: 1}
+  - value: 9
+    displayName: "\u5BFF\u53F8\u4FBF\u5F53"
+    category: "\u7EFC\u5408\u9910"
+    skillLabel: "\u4FA6\u67E5"
+    foodSprite: {fileID: 21300000, guid: 03138692aaf5b194ea0030beaea915b0, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 5059ae0f449dbb9449f3c855f16575fe, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 15a56000d24f9f647a36287c55b176ad, type: 3}
+    consumePose: 2
+    accentColor: {r: 0.94, g: 0.52, b: 0.24, a: 1}
+  - value: 10
+    displayName: "\u9999\u8549\u725B\u5976"
+    category: "\u751C\u996E"
+    skillLabel: "\u4FA6\u67E5"
+    foodSprite: {fileID: 21300000, guid: 4aadc3d30cccf0e48b369723873a8cfd, type: 3}
+    consumeSprite: {fileID: 21300000, guid: d9b28463a6fc73e4db560d7405eb7a60, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 3b7d12344466d9c47aad041f298f7899, type: 3}
+    consumePose: 3
+    accentColor: {r: 0.94, g: 0.52, b: 0.24, a: 1}
+  - value: 11
+    displayName: "\u829D\u58EB\u62AB\u8428"
+    category: "\u9AD8\u70ED\u91CF\u4E3B\u98DF"
+    skillLabel: "\u4EA4\u6362"
+    foodSprite: {fileID: 21300000, guid: c469943f3368436448496e0deaf54ed8, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 45702ca5f2ab5eb4cb3826c264c7bcba, type: 3}
+    consumedSprite: {fileID: 21300000, guid: eb3b169d6642e1347ab3c8626d7bfa2d, type: 3}
+    consumePose: 1
+    accentColor: {r: 0.88, g: 0.35, b: 0.31, a: 1}
+  - value: 12
+    displayName: "\u5DE7\u514B\u529B\u86CB\u7CD5"
+    category: "\u9AD8\u7CD6\u751C\u70B9"
+    skillLabel: "\u4EA4\u6362"
+    foodSprite: {fileID: 21300000, guid: e7fe206b8b1228f439977957b5c7612a, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 33b307a50354c8243bddd4e42e199028, type: 3}
+    consumedSprite: {fileID: 21300000, guid: b80c728a1e354874e9e154f294e0fad8, type: 3}
+    consumePose: 1
+    accentColor: {r: 0.88, g: 0.35, b: 0.31, a: 1}
+  - value: 13
+    displayName: "\u8D85\u5927\u676F\u73CD\u73E0\u5976\u8336"
+    category: "\u9AD8\u7CD6\u996E\u54C1"
+    skillLabel: 
+    foodSprite: {fileID: 21300000, guid: 8822fac9a27e49345a169c35c377e0d4, type: 3}
+    consumeSprite: {fileID: 21300000, guid: 843a883f13859344ebe24aa29f3452e5, type: 3}
+    consumedSprite: {fileID: 21300000, guid: 7898344495805a24a862222f83ad678c, type: 3}
+    consumePose: 3
+    accentColor: {r: 0.88, g: 0.35, b: 0.31, a: 1}
+  characters:
+  - characterId: pomelo
+    displayName: "\u67DA\u67DA"
+    portraitSprite: {fileID: 21300000, guid: da9e9fe917ac02543aefe57234cdf396, type: 3}
+    settlementPrefab: {fileID: 7822593758061869816, guid: 31628cf75bc5d7b4993e87feb1278242, type: 3}
+  cardBack: {fileID: 21300000, guid: d413b6caa91ed5747aa3512043c6ead8, type: 3}
+  homeBackground: {fileID: 21300000, guid: c1121bef4153e564ea58ea42b5b94a72, type: 3}
+  tableBackground: {fileID: 21300000, guid: fff8df3d45ecb48438fb0ab1ec645b8f, type: 3}
+  settlementBackground: {fileID: 21300000, guid: 11292b23487a9de488ee9894a20fe7c8, type: 3}
+  seatTopBackground: {fileID: 21300000, guid: c161beac50ae0244ca7e27abaf3271e8, type: 3}
+  seatSelfBackground: {fileID: 21300000, guid: 62c3eaf3c92188e49abfddb577245126, type: 3}
+  seatLeftBackground: {fileID: 21300000, guid: a6ccba631e19ae541992f322e898e6df, type: 3}
+  seatRightBackground: {fileID: 21300000, guid: 1caa8e9716c47bf459dcc4f7a603c1fe, type: 3}
+  tableCenterBackground: {fileID: 21300000, guid: 3271a72733f8c2d4b97feb3b0b125603, type: 3}

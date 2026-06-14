@@ -23,6 +23,8 @@ namespace Cabo.Client.Editor
         public void OnPreprocessBuild(BuildReport report)
         {
             SyncArtResources();
+            CaboArtCatalogBuilder.RebuildCatalog();
+            CaboArtCatalogBuilder.ValidateCatalogOrThrow();
         }
 
         [MenuItem("Cabo/Sync Art Resources")]

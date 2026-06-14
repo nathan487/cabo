@@ -129,21 +129,21 @@ namespace Cabo.Client
         }
 
         /// <summary>Quick send helper for room actions.</summary>
-        public void SendCreateRoom(string nickname, int maxPlayers = 4)
+        public void SendCreateRoom(string nickname, string characterId, int maxPlayers = 4)
         {
             var reqId = _nextSeq;
             Send(new ClientMessage
             {
-                CreateRoomReq = new Game.Room.CreateRoomReq { RequestId = reqId, MaxPlayers = maxPlayers, Nickname = nickname }
+                CreateRoomReq = new Game.Room.CreateRoomReq { RequestId = reqId, MaxPlayers = maxPlayers, Nickname = nickname, CharacterId = characterId }
             });
         }
 
-        public void SendJoinRoom(string roomCode, string nickname)
+        public void SendJoinRoom(string roomCode, string nickname, string characterId)
         {
             var reqId = _nextSeq;
             Send(new ClientMessage
             {
-                JoinRoomReq = new Game.Room.JoinRoomReq { RequestId = reqId, RoomCode = roomCode, Nickname = nickname }
+                JoinRoomReq = new Game.Room.JoinRoomReq { RequestId = reqId, RoomCode = roomCode, Nickname = nickname, CharacterId = characterId }
             });
         }
 
