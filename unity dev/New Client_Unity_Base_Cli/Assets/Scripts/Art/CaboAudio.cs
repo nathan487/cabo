@@ -54,8 +54,8 @@ namespace Cabo.Client.Art
         public static void SetBGMVolume(float volume)
         {
             _bgmVolume = Mathf.Clamp01(volume);
-            if (_bgmSource != null && _bgmSource.isPlaying)
-                _bgmSource.volume = _bgmVolume;
+            if (_host != null && _bgmSource != null)
+                _host.SetBGMVolume(_bgmSource, _bgmVolume);
         }
 
         static void EnsureSources()
@@ -85,10 +85,19 @@ namespace Cabo.Client.Art
     sealed class CaboAudioHost : MonoBehaviour
     {
         Coroutine _bgmRoutine;
+        float _playVolume = 0.42f;
 
         public void PlayBGM(AudioSource source, AudioClip clip, float targetVolume, float fadeDuration)
         {
-            Restart(PlayRoutine(source, clip, targetVolume, fadeDuration));
+            _playVolume = Mathf.Clamp01(targetVolume);
+            Restart(PlayRoutine(source, clip, fadeDuration));
+        }
+
+        public void SetBGMVolume(AudioSource source, float volume)
+        {
+            _playVolume = Mathf.Clamp01(volume);
+            if (source != null && source.isPlaying)
+                source.volume = _playVolume;
         }
 
         public void StopBGM(AudioSource source, float fadeDuration)
@@ -103,7 +112,7 @@ namespace Cabo.Client.Art
             _bgmRoutine = StartCoroutine(routine);
         }
 
-        IEnumerator PlayRoutine(AudioSource source, AudioClip clip, float targetVolume, float fadeDuration)
+        IEnumerator PlayRoutine(AudioSource source, AudioClip clip, float fadeDuration)
         {
             if (source.isPlaying && source.clip != clip)
             {
@@ -119,7 +128,7 @@ namespace Cabo.Client.Art
                 source.Play();
             }
 
-            yield return Fade(source, targetVolume, fadeDuration);
+            yield return FadeToPlayVolume(source, fadeDuration);
             _bgmRoutine = null;
         }
 
@@ -143,6 +152,19 @@ namespace Cabo.Client.Art
                 yield return null;
             }
             source.volume = targetVolume;
+        }
+
+        IEnumerator FadeToPlayVolume(AudioSource source, float duration)
+        {
+            float startVolume = source.volume;
+            float startedAt = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - startedAt < duration)
+            {
+                float progress = (Time.realtimeSinceStartup - startedAt) / Mathf.Max(0.01f, duration);
+                source.volume = Mathf.Lerp(startVolume, _playVolume, progress);
+                yield return null;
+            }
+            source.volume = _playVolume;
         }
     }
 }

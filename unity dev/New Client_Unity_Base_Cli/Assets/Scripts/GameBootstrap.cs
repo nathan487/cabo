@@ -35,9 +35,27 @@ namespace Cabo.Client
         {
             if (_instance != null) return;
             if (SceneManager.GetActiveScene().name == "PomeloSettlementPilot") return;
+            var existing = FindFirstObjectByType<GameBootstrap>();
+            if (existing != null)
+            {
+                _instance = existing;
+                return;
+            }
             var go = new GameObject("GameBootstrap");
             DontDestroyOnLoad(go);
             _instance = go.AddComponent<GameBootstrap>();
+        }
+
+        void Awake()
+        {
+            if (_instance != null && _instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            _instance = this;
+            DontDestroyOnLoad(gameObject);
         }
 
         void Start()
@@ -167,6 +185,8 @@ namespace Cabo.Client
         void OnDestroy()
         {
             _flow?.Dispose();
+            if (_instance == this)
+                _instance = null;
         }
 
         void HandleSceneTransition()
