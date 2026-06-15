@@ -1914,6 +1914,8 @@ namespace Cabo.Client.UI
                     FaceUp = faceUp,
                     Value = value,
                     Selected = selected,
+                    LocallyPeeked = !faceUp && _flow.State.IsOpponentCardPeeked(playerId, slot),
+                    PubliclyKnown = isSelf && faceUp && _flow.State.IsMyRevealedSlot(slot),
                     Clickable = clickable,
                     Clicked = clicked
                 });

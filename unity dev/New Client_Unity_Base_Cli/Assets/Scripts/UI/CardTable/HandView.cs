@@ -74,6 +74,7 @@ namespace Cabo.Client.UI.CardTable
                     card.ShowFront(layout.Value);
                 else
                     card.ShowBack();
+                card.SetKnowledgeMarkers(layout.LocallyPeeked, layout.PubliclyKnown);
                 card.SetSelected(layout.Selected);
                 card.SetInteraction(layout.Clickable, layout.Clicked);
                 card.SetVisible(true);
@@ -110,6 +111,7 @@ namespace Cabo.Client.UI.CardTable
                 if (card == null)
                     continue;
 
+                card.SetKnowledgeMarkers(layout.LocallyPeeked, layout.PubliclyKnown);
                 card.SetSelected(layout.Selected);
                 card.SetInteraction(layout.Clickable, layout.Clicked);
             }

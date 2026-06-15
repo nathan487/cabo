@@ -18,6 +18,8 @@ namespace Cabo.Client.UI.CardTable
         public bool FaceUp;
         public int Value;
         public bool Selected;
+        public bool LocallyPeeked;
+        public bool PubliclyKnown;
         public bool Clickable;
         public Action Clicked;
         public bool IsValid => PlayerId > 0 && SlotIndex >= 0 && Size.x > 1f && Size.y > 1f;

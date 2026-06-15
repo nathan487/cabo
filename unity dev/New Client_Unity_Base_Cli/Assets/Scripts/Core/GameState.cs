@@ -131,6 +131,8 @@ namespace Cabo.Client
         // Skill results
         public int LastPeekedValue = -1;
         public bool LastSwapOccurred;
+        readonly HashSet<(long PlayerId, int SlotIndex)> _peekedCards = new();
+        readonly HashSet<int> _myRevealedSlots = new();
 
         // Action broadcast message (printed after render)
         public string LastActionMessage;
@@ -159,6 +161,16 @@ namespace Cabo.Client
         }
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
         public bool IsMyselfHost => Players.Exists(player => player.PlayerId == MyPlayerId && player.IsHost);
+
+        public bool IsOpponentCardPeeked(long playerId, int slotIndex)
+        {
+            return playerId != MyPlayerId && _peekedCards.Contains((playerId, slotIndex));
+        }
+
+        public bool IsMyRevealedSlot(int slotIndex)
+        {
+            return _myRevealedSlots.Contains(slotIndex);
+        }
 
         public bool TryGetVisibleCardValue(long playerId, int slotIndex, out int value)
         {
@@ -428,6 +440,7 @@ namespace Cabo.Client
         void HandleGameStart(GameStartNotify notify)
         {
             Phase = GamePhase.Playing;
+            ClearLocalCardKnowledge();
             ResetEarlyEndState();
             RoundJustRevealed = false;
             GameOverPending = false;
@@ -711,6 +724,7 @@ namespace Cabo.Client
                 ApplyPlayerHandStates(ar.PlayerHands);
             else
                 ApplyFallbackActionHandCount(ar);
+            UpdateLocalCardKnowledge(ar);
 
             // Swap: update own card state
             if (ar.SwapOccurred)
@@ -762,6 +776,56 @@ namespace Cabo.Client
                     Value = card.IsKnown ? card.Value : 0
                 });
             }
+        }
+
+        void UpdateLocalCardKnowledge(ActionResultNotify action)
+        {
+            if (action == null)
+                return;
+
+            if (action.ActionType == ActionType.UseSkill
+                && action.SkillUsed == SkillType.Spy
+                && action.SourcePlayerId == MyPlayerId
+                && action.TargetPlayerId > 0
+                && action.TargetSlot >= 0)
+            {
+                _peekedCards.Add((action.TargetPlayerId, action.TargetSlot));
+            }
+
+            bool exchanged = action.ExchangeResult?.Success ?? false;
+            if (exchanged && (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard))
+                ClearPeekedCardsForPlayer(action.SourcePlayerId);
+
+            if (action.ActionType == ActionType.UseSkill && action.SkillUsed == SkillType.Swap && action.SwapOccurred)
+            {
+                _peekedCards.Remove((action.SourcePlayerId, action.SourceSlot));
+                _peekedCards.Remove((action.TargetPlayerId, action.TargetSlot));
+            }
+
+            SyncMyRevealedSlots();
+        }
+
+        void SyncMyRevealedSlots()
+        {
+            _myRevealedSlots.Clear();
+            var me = Players.Find(player => player.PlayerId == MyPlayerId);
+            if (me == null)
+                return;
+
+            foreach (var card in me.PublicCards)
+                if (card != null && card.IsKnown && card.SlotIndex >= 0)
+                    _myRevealedSlots.Add(card.SlotIndex);
+        }
+
+        void ClearPeekedCardsForPlayer(long playerId)
+        {
+            _peekedCards.RemoveWhere(card => card.PlayerId == playerId);
+        }
+
+        void ClearLocalCardKnowledge()
+        {
+            _peekedCards.Clear();
+            _myRevealedSlots.Clear();
         }
 
         void ApplyFallbackActionHandCount(ActionResultNotify ar)
@@ -895,6 +959,7 @@ namespace Cabo.Client
                 return;
 
             ResetEarlyEndState();
+            ClearLocalCardKnowledge();
             Phase = GamePhase.WaitingRoom;
             MyCards.Clear();
             DrawPileCount = 0;
@@ -951,6 +1016,7 @@ namespace Cabo.Client
         public void ReturnHome()
         {
             ResetEarlyEndState();
+            ClearLocalCardKnowledge();
             _requestedCharacterId = "pomelo";
             _hasRequestedCharacterId = false;
             Phase = GamePhase.Lobby;

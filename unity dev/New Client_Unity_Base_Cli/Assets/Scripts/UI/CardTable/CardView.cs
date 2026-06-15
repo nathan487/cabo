@@ -14,12 +14,18 @@ namespace Cabo.Client.UI.CardTable
         Text _label;
         Text _foodName;
         Text _skillBadge;
+        Image _knowledgeBadgeBackground;
+        Text _knowledgeBadge;
         Outline _outline;
         CanvasGroup _canvasGroup;
         Coroutine _moveRoutine;
         Coroutine _flipRoutine;
         Coroutine _clickRoutine;
         Action _onClicked;
+        bool _selected;
+        bool _locallyPeeked;
+        bool _publiclyKnown;
+        Color _defaultOutlineColor;
 
         public RectTransform RectTransform { get; private set; }
         public int Value { get; private set; }
@@ -122,6 +128,31 @@ namespace Cabo.Client.UI.CardTable
             badgeOutline.effectColor = new Color(1f, 1f, 1f, 0.95f);
             badgeOutline.effectDistance = new Vector2(1f, -1f);
 
+            var knowledgeGo = new GameObject("KnowledgeBadge", typeof(RectTransform), typeof(Image));
+            knowledgeGo.transform.SetParent(transform, false);
+            var knowledgeRect = knowledgeGo.GetComponent<RectTransform>();
+            knowledgeRect.anchorMin = new Vector2(0.48f, 0.51f);
+            knowledgeRect.anchorMax = new Vector2(0.96f, 0.70f);
+            knowledgeRect.offsetMin = Vector2.zero;
+            knowledgeRect.offsetMax = Vector2.zero;
+            _knowledgeBadgeBackground = knowledgeGo.GetComponent<Image>();
+            _knowledgeBadgeBackground.raycastTarget = false;
+
+            var knowledgeTextGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            knowledgeTextGo.transform.SetParent(knowledgeGo.transform, false);
+            var knowledgeTextRect = knowledgeTextGo.GetComponent<RectTransform>();
+            knowledgeTextRect.anchorMin = Vector2.zero;
+            knowledgeTextRect.anchorMax = Vector2.one;
+            knowledgeTextRect.offsetMin = Vector2.zero;
+            knowledgeTextRect.offsetMax = Vector2.zero;
+            _knowledgeBadge = knowledgeTextGo.GetComponent<Text>();
+            _knowledgeBadge.alignment = TextAnchor.MiddleCenter;
+            _knowledgeBadge.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            _knowledgeBadge.fontStyle = FontStyle.Bold;
+            _knowledgeBadge.color = Color.white;
+            _knowledgeBadge.raycastTarget = false;
+            knowledgeGo.SetActive(false);
+
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null)
                 _canvasGroup = gameObject.AddComponent<CanvasGroup>();
@@ -135,6 +166,7 @@ namespace Cabo.Client.UI.CardTable
             _label.fontSize = Mathf.Max(10, Mathf.RoundToInt(RectTransform.sizeDelta.y * (FaceUp ? 0.22f : 0.16f)));
             _foodName.fontSize = Mathf.Max(7, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.105f));
             _skillBadge.fontSize = Mathf.Max(7, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.095f));
+            _knowledgeBadge.fontSize = Mathf.Max(7, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.09f));
         }
 
         public void ShowFront(int value, bool showSkillBadge = true)
@@ -160,12 +192,13 @@ namespace Cabo.Client.UI.CardTable
             _foodName.text = food.displayName;
             _foodName.color = UITheme.TextPrimary;
             _foodName.gameObject.SetActive(true);
-            _outline.effectColor = Color.Lerp(UITheme.CardBorder, food.accentColor, 0.45f);
+            _defaultOutlineColor = Color.Lerp(UITheme.CardBorder, food.accentColor, 0.45f);
 
             string skillName = showSkillBadge ? food.skillLabel : "";
             _skillBadge.text = skillName;
             _skillBadge.color = SkillBadgeColor(value);
             _skillBadge.gameObject.SetActive(!string.IsNullOrEmpty(skillName));
+            RefreshKnowledgeStyle();
         }
 
         public void ShowBack()
@@ -184,14 +217,59 @@ namespace Cabo.Client.UI.CardTable
             labelRect.anchorMax = Vector2.one;
             _label.fontSize = Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.16f);
             _label.gameObject.SetActive(_background.sprite == null);
-            _outline.effectColor = UITheme.CardBorder;
+            _defaultOutlineColor = UITheme.CardBorder;
             _skillBadge.gameObject.SetActive(false);
+            RefreshKnowledgeStyle();
         }
 
         public void SetSelected(bool selected)
         {
-            _outline.effectDistance = selected ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
-            _outline.effectColor = selected ? UITheme.SelectedBorder : UITheme.CardBorder;
+            _selected = selected;
+            RefreshKnowledgeStyle();
+        }
+
+        public void SetKnowledgeMarkers(bool locallyPeeked, bool publiclyKnown)
+        {
+            _locallyPeeked = locallyPeeked;
+            _publiclyKnown = publiclyKnown;
+            RefreshKnowledgeStyle();
+        }
+
+        void RefreshKnowledgeStyle()
+        {
+            if (_knowledgeBadge == null || _knowledgeBadgeBackground == null || _outline == null)
+                return;
+
+            bool showPeeked = _locallyPeeked && !FaceUp;
+            bool showPublic = _publiclyKnown && FaceUp;
+            _knowledgeBadgeBackground.gameObject.SetActive(showPeeked || showPublic);
+            if (showPublic)
+            {
+                _knowledgeBadge.text = "公开";
+                _knowledgeBadgeBackground.color = new Color(0.93f, 0.38f, 0.05f, 0.94f);
+            }
+            else if (showPeeked)
+            {
+                _knowledgeBadge.text = "已看";
+                _knowledgeBadgeBackground.color = new Color(0.46f, 0.20f, 0.68f, 0.94f);
+            }
+
+            if (!FaceUp)
+            {
+                if (_background.sprite != null)
+                    _background.color = showPeeked ? new Color(0.82f, 0.72f, 1f, 1f) : Color.white;
+                else
+                    _background.color = showPeeked ? new Color(0.44f, 0.29f, 0.67f, 1f) : UITheme.CardBack;
+            }
+
+            _outline.effectDistance = _selected || showPublic ? new Vector2(4f, -4f) : new Vector2(2f, -2f);
+            _outline.effectColor = _selected
+                ? UITheme.SelectedBorder
+                : showPublic
+                    ? new Color(1f, 0.42f, 0.05f, 1f)
+                    : showPeeked
+                        ? new Color(0.58f, 0.34f, 0.82f, 1f)
+                        : _defaultOutlineColor;
         }
 
         public void SetInteraction(bool clickable, Action onClicked)
