@@ -171,9 +171,9 @@ MonoBehaviour:
     settlementPrefab: {fileID: 1360752265365731589, guid: 55430708e50dc71419730ebbf8bc7bb4, type: 3}
     gameOverDefeatSprite: {fileID: 21300000, guid: 23ac5b74d31d1794bb9458f123ca4c5f, type: 3}
   cardBack: {fileID: 21300000, guid: d413b6caa91ed5747aa3512043c6ead8, type: 3}
-  homeBackground: {fileID: 21300000, guid: b50080ee76c35704081b3a8d52fe63d7, type: 3}
-  tableBackground: {fileID: 21300000, guid: 8a699fd077afa2746b21013e1a7ec5fd, type: 3}
-  settlementBackground: {fileID: 21300000, guid: 54e33af5ad76b7749b16ce8e88fa97c2, type: 3}
+  homeBackground: {fileID: 21300000, guid: 2b617552a39957f47beabb5c7c182488, type: 3}
+  tableBackground: {fileID: 21300000, guid: 151c1e77cb9846744b5e135124f9cad6, type: 3}
+  settlementBackground: {fileID: 21300000, guid: b6aa95d8e4910504db6cbbc53fe587ed, type: 3}
   tableStations:
   - playerRoomIndex: 0
     selfView: {fileID: 21300000, guid: f86df2c555d609b48b8e0977455bb5a6, type: 3}

@@ -13,6 +13,9 @@ namespace Cabo.Client.Editor
         const string FoodFolder = "Assets/Art/Cards/Foods";
         const string CardBackPath = "Assets/Art/Cards/Backs/card_back_default.png";
         const string BackgroundFolder = "Assets/Art/UI/Backgrounds";
+        const string HomeBackgroundPath = BackgroundFolder + "/home_aqua_morning.png";
+        const string TableBackgroundPath = BackgroundFolder + "/table_berry_twilight.png";
+        const string SettlementBackgroundPath = BackgroundFolder + "/settlement_japanese_watercolor.png";
         const string TableStationFolder = "Assets/Art/UI/TableStations";
         const string SettlementPropsFolder = "Assets/Art/SettlementProps/Pilot";
         const string CharacterFolder = "Assets/Art/Characters";
@@ -134,9 +137,9 @@ namespace Cabo.Client.Editor
                 }
             };
             catalog.cardBack = AssetDatabase.LoadAssetAtPath<Sprite>(CardBackPath);
-            catalog.homeBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_warm_sunset.png");
-            catalog.tableBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_neutral_cream.png");
-            catalog.settlementBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_cool_night.png");
+            catalog.homeBackground = AssetDatabase.LoadAssetAtPath<Sprite>(HomeBackgroundPath);
+            catalog.tableBackground = AssetDatabase.LoadAssetAtPath<Sprite>(TableBackgroundPath);
+            catalog.settlementBackground = AssetDatabase.LoadAssetAtPath<Sprite>(SettlementBackgroundPath);
             catalog.tableStations = BuildTableStations();
             catalog.tableCenterBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/table_center_island.png");
             catalog.bgmClip = AssetDatabase.LoadAssetAtPath<AudioClip>(CaboAudioAssetBuilder.BgmPath);
