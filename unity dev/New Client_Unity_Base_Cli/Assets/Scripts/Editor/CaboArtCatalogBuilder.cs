@@ -42,6 +42,7 @@ namespace Cabo.Client.Editor
         {
             EnsureFolder("Assets/Resources", "Art");
             CaboAudioAssetBuilder.EnsureAudioAssets();
+            CaboDirectionalTableArtBuilder.EnsureAssets();
             ConfigureTextureImporters();
 
             var catalog = AssetDatabase.LoadAssetAtPath<CaboArtCatalog>(CatalogPath);
@@ -133,13 +134,10 @@ namespace Cabo.Client.Editor
                 }
             };
             catalog.cardBack = AssetDatabase.LoadAssetAtPath<Sprite>(CardBackPath);
-            catalog.homeBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/home_kitchen.png");
-            catalog.tableBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/table_layout_subtle_v2.png");
-            catalog.settlementBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/settlement_alcove.png");
-            catalog.seatTopBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_top_honey.png");
-            catalog.seatSelfBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_self_seaside.png");
-            catalog.seatLeftBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_left_garden.png");
-            catalog.seatRightBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_right_strawberry.png");
+            catalog.homeBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_warm_sunset.png");
+            catalog.tableBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_neutral_cream.png");
+            catalog.settlementBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{BackgroundFolder}/background_cool_night.png");
+            catalog.tableStations = BuildTableStations();
             catalog.tableCenterBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/table_center_island.png");
             catalog.bgmClip = AssetDatabase.LoadAssetAtPath<AudioClip>(CaboAudioAssetBuilder.BgmPath);
             catalog.drawSfx = LoadSfx("draw");
@@ -209,6 +207,24 @@ namespace Cabo.Client.Editor
             food.consumeSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SettlementPropsFolder}/{fullName}");
             food.consumedSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{SettlementPropsFolder}/{consumedName}");
             food.consumePose = pose;
+        }
+
+        static TableStationConfig[] BuildTableStations()
+        {
+            var result = new TableStationConfig[4];
+            for (int seat = 0; seat < result.Length; seat++)
+            {
+                string prefix = $"{TableStationFolder}/station_{seat + 1}";
+                result[seat] = new TableStationConfig
+                {
+                    playerRoomIndex = seat,
+                    selfView = AssetDatabase.LoadAssetAtPath<Sprite>($"{prefix}_self.png"),
+                    oppositeView = AssetDatabase.LoadAssetAtPath<Sprite>($"{prefix}_opposite.png"),
+                    leftView = AssetDatabase.LoadAssetAtPath<Sprite>($"{prefix}_left.png"),
+                    rightView = AssetDatabase.LoadAssetAtPath<Sprite>($"{prefix}_right.png")
+                };
+            }
+            return result;
         }
 
         static void ConfigureFolder(string folder, int maxSize, float pixelsPerUnit = 100f)
@@ -282,10 +298,18 @@ namespace Cabo.Client.Editor
             if (catalog.homeBackground == null) errors.Add("Home background is missing");
             if (catalog.tableBackground == null) errors.Add("Table background is missing");
             if (catalog.settlementBackground == null) errors.Add("Settlement background is missing");
-            if (catalog.seatTopBackground == null) errors.Add("Top player station is missing");
-            if (catalog.seatSelfBackground == null) errors.Add("Self player station is missing");
-            if (catalog.seatLeftBackground == null) errors.Add("Left player station is missing");
-            if (catalog.seatRightBackground == null) errors.Add("Right player station is missing");
+            if (catalog.tableStations == null || catalog.tableStations.Length != 4)
+                errors.Add("Four table station configurations are required");
+            else
+            {
+                for (int i = 0; i < catalog.tableStations.Length; i++)
+                {
+                    var station = catalog.tableStations[i];
+                    if (station == null || station.selfView == null || station.oppositeView == null
+                        || station.leftView == null || station.rightView == null)
+                        errors.Add($"Table station {i + 1} is missing a directional view");
+                }
+            }
             if (catalog.tableCenterBackground == null) errors.Add("Center table illustration is missing");
             if (catalog.bgmClip == null) errors.Add("Background music clip is missing");
             ValidateSfx(catalog.drawSfx, "Draw", errors);

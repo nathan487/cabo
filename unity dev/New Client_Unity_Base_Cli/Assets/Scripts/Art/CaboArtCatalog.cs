@@ -48,6 +48,28 @@ namespace Cabo.Client.Art
         public Sprite gameOverDefeatSprite;
     }
 
+    [Serializable]
+    public sealed class TableStationConfig
+    {
+        public int playerRoomIndex;
+        public Sprite selfView;
+        public Sprite oppositeView;
+        public Sprite leftView;
+        public Sprite rightView;
+
+        public Sprite GetView(int relativeSeat)
+        {
+            switch (relativeSeat)
+            {
+                case 0: return selfView;
+                case 1: return leftView;
+                case 2: return oppositeView;
+                case 3: return rightView;
+                default: return selfView;
+            }
+        }
+    }
+
     [CreateAssetMenu(fileName = "CaboArtCatalog", menuName = "Cabo/Art Catalog")]
     public sealed class CaboArtCatalog : ScriptableObject
     {
@@ -57,10 +79,7 @@ namespace Cabo.Client.Art
         public Sprite homeBackground;
         public Sprite tableBackground;
         public Sprite settlementBackground;
-        public Sprite seatTopBackground;
-        public Sprite seatSelfBackground;
-        public Sprite seatLeftBackground;
-        public Sprite seatRightBackground;
+        public TableStationConfig[] tableStations = Array.Empty<TableStationConfig>();
         public Sprite tableCenterBackground;
         public AudioClip bgmClip;
         public AudioClip drawSfx;

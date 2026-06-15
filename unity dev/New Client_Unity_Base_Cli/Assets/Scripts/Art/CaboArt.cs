@@ -71,25 +71,30 @@ namespace Cabo.Client.Art
         public static Sprite HomeBackground => Catalog != null ? Catalog.homeBackground : null;
         public static Sprite TableBackground => Catalog != null ? Catalog.tableBackground : null;
         public static Sprite SettlementBackground => Catalog != null ? Catalog.settlementBackground : null;
-        public static Sprite SeatTopBackground => Catalog != null ? Catalog.seatTopBackground : null;
-        public static Sprite SeatSelfBackground => Catalog != null ? Catalog.seatSelfBackground : null;
-        public static Sprite SeatLeftBackground => Catalog != null ? Catalog.seatLeftBackground : null;
-        public static Sprite SeatRightBackground => Catalog != null ? Catalog.seatRightBackground : null;
         public static Sprite TableCenterBackground => Catalog != null ? Catalog.tableCenterBackground : null;
         public static AudioClip BGM => Catalog != null ? Catalog.bgmClip : null;
         public static AudioClip GetSfx(CaboSfx cue) => Catalog != null ? Catalog.GetSfx(cue) : null;
 
-        public static Sprite GetSeatBackground(string seatName)
+        public static Sprite GetSeatBackground(int playerRoomIndex, int viewerRoomIndex)
         {
-            switch (seatName)
+            var stations = Catalog?.tableStations;
+            if (stations == null || stations.Length == 0)
+                return null;
+
+            int playerIndex = NormalizeSeat(playerRoomIndex);
+            int viewerIndex = NormalizeSeat(viewerRoomIndex);
+            int relativeSeat = NormalizeSeat(playerIndex - viewerIndex);
+            for (int i = 0; i < stations.Length; i++)
             {
-                case "top": return SeatTopBackground;
-                case "self": return SeatSelfBackground;
-                case "left": return SeatLeftBackground;
-                case "right": return SeatRightBackground;
-                default: return null;
+                var station = stations[i];
+                if (station != null && NormalizeSeat(station.playerRoomIndex) == playerIndex)
+                    return station.GetView(relativeSeat);
             }
+
+            return stations[0]?.GetView(relativeSeat);
         }
+
+        static int NormalizeSeat(int seatIndex) => ((seatIndex % 4) + 4) % 4;
 
         public static void ResetCache()
         {

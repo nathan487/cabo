@@ -171,13 +171,30 @@ MonoBehaviour:
     settlementPrefab: {fileID: 1360752265365731589, guid: 55430708e50dc71419730ebbf8bc7bb4, type: 3}
     gameOverDefeatSprite: {fileID: 21300000, guid: 23ac5b74d31d1794bb9458f123ca4c5f, type: 3}
   cardBack: {fileID: 21300000, guid: d413b6caa91ed5747aa3512043c6ead8, type: 3}
-  homeBackground: {fileID: 21300000, guid: c1121bef4153e564ea58ea42b5b94a72, type: 3}
-  tableBackground: {fileID: 21300000, guid: fff8df3d45ecb48438fb0ab1ec645b8f, type: 3}
-  settlementBackground: {fileID: 21300000, guid: 11292b23487a9de488ee9894a20fe7c8, type: 3}
-  seatTopBackground: {fileID: 21300000, guid: c161beac50ae0244ca7e27abaf3271e8, type: 3}
-  seatSelfBackground: {fileID: 21300000, guid: 62c3eaf3c92188e49abfddb577245126, type: 3}
-  seatLeftBackground: {fileID: 21300000, guid: a6ccba631e19ae541992f322e898e6df, type: 3}
-  seatRightBackground: {fileID: 21300000, guid: 1caa8e9716c47bf459dcc4f7a603c1fe, type: 3}
+  homeBackground: {fileID: 21300000, guid: b50080ee76c35704081b3a8d52fe63d7, type: 3}
+  tableBackground: {fileID: 21300000, guid: 8a699fd077afa2746b21013e1a7ec5fd, type: 3}
+  settlementBackground: {fileID: 21300000, guid: 54e33af5ad76b7749b16ce8e88fa97c2, type: 3}
+  tableStations:
+  - playerRoomIndex: 0
+    selfView: {fileID: 21300000, guid: f86df2c555d609b48b8e0977455bb5a6, type: 3}
+    oppositeView: {fileID: 21300000, guid: 319b309bc5d0da64d8c69fcf2b2d2600, type: 3}
+    leftView: {fileID: 21300000, guid: d1b02acdbbd379a4f8a2114a701fd1bd, type: 3}
+    rightView: {fileID: 21300000, guid: 49b8f92cfbb437e4dbcc88d9c8fff138, type: 3}
+  - playerRoomIndex: 1
+    selfView: {fileID: 21300000, guid: 58e3959158d886647a7860663aa3bde5, type: 3}
+    oppositeView: {fileID: 21300000, guid: bb212cca43196284d84f0e34c1ad9520, type: 3}
+    leftView: {fileID: 21300000, guid: 34cc6be255180af44badf835b484f3dd, type: 3}
+    rightView: {fileID: 21300000, guid: f952c3594c9a2b849a95b9ed4da4ab61, type: 3}
+  - playerRoomIndex: 2
+    selfView: {fileID: 21300000, guid: 3758fa2a7990bf64e8ef29f9476cfdb2, type: 3}
+    oppositeView: {fileID: 21300000, guid: d63367f8cede86842bd73889bc1883ce, type: 3}
+    leftView: {fileID: 21300000, guid: 40ffe1fcd3d1e1141a1799e4a6afeaeb, type: 3}
+    rightView: {fileID: 21300000, guid: eef5fb47f42bac24cb63dd6149295730, type: 3}
+  - playerRoomIndex: 3
+    selfView: {fileID: 21300000, guid: 7dda69cd3e15b15428dd5610edb568b8, type: 3}
+    oppositeView: {fileID: 21300000, guid: 7383096bce4818d4b9faea6a8e783128, type: 3}
+    leftView: {fileID: 21300000, guid: 38924920ee089f2419b5ed3c3ebabe6d, type: 3}
+    rightView: {fileID: 21300000, guid: 64625aed9f552b040bbfd2504882ca64, type: 3}
   tableCenterBackground: {fileID: 21300000, guid: 3271a72733f8c2d4b97feb3b0b125603, type: 3}
   bgmClip: {fileID: 8300000, guid: a165182d2278f524a97b075a1f500727, type: 3}
   drawSfx: {fileID: 8300000, guid: 3e7799b770c343f43916f3e78a1ba15b, type: 3}

@@ -1058,6 +1058,8 @@ namespace Cabo.Client.UI
             }
 
             var myInfo = state.Players.Find(p => p.PlayerId == state.MyPlayerId);
+            int viewerSeatId = myInfo?.SeatId ?? 0;
+            _selfSeat.SetStationBackground(CaboArt.GetSeatBackground(viewerSeatId, viewerSeatId));
             bool selfCabo = state.SteadyCallerId != 0 && state.SteadyCallerId == state.MyPlayerId;
             _selfSeat.RenderHeader(myInfo?.Nickname ?? "你", myInfo?.TotalScore ?? 0, visualCurrentPlayerId == state.MyPlayerId, selfCabo ? "CABO" : "你", selfCabo,
                 PlayerProfileStore.GetCharacterVisualPath(myInfo?.CharacterId));
@@ -1077,6 +1079,7 @@ namespace Cabo.Client.UI
 
                 _opponentSeats[i].Root.style.visibility = Visibility.Visible;
                 var player = state.Players[opponentIndices[i]];
+                _opponentSeats[i].SetStationBackground(CaboArt.GetSeatBackground(player.SeatId, viewerSeatId));
                 bool current = player.PlayerId == visualCurrentPlayerId;
                 bool selected = _selectedOpponentPlayerId == player.PlayerId;
                 bool cabo = state.SteadyCallerId != 0 && state.SteadyCallerId == player.PlayerId;
@@ -5168,6 +5171,7 @@ namespace Cabo.Client.UI
             readonly Label _tag;
             readonly VisualElement _avatarSlot;
             string _avatarCacheKey;
+            Sprite _stationBackground;
 
             public SeatView(string name, bool isSelf)
             {
@@ -5186,13 +5190,6 @@ namespace Cabo.Client.UI
                 Root.style.borderBottomColor = UITheme.PanelBorder;
                 Root.style.borderLeftColor = UITheme.PanelBorder;
                 Root.style.overflow = Overflow.Hidden;
-                var stationArt = CaboArt.GetSeatBackground(name);
-                if (stationArt != null)
-                {
-                    Root.style.backgroundImage = new StyleBackground(stationArt);
-                    Root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-                    Root.style.backgroundColor = Color.white;
-                }
                 Root.style.paddingLeft = 12;
                 Root.style.paddingRight = 12;
                 Root.style.paddingTop = 8;
@@ -5262,6 +5259,19 @@ namespace Cabo.Client.UI
                 CardRow.style.alignItems = Align.Center;
                 CardRow.style.marginTop = 6;
                 Root.Add(CardRow);
+            }
+
+            public void SetStationBackground(Sprite stationArt)
+            {
+                if (_stationBackground == stationArt)
+                    return;
+
+                _stationBackground = stationArt;
+                Root.style.backgroundImage = stationArt != null
+                    ? new StyleBackground(stationArt)
+                    : new StyleBackground(StyleKeyword.None);
+                Root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                Root.style.backgroundColor = stationArt != null ? Color.white : UITheme.TableSeatGlass;
             }
 
             public void Clear()
