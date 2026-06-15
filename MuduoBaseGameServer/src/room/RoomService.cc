@@ -24,15 +24,10 @@ std::string trimAsciiWhitespace(const std::string& input) {
 
 std::string normalizeCharacterId(const std::string& input) {
     const std::string value = trimAsciiWhitespace(input);
-    if (value.empty() || value.size() > 32) {
-        return "pomelo";
-    }
-    for (unsigned char ch : value) {
-        if (!(std::islower(ch) || std::isdigit(ch) || ch == '_' || ch == '-')) {
-            return "pomelo";
-        }
-    }
-    return value;
+    if (value == "pomelo" || value == "strawberry"
+        || value == "oat" || value == "bean")
+        return value;
+    return "pomelo";
 }
 
 int64_t nowMs() {
@@ -205,7 +200,8 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
         playerRooms_[player->playerId] = room;
     }
 
-    LOG_INFO("[Room] Creating room for '%s' (max %d)...", player->nickname.c_str(), room->maxPlayers);
+    LOG_INFO("[Room] Creating room for '%s' character='%s' (max %d)...",
+             player->nickname.c_str(), player->characterId.c_str(), room->maxPlayers);
 
     // CreateRoomRsp
     ::game::messages::ServerMessage rspMsg;
@@ -333,8 +329,8 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
             sendRoomState(room->roomId, p->conn);
     }
 
-    LOG_INFO("[Room] Player %s joined room %s (seat %d, %zu/%d players)",
-             player->nickname.c_str(), room->roomCode.c_str(),
+    LOG_INFO("[Room] Player %s character='%s' joined room %s (seat %d, %zu/%d players)",
+             player->nickname.c_str(), player->characterId.c_str(), room->roomCode.c_str(),
              player->seatId, room->players.size(), room->maxPlayers);
 }
 

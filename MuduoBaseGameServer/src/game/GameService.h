@@ -19,6 +19,7 @@ using game::TcpConnectionPtr;
 struct PlayerGameState {
     int64_t playerId;
     std::string nickname;
+    std::string characterId = "pomelo";
     int32_t seatId;
     TcpConnectionPtr conn;
     bool isConnected;

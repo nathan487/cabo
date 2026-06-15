@@ -1,5 +1,7 @@
 from pathlib import Path
+import argparse
 import json
+import math
 import shutil
 from collections import deque
 
@@ -18,23 +20,15 @@ VARIANTS = {
         "brow": (111, 43, 35, 255),
     },
     "oat": {
-        "sheet": "amai_rig_sheet_cyan.png",
+        "sheet": "amai_male_rig_sheet_cyan_v2.png",
         "brow": (103, 67, 40, 255),
+        "brow_width": 7,
     },
     "bean": {
-        "sheet": "doudou_rig_sheet_cyan.png",
+        "sheet": "doudou_male_rig_sheet_cyan_v2.png",
         "brow": (67, 86, 45, 255),
+        "brow_width": 7,
     },
-}
-
-GENERATED_PARTS = {
-    "head",
-    "body",
-    "eye_open_left",
-    "eye_open_right",
-    "left_leg",
-    "right_leg",
-    "bag",
 }
 
 
@@ -62,24 +56,81 @@ def remove_chroma(image: Image.Image) -> Image.Image:
     return Image.fromarray(np.uint8(np.clip(rgba, 0, 255)), "RGBA")
 
 
-def create_brow(path: Path, color, mirror: bool) -> None:
+def create_brow(path: Path, color, mirror: bool, width: int = 5) -> None:
     image = Image.new("RGBA", (80, 32), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     points = [(8, 22), (18, 15), (31, 11), (46, 11), (62, 16), (72, 21)]
     if mirror:
         points = [(79 - x, y) for x, y in reversed(points)]
-    draw.line(points, fill=color, width=5, joint="curve")
+    draw.line(points, fill=color, width=width, joint="curve")
     draw.line([(x, y + 1) for x, y in points], fill=(color[0], color[1], color[2], 150), width=2)
     image.save(path)
 
 
-def resize_crop(sheet: Image.Image, rect, target_size, part_name: str) -> Image.Image:
-    crop = sheet.crop((rect["x"], rect["y"], rect["x"] + rect["w"], rect["y"] + rect["h"]))
-    result = keep_center_component(crop.resize(target_size, Image.Resampling.LANCZOS))
-    if part_name == "body":
-        rgba = np.asarray(result).copy()
-        rgba[:, int(rgba.shape[1] * 0.90):, 3] = 0
-        result = Image.fromarray(rgba, "RGBA")
+def find_components(image: Image.Image):
+    mask = np.asarray(image.convert("RGBA"))[:, :, 3] > 18
+    height, width = mask.shape
+    visited = np.zeros_like(mask, dtype=bool)
+    components = []
+
+    for y in range(height):
+        for x in range(width):
+            if not mask[y, x] or visited[y, x]:
+                continue
+            queue = deque([(x, y)])
+            visited[y, x] = True
+            min_x = max_x = x
+            min_y = max_y = y
+            area = 0
+            while queue:
+                px, py = queue.popleft()
+                area += 1
+                min_x = min(min_x, px)
+                max_x = max(max_x, px)
+                min_y = min(min_y, py)
+                max_y = max(max_y, py)
+                for nx, ny in ((px - 1, py), (px + 1, py), (px, py - 1), (px, py + 1)):
+                    if 0 <= nx < width and 0 <= ny < height and mask[ny, nx] and not visited[ny, nx]:
+                        visited[ny, nx] = True
+                        queue.append((nx, ny))
+            if area >= 12:
+                components.append((min_x, min_y, max_x + 1, max_y + 1, area))
+
+    return components
+
+
+def component_score(rect, component) -> float:
+    min_x, min_y, max_x, max_y, _ = component
+    width = max_x - min_x
+    height = max_y - min_y
+    center_x = (min_x + max_x) * 0.5
+    center_y = (min_y + max_y) * 0.5
+    dx = (center_x - rect["cx"]) / max(rect["w"], 1)
+    dy = (center_y - rect["cy"]) / max(rect["h"], 1)
+    size_delta = abs(math.log(max(width, 1) / rect["w"])) + abs(math.log(max(height, 1) / rect["h"]))
+    return dx * dx + dy * dy + size_delta * 0.20
+
+
+def normalize_component(sheet: Image.Image, rect, components, template: Image.Image) -> Image.Image:
+    min_x, min_y, max_x, max_y, _ = min(components, key=lambda item: component_score(rect, item))
+    min_x = max(0, min_x - 3)
+    min_y = max(0, min_y - 3)
+    max_x = min(sheet.width, max_x + 3)
+    max_y = min(sheet.height, max_y + 3)
+    crop = sheet.crop((min_x, min_y, max_x, max_y))
+
+    alpha_bbox = crop.getchannel("A").getbbox()
+    if alpha_bbox:
+        crop = crop.crop(alpha_bbox)
+
+    target = template.convert("RGBA")
+    target_alpha = target.getchannel("A").point(lambda value: 255 if value > 18 else 0)
+    target_bbox = target_alpha.getbbox() or (0, 0, target.width, target.height)
+    target_width = max(1, target_bbox[2] - target_bbox[0])
+    target_height = max(1, target_bbox[3] - target_bbox[1])
+    resized = crop.resize((target_width, target_height), Image.Resampling.LANCZOS)
+    result = Image.new("RGBA", target.size, (0, 0, 0, 0))
+    result.alpha_composite(resized, (target_bbox[0], target_bbox[1]))
     return result
 
 
@@ -133,30 +184,36 @@ def build_variant(character_id: str, config, layout) -> None:
     if not sheet_path.exists():
         raise FileNotFoundError(sheet_path)
     sheet = remove_chroma(Image.open(sheet_path))
+    components = find_components(sheet)
 
     for source_part in POMELO_PARTS.glob("*.png"):
         name = source_part.stem
         target = parts / source_part.name
-        if name in GENERATED_PARTS:
-            if name not in layout:
-                raise KeyError(f"Missing layout entry for {name}")
-            target_size = Image.open(source_part).size
-            resize_crop(sheet, layout[name], target_size, name).save(target)
+        if name in layout:
+            template = Image.open(source_part).convert("RGBA")
+            normalize_component(sheet, layout[name], components, template).save(target)
         else:
             shutil.copy2(source_part, target)
 
-    create_brow(parts / "brow_left.png", config["brow"], False)
-    create_brow(parts / "brow_right.png", config["brow"], True)
+    brow_width = config.get("brow_width", 5)
+    create_brow(parts / "brow_left.png", config["brow"], False, brow_width)
+    create_brow(parts / "brow_right.png", config["brow"], True, brow_width)
 
 
 def main() -> None:
-    layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
-    for character_id, config in VARIANTS.items():
-        build_variant(character_id, config, layout)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("character_ids", nargs="*", choices=sorted(VARIANTS))
+    args = parser.parse_args()
 
-    create_brow(POMELO_PARTS / "brow_left.png", (105, 58, 35, 255), False)
-    create_brow(POMELO_PARTS / "brow_right.png", (105, 58, 35, 255), True)
-    print("Built strawberry, oat, bean sprite parts and pomelo eyebrow sprites.")
+    layout = json.loads(LAYOUT_PATH.read_text(encoding="utf-8"))
+    selected = args.character_ids or list(VARIANTS)
+    for character_id in selected:
+        build_variant(character_id, VARIANTS[character_id], layout)
+
+    if not args.character_ids:
+        create_brow(POMELO_PARTS / "brow_left.png", (105, 58, 35, 255), False)
+        create_brow(POMELO_PARTS / "brow_right.png", (105, 58, 35, 255), True)
+    print(f"Built sprite parts for: {', '.join(selected)}")
 
 
 if __name__ == "__main__":

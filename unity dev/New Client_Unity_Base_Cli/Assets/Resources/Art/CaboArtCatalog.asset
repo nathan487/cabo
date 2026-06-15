@@ -144,18 +144,22 @@ MonoBehaviour:
     displayName: "\u67DA\u67DA"
     portraitSprite: {fileID: 21300000, guid: c8a75fd74b7834944adb2aa989efe093, type: 3}
     settlementPrefab: {fileID: 7822593758061869816, guid: 31628cf75bc5d7b4993e87feb1278242, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: 9ae4ab77ab96ffa498c7ca95462fd210, type: 3}
   - characterId: strawberry
     displayName: "\u5C0F\u8393"
     portraitSprite: {fileID: 21300000, guid: 7ae2d5fbe0ad570419816ab6c7013e02, type: 3}
     settlementPrefab: {fileID: 7406747149449273165, guid: d2c5019652394de499cd778ac39873f6, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: c4fe54dae4910884984bb7448df15ce3, type: 3}
   - characterId: oat
     displayName: "\u963F\u9EA6"
     portraitSprite: {fileID: 21300000, guid: 8cc005153a250444e9c452c21fdbf62d, type: 3}
     settlementPrefab: {fileID: 2096708077791047615, guid: 1419aff8964f8c645a55ad10fa08837b, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: 53f33d17f38106e469770e10b7b78ba4, type: 3}
   - characterId: bean
     displayName: "\u8C46\u8C46"
     portraitSprite: {fileID: 21300000, guid: 6f544cf55be564543aa29c45711a602f, type: 3}
     settlementPrefab: {fileID: 7537269471778311518, guid: eeae92236360a0248b5a735a01c2f75b, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: 47ba564cbc91a2f49818e8dd2bf1b3ad, type: 3}
   cardBack: {fileID: 21300000, guid: d413b6caa91ed5747aa3512043c6ead8, type: 3}
   homeBackground: {fileID: 21300000, guid: c1121bef4153e564ea58ea42b5b94a72, type: 3}
   tableBackground: {fileID: 21300000, guid: fff8df3d45ecb48438fb0ab1ec645b8f, type: 3}

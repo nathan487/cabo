@@ -153,6 +153,7 @@ private:
             auto gp = std::make_shared<cabogame::PlayerGameState>();
             gp->playerId = rp->playerId;
             gp->nickname = rp->nickname;
+            gp->characterId = rp->characterId;
             gp->seatId = rp->seatId;
             gp->conn = rp->conn;
             gp->isConnected = rp->isConnected;

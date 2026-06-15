@@ -88,28 +88,32 @@ namespace Cabo.Client.Editor
                     characterId = "pomelo",
                     displayName = "\u67da\u67da",
                     portraitSprite = LoadCharacterPortrait("pomelo"),
-                    settlementPrefab = LoadCharacterPrefab("pomelo", "PomeloSettlement")
+                    settlementPrefab = LoadCharacterPrefab("pomelo", "PomeloSettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("pomelo")
                 },
                 new CharacterDefinition
                 {
                     characterId = "strawberry",
                     displayName = "\u5c0f\u8393",
                     portraitSprite = LoadCharacterPortrait("strawberry"),
-                    settlementPrefab = LoadCharacterPrefab("strawberry", "StrawberrySettlement")
+                    settlementPrefab = LoadCharacterPrefab("strawberry", "StrawberrySettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("strawberry")
                 },
                 new CharacterDefinition
                 {
                     characterId = "oat",
                     displayName = "\u963f\u9ea6",
                     portraitSprite = LoadCharacterPortrait("oat"),
-                    settlementPrefab = LoadCharacterPrefab("oat", "OatSettlement")
+                    settlementPrefab = LoadCharacterPrefab("oat", "OatSettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("oat")
                 },
                 new CharacterDefinition
                 {
                     characterId = "bean",
                     displayName = "\u8c46\u8c46",
                     portraitSprite = LoadCharacterPortrait("bean"),
-                    settlementPrefab = LoadCharacterPrefab("bean", "BeanSettlement")
+                    settlementPrefab = LoadCharacterPrefab("bean", "BeanSettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("bean")
                 }
             };
             catalog.cardBack = AssetDatabase.LoadAssetAtPath<Sprite>(CardBackPath);
@@ -172,6 +176,10 @@ namespace Cabo.Client.Editor
             ConfigureFolder($"{CharacterFolder}/strawberry/Parts", 1024, 256f);
             ConfigureFolder($"{CharacterFolder}/oat/Parts", 1024, 256f);
             ConfigureFolder($"{CharacterFolder}/bean/Parts", 1024, 256f);
+            ConfigureAsset($"{CharacterFolder}/pomelo/gameover_defeat_v1.png", 2048, 256f);
+            ConfigureAsset($"{CharacterFolder}/strawberry/gameover_defeat_v1.png", 2048, 256f);
+            ConfigureAsset($"{CharacterFolder}/oat/gameover_defeat_v1.png", 2048, 256f);
+            ConfigureAsset($"{CharacterFolder}/bean/gameover_defeat_v1.png", 2048, 256f);
             AssetDatabase.Refresh();
         }
 
@@ -286,6 +294,8 @@ namespace Cabo.Client.Editor
                         errors.Add($"Character '{character.characterId}' portrait is missing");
                     if (character.settlementPrefab == null)
                         errors.Add($"Character '{character.characterId}' settlement prefab is missing");
+                    if (character.gameOverDefeatSprite == null)
+                        errors.Add($"Character '{character.characterId}' game-over defeat sprite is missing");
                 }
             }
             return errors;
@@ -299,6 +309,11 @@ namespace Cabo.Client.Editor
         static GameObject LoadCharacterPrefab(string characterId, string prefabName)
         {
             return AssetDatabase.LoadAssetAtPath<GameObject>($"{CharacterFolder}/{characterId}/{prefabName}.prefab");
+        }
+
+        static Sprite LoadCharacterDefeatSprite(string characterId)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"{CharacterFolder}/{characterId}/gameover_defeat_v1.png");
         }
 
         static AudioClip LoadSfx(string name)

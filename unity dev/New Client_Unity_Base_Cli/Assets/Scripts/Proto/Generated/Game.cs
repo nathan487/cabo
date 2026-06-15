@@ -105,21 +105,21 @@ namespace Game.Game {
             "Z2FtZS5nYW1lLlBsYXllclJldmVhbGVkSGFuZBIrCgZzY29yZXMYBSADKAsy",
             "Gy5nYW1lLmdhbWUuUm91bmRTY29yZURldGFpbCJLChJQbGF5ZXJSZXZlYWxl",
             "ZEhhbmQSEQoJcGxheWVyX2lkGAEgASgDEhMKC2NhcmRfdmFsdWVzGAIgAygF",
-            "Eg0KBXRvdGFsGAMgASgFIrsBChBSb3VuZFNjb3JlRGV0YWlsEhEKCXBsYXll",
+            "Eg0KBXRvdGFsGAMgASgFItEBChBSb3VuZFNjb3JlRGV0YWlsEhEKCXBsYXll",
             "cl9pZBgBIAEoAxISCgpoYW5kX3RvdGFsGAIgASgFEg8KB3BlbmFsdHkYAyAB",
             "KAUSEwoLcm91bmRfc2NvcmUYBCABKAUSGAoQY3VtdWxhdGl2ZV9zY29yZRgF",
             "IAEoBRIYChBpc19zdGVhZHlfY2FsbGVyGAYgASgIEhEKCWlzX2xvd2VzdBgH",
-            "IAEoCBITCgtpc19rYW1pa2F6ZRgIIAEoCCI2Cg5IdW5kcmVkVHJpZ2dlchIR",
-            "CglwbGF5ZXJfaWQYASABKAMSEQoJbmV3X3Njb3JlGAIgASgFIpsBChFTY29y",
-            "ZVVwZGF0ZU5vdGlmeRIPCgdyb29tX2lkGAEgASgDEhQKDHJvdW5kX251bWJl",
-            "chgCIAEoBRIqCgZzY29yZXMYAyADKAsyGi5nYW1lLmdhbWUuUGxheWVyU2Nv",
-            "cmVJbmZvEjMKEGh1bmRyZWRfdHJpZ2dlcnMYBCADKAsyGS5nYW1lLmdhbWUu",
-            "SHVuZHJlZFRyaWdnZXIiYgoOR2FtZU92ZXJOb3RpZnkSDwoHcm9vbV9pZBgB",
-            "IAEoAxIUCgx0b3RhbF9yb3VuZHMYAiABKAUSKQoIcmFua2luZ3MYAyADKAsy",
-            "Fy5nYW1lLmdhbWUuRmluYWxSYW5raW5nImkKDEZpbmFsUmFua2luZxIMCgRy",
-            "YW5rGAEgASgFEhEKCXBsYXllcl9pZBgCIAEoAxIQCghuaWNrbmFtZRgDIAEo",
-            "CRITCgtmaW5hbF9zY29yZRgEIAEoBRIRCglpc193aW5uZXIYBSABKAhCDKoC",
-            "CUdhbWUuR2FtZWIGcHJvdG8z"));
+            "IAEoCBITCgtpc19rYW1pa2F6ZRgIIAEoCBIUCgxjaGFyYWN0ZXJfaWQYCSAB",
+            "KAkiNgoOSHVuZHJlZFRyaWdnZXISEQoJcGxheWVyX2lkGAEgASgDEhEKCW5l",
+            "d19zY29yZRgCIAEoBSKbAQoRU2NvcmVVcGRhdGVOb3RpZnkSDwoHcm9vbV9p",
+            "ZBgBIAEoAxIUCgxyb3VuZF9udW1iZXIYAiABKAUSKgoGc2NvcmVzGAMgAygL",
+            "MhouZ2FtZS5nYW1lLlBsYXllclNjb3JlSW5mbxIzChBodW5kcmVkX3RyaWdn",
+            "ZXJzGAQgAygLMhkuZ2FtZS5nYW1lLkh1bmRyZWRUcmlnZ2VyImIKDkdhbWVP",
+            "dmVyTm90aWZ5Eg8KB3Jvb21faWQYASABKAMSFAoMdG90YWxfcm91bmRzGAIg",
+            "ASgFEikKCHJhbmtpbmdzGAMgAygLMhcuZ2FtZS5nYW1lLkZpbmFsUmFua2lu",
+            "ZyJpCgxGaW5hbFJhbmtpbmcSDAoEcmFuaxgBIAEoBRIRCglwbGF5ZXJfaWQY",
+            "AiABKAMSEAoIbmlja25hbWUYAyABKAkSEwoLZmluYWxfc2NvcmUYBCABKAUS",
+            "EQoJaXNfd2lubmVyGAUgASgIQgyqAglHYW1lLkdhbWViBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Game.Common.CommonReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
@@ -148,7 +148,7 @@ namespace Game.Game {
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.ActionResultNotify), global::Game.Game.ActionResultNotify.Parser, new[]{ "RoomId", "ServerSeq", "ActionType", "SourcePlayerId", "TargetPlayerId", "DrawPile", "DiscardPile", "SkillUsed", "SwapOccurred", "TurnEnded", "NextPlayerId", "ExchangeResult", "SourceSlot", "TargetSlot", "PlayerHands" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.RoundRevealNotify), global::Game.Game.RoundRevealNotify.Parser, new[]{ "RoomId", "RoundNumber", "SteadyCallerId", "RevealedHands", "Scores" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.PlayerRevealedHand), global::Game.Game.PlayerRevealedHand.Parser, new[]{ "PlayerId", "CardValues", "Total" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.RoundScoreDetail), global::Game.Game.RoundScoreDetail.Parser, new[]{ "PlayerId", "HandTotal", "Penalty", "RoundScore", "CumulativeScore", "IsSteadyCaller", "IsLowest", "IsKamikaze" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.RoundScoreDetail), global::Game.Game.RoundScoreDetail.Parser, new[]{ "PlayerId", "HandTotal", "Penalty", "RoundScore", "CumulativeScore", "IsSteadyCaller", "IsLowest", "IsKamikaze", "CharacterId" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.HundredTrigger), global::Game.Game.HundredTrigger.Parser, new[]{ "PlayerId", "NewScore" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.ScoreUpdateNotify), global::Game.Game.ScoreUpdateNotify.Parser, new[]{ "RoomId", "RoundNumber", "Scores", "HundredTriggers" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Game.Game.GameOverNotify), global::Game.Game.GameOverNotify.Parser, new[]{ "RoomId", "TotalRounds", "Rankings" }, null, null, null, null),
@@ -8423,6 +8423,7 @@ namespace Game.Game {
       isSteadyCaller_ = other.isSteadyCaller_;
       isLowest_ = other.isLowest_;
       isKamikaze_ = other.isKamikaze_;
+      characterId_ = other.characterId_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -8546,6 +8547,21 @@ namespace Game.Game {
       }
     }
 
+    /// <summary>Field number for the "character_id" field.</summary>
+    public const int CharacterIdFieldNumber = 9;
+    private string characterId_ = "";
+    /// <summary>
+    /// 该玩家选择的角色，供结算场景权威绑定
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string CharacterId {
+      get { return characterId_; }
+      set {
+        characterId_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -8569,6 +8585,7 @@ namespace Game.Game {
       if (IsSteadyCaller != other.IsSteadyCaller) return false;
       if (IsLowest != other.IsLowest) return false;
       if (IsKamikaze != other.IsKamikaze) return false;
+      if (CharacterId != other.CharacterId) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -8584,6 +8601,7 @@ namespace Game.Game {
       if (IsSteadyCaller != false) hash ^= IsSteadyCaller.GetHashCode();
       if (IsLowest != false) hash ^= IsLowest.GetHashCode();
       if (IsKamikaze != false) hash ^= IsKamikaze.GetHashCode();
+      if (CharacterId.Length != 0) hash ^= CharacterId.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -8634,6 +8652,10 @@ namespace Game.Game {
         output.WriteRawTag(64);
         output.WriteBool(IsKamikaze);
       }
+      if (CharacterId.Length != 0) {
+        output.WriteRawTag(74);
+        output.WriteString(CharacterId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -8676,6 +8698,10 @@ namespace Game.Game {
         output.WriteRawTag(64);
         output.WriteBool(IsKamikaze);
       }
+      if (CharacterId.Length != 0) {
+        output.WriteRawTag(74);
+        output.WriteString(CharacterId);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -8709,6 +8735,9 @@ namespace Game.Game {
       }
       if (IsKamikaze != false) {
         size += 1 + 1;
+      }
+      if (CharacterId.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(CharacterId);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -8745,6 +8774,9 @@ namespace Game.Game {
       }
       if (other.IsKamikaze != false) {
         IsKamikaze = other.IsKamikaze;
+      }
+      if (other.CharacterId.Length != 0) {
+        CharacterId = other.CharacterId;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -8793,6 +8825,10 @@ namespace Game.Game {
             IsKamikaze = input.ReadBool();
             break;
           }
+          case 74: {
+            CharacterId = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -8838,6 +8874,10 @@ namespace Game.Game {
           }
           case 64: {
             IsKamikaze = input.ReadBool();
+            break;
+          }
+          case 74: {
+            CharacterId = input.ReadString();
             break;
           }
         }

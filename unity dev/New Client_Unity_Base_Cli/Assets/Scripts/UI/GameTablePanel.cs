@@ -95,6 +95,8 @@ namespace Cabo.Client.UI
         bool _interRoundStartCanUse;
         bool _settlementPlaybackComplete;
         int _settlementRoundNumber = -1;
+        bool _gameOverFinalePlaying;
+        int _gameOverFinaleRound = -1;
         bool _victorySfxPlayed;
         EventCallback<GeometryChangedEvent> _geometryChangedHandler;
         Action _animationQueueDrained;
@@ -540,6 +542,8 @@ namespace Cabo.Client.UI
         public void RenderGame()
         {
             _victorySfxPlayed = false;
+            _gameOverFinalePlaying = false;
+            _gameOverFinaleRound = -1;
             HideSettlementStage();
             var state = _flow.State;
             if (state.RoundNumber != _lastRenderedRoundNumber)
@@ -677,6 +681,8 @@ namespace Cabo.Client.UI
             {
                 _settlementRoundNumber = state.RoundNumber;
                 _settlementPlaybackComplete = false;
+                _gameOverFinalePlaying = false;
+                _gameOverFinaleRound = -1;
             }
 
             var title = new Label("本轮餐盘糖能");
@@ -728,7 +734,10 @@ namespace Cabo.Client.UI
             }
             scorePanel.Add(resultList);
 
-            AddInterRoundControls(state, _settlementPlaybackComplete);
+            if (state.GameOverPending)
+                AddGameOverFinaleGate(_settlementPlaybackComplete);
+            else
+                AddInterRoundControls(state, _settlementPlaybackComplete);
             MountSettlementStage(state, revealContent);
             UpdateStatusLineForEarlyEnd(state, true);
         }
@@ -3750,7 +3759,8 @@ namespace Cabo.Client.UI
             card.style.opacity = clickable ? 1f : 0.96f;
 
             var valueLabel = new Label(faceUp ? value.ToString() : hasArtwork ? "" : "CABO");
-            valueLabel.style.fontSize = faceUp ? Mathf.Max(11, Mathf.RoundToInt(height * 0.18f)) : Mathf.RoundToInt(height * 0.16f);
+            int valueFontSize = faceUp ? Mathf.Max(11, Mathf.RoundToInt(height * 0.18f)) : Mathf.RoundToInt(height * 0.16f);
+            valueLabel.style.fontSize = valueFontSize;
             valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             valueLabel.style.unityTextAlign = faceUp ? TextAnchor.UpperLeft : TextAnchor.MiddleCenter;
             valueLabel.style.color = faceUp ? UITheme.TextPrimary : Color.white;
@@ -3761,6 +3771,9 @@ namespace Cabo.Client.UI
                 valueLabel.style.top = 3;
                 valueLabel.style.paddingLeft = 3;
                 valueLabel.style.paddingRight = 3;
+                valueLabel.style.minWidth = value >= 10 ? valueFontSize * 1.55f + 6f : valueFontSize + 6f;
+                valueLabel.style.whiteSpace = WhiteSpace.NoWrap;
+                valueLabel.style.overflow = Overflow.Visible;
                 valueLabel.style.backgroundColor = new Color(1f, 0.98f, 0.90f, 0.86f);
                 valueLabel.style.borderTopLeftRadius = 5;
                 valueLabel.style.borderTopRightRadius = 5;
@@ -4165,10 +4178,73 @@ namespace Cabo.Client.UI
             for (int i = 0; i < _settlementScoreRows.Count; i++)
                 ApplyServerSettlementResult(_settlementScoreRows[i]);
 
+            if (_flow.State.GameOverPending)
+            {
+                if (_settlementGateLabel != null)
+                    _settlementGateLabel.text = "\u6b63\u5728\u64ad\u653e\u6700\u7ec8\u5931\u8d25\u52a8\u753b...";
+                StartGameOverFinale();
+                return;
+            }
+
             _interRoundReadyButton?.SetEnabled(_interRoundReadyCanUse);
             _interRoundStartButton?.SetEnabled(_interRoundStartCanUse);
             if (_settlementGateLabel != null)
                 _settlementGateLabel.style.display = DisplayStyle.None;
+        }
+
+        void StartGameOverFinale()
+        {
+            var state = _flow.State;
+            if (!state.GameOverPending || _gameOverFinalePlaying)
+                return;
+
+            _gameOverFinalePlaying = true;
+            _gameOverFinaleRound = state.RoundNumber;
+
+            long highestPlayerId = 0;
+            int highestScore = int.MinValue;
+            for (int i = 0; i < state.FinalRankings.Count; i++)
+            {
+                var rank = state.FinalRankings[i];
+                if (rank.FinalScore > highestScore)
+                {
+                    highestScore = rank.FinalScore;
+                    highestPlayerId = rank.PlayerId;
+                }
+            }
+
+            int actorIndex = -1;
+            for (int i = 0; i < state.LastRoundResults.Count; i++)
+            {
+                if (state.LastRoundResults[i].PlayerId == highestPlayerId)
+                {
+                    actorIndex = i;
+                    break;
+                }
+            }
+            if (actorIndex < 0 && state.LastRoundResults.Count > 0)
+                actorIndex = 0;
+
+            _turnLabel.text = "\u603b\u7cd6\u5206\u6700\u9ad8\u7684\u89d2\u8272\u5403\u6491\u4e86\uff0c\u6b63\u5728\u64ad\u653e\u6700\u7ec8\u5931\u8d25\u52a8\u753b";
+            _statusLine.text = "\u52a8\u753b\u7ed3\u675f\u540e\u5c06\u663e\u793a\u6700\u7ec8\u6392\u540d\u3002";
+            _statusLine.style.display = DisplayStyle.Flex;
+
+            if (_settlementStage == null)
+            {
+                CompleteGameOverFinale();
+                return;
+            }
+
+            _settlementStage.PlayGameOverFinale(actorIndex, CompleteGameOverFinale);
+        }
+
+        void CompleteGameOverFinale()
+        {
+            if (_gameOverFinaleRound != _flow.State.RoundNumber)
+                return;
+
+            _gameOverFinalePlaying = false;
+            _flow.CompletePendingGameOverPresentation();
         }
 
 
@@ -4328,6 +4404,42 @@ namespace Cabo.Client.UI
                 return;
             _settlementStage.StopPlayback();
             _settlementStage.gameObject.SetActive(false);
+        }
+
+        void AddGameOverFinaleGate(bool playbackComplete)
+        {
+            _interRoundReadyButton = null;
+            _interRoundStartButton = null;
+            _interRoundReadyCanUse = false;
+            _interRoundStartCanUse = false;
+
+            var divider = new VisualElement();
+            divider.style.height = 1;
+            divider.style.marginTop = 4;
+            divider.style.marginBottom = 8;
+            divider.style.flexShrink = 0;
+            divider.style.backgroundColor = UITheme.PanelBorder;
+            _actionPanel.Add(divider);
+
+            var title = new Label("\u6700\u7ec8\u7ed3\u7b97\u6f14\u51fa");
+            title.style.fontSize = 14;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            title.style.flexShrink = 0;
+            _actionPanel.Add(title);
+
+            _settlementGateLabel = new Label(playbackComplete
+                ? "\u6b63\u5728\u64ad\u653e\u6700\u7ec8\u5931\u8d25\u52a8\u753b..."
+                : "\u672c\u8f6e\u8fdb\u98df\u5b8c\u6210\u540e\uff0c\u5c06\u64ad\u653e\u603b\u7cd6\u5206\u6700\u9ad8\u89d2\u8272\u7684\u53d8\u80d6\u54ed\u6ce3\u52a8\u753b\u3002");
+            _settlementGateLabel.style.fontSize = 12;
+            _settlementGateLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _settlementGateLabel.style.marginTop = 5;
+            _settlementGateLabel.style.color = UITheme.SelectedBorder;
+            _settlementGateLabel.style.whiteSpace = WhiteSpace.Normal;
+            _actionPanel.Add(_settlementGateLabel);
+
+            _statusLine.text = "\u6700\u7ec8\u6392\u540d\u548c\u8fd4\u56de\u6309\u94ae\u5c06\u5728\u5168\u90e8\u52a8\u753b\u7ed3\u675f\u540e\u663e\u793a\u3002";
+            _statusLine.style.display = DisplayStyle.Flex;
         }
 
         void AddInterRoundControls(GameState state, bool playbackComplete)

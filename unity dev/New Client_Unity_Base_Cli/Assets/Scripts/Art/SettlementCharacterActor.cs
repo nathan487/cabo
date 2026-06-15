@@ -48,11 +48,17 @@ namespace Cabo.Client.Art
         public float upperArmLength = 0.48f;
         public float forearmLength = 0.58f;
 
+        [Header("Game over")]
+        [SerializeField] Sprite gameOverDefeatSprite;
+
         Coroutine _routine;
+        SpriteRenderer _gameOverDefeatRenderer;
         Vector2 _leftTarget;
         Vector2 _rightTarget;
         Vector3 _bodyStart;
         Vector3 _headStart;
+        Vector3 _bodyStartScale;
+        Vector3 _visualRootStartScale;
         Quaternion _leftHandRestRotation;
         Quaternion _rightHandRestRotation;
         bool _leftHandIsRaised;
@@ -65,7 +71,9 @@ namespace Cabo.Client.Art
         void Awake()
         {
             if (bodyBone != null) _bodyStart = bodyBone.localPosition;
+            if (bodyBone != null) _bodyStartScale = bodyBone.localScale;
             if (headBone != null) _headStart = headBone.localPosition;
+            if (visualRoot != null) _visualRootStartScale = visualRoot.localScale;
             if (leftHand != null) _leftHandRestRotation = leftHand.transform.localRotation;
             if (rightHand != null) _rightHandRestRotation = rightHand.transform.localRotation;
             ResetPose();
@@ -85,7 +93,16 @@ namespace Cabo.Client.Art
         {
             _leftTarget = leftRestTarget;
             _rightTarget = rightRestTarget;
-            if (bodyBone != null) bodyBone.localPosition = _bodyStart;
+            if (visualRoot != null)
+            {
+                visualRoot.gameObject.SetActive(true);
+                visualRoot.localScale = _visualRootStartScale;
+            }
+            if (bodyBone != null)
+            {
+                bodyBone.localPosition = _bodyStart;
+                bodyBone.localScale = _bodyStartScale;
+            }
             if (headBone != null) headBone.localPosition = _headStart;
             if (leftEye != null) leftEye.sprite = leftEyeOpen;
             if (rightEye != null) rightEye.sprite = rightEyeOpen;
@@ -99,6 +116,30 @@ namespace Cabo.Client.Art
                 propRenderer.transform.localRotation = Quaternion.identity;
                 propRenderer.transform.localScale = Vector3.one;
             }
+            if (_gameOverDefeatRenderer != null)
+            {
+                _gameOverDefeatRenderer.enabled = false;
+                _gameOverDefeatRenderer.color = Color.white;
+                _gameOverDefeatRenderer.transform.localPosition = Vector3.zero;
+                _gameOverDefeatRenderer.transform.localRotation = Quaternion.identity;
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
+            }
+        }
+
+        public void ConfigureGameOverDefeat(Sprite sprite)
+        {
+            gameOverDefeatSprite = sprite;
+            if (_gameOverDefeatRenderer == null)
+            {
+                var defeatObject = new GameObject("GameOverDefeat");
+                defeatObject.transform.SetParent(transform, false);
+                _gameOverDefeatRenderer = defeatObject.AddComponent<SpriteRenderer>();
+                _gameOverDefeatRenderer.sortingOrder = 40;
+                _gameOverDefeatRenderer.enabled = false;
+            }
+
+            _gameOverDefeatRenderer.sprite = gameOverDefeatSprite;
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
         }
 
         public void StopPlayback()
@@ -209,6 +250,105 @@ namespace Cabo.Client.Art
             yield return Bounce(0.18f, 0.22f);
             yield return Bounce(0.12f, 0.18f);
             ResetPose();
+        }
+
+        public IEnumerator PlayGameOverDefeat()
+        {
+            if (_routine != null)
+                StopCoroutine(_routine);
+            _routine = StartCoroutine(GameOverDefeatRoutine());
+            yield return _routine;
+            _routine = null;
+        }
+
+        IEnumerator GameOverDefeatRoutine()
+        {
+            ResetPose();
+            float elapsed = 0f;
+            const float swellDuration = 0.34f;
+            while (elapsed < swellDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / swellDuration));
+                if (visualRoot != null)
+                {
+                    visualRoot.localScale = Vector3.Scale(
+                        _visualRootStartScale,
+                        new Vector3(Mathf.Lerp(1f, 1.28f, t), Mathf.Lerp(1f, 0.88f, t), 1f));
+                }
+                yield return null;
+            }
+
+            if (gameOverDefeatSprite == null || _gameOverDefeatRenderer == null)
+            {
+                if (bodyBone != null)
+                    bodyBone.localScale = Vector3.Scale(_bodyStartScale, new Vector3(1.28f, 1.06f, 1f));
+                if (leftEye != null) leftEye.sprite = leftEyeClosed;
+                if (rightEye != null) rightEye.sprite = rightEyeClosed;
+                if (mouth != null) mouth.sprite = mouthFail;
+                yield return SobFallback(1.8f);
+                yield break;
+            }
+
+            visualRoot.gameObject.SetActive(false);
+            _gameOverDefeatRenderer.sprite = gameOverDefeatSprite;
+            _gameOverDefeatRenderer.enabled = true;
+            _gameOverDefeatRenderer.color = new Color(1f, 1f, 1f, 0f);
+            _gameOverDefeatRenderer.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.50f;
+
+            elapsed = 0f;
+            const float popDuration = 0.42f;
+            while (elapsed < popDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / popDuration));
+                _gameOverDefeatRenderer.color = new Color(1f, 1f, 1f, t);
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.50f, 0.74f, t);
+                yield return null;
+            }
+
+            elapsed = 0f;
+            const float settleDuration = 0.18f;
+            while (elapsed < settleDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / settleDuration));
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.74f, 0.68f, t);
+                yield return null;
+            }
+
+            elapsed = 0f;
+            const float sobDuration = 1.8f;
+            while (elapsed < sobDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float fade = 1f - Mathf.Clamp01(elapsed / sobDuration);
+                float wave = Mathf.Sin(elapsed * 11f);
+                _gameOverDefeatRenderer.transform.localPosition = new Vector3(
+                    wave * 0.055f * fade,
+                    -0.02f + Mathf.Abs(wave) * 0.035f,
+                    0f);
+                _gameOverDefeatRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, wave * 1.8f * fade);
+                yield return null;
+            }
+
+            _gameOverDefeatRenderer.transform.localPosition = new Vector3(0f, -0.02f, 0f);
+            _gameOverDefeatRenderer.transform.localRotation = Quaternion.identity;
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
+        }
+
+        IEnumerator SobFallback(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float wave = Mathf.Sin(elapsed * 12f);
+                if (bodyBone != null)
+                    bodyBone.localPosition = _bodyStart + new Vector3(wave * 0.04f, Mathf.Abs(wave) * 0.025f, 0f);
+                yield return null;
+            }
         }
 
         IEnumerator MoveProp(Vector3 fromPosition, Vector3 toPosition, Vector3 fromScale, Vector3 toScale, float duration)

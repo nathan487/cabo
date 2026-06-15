@@ -267,6 +267,7 @@ message RoundScoreDetail {
   bool is_steady_caller = 6;
   bool is_lowest = 7;        // 是否本轮最低
   bool is_kamikaze = 8;      // 是否触发神风特攻队（两张12和两张13）
+  string character_id = 9;   // 该玩家选择的角色，供结算场景权威绑定
 }
 
 // 100 分减半触发记录（同轮可能多人触发）

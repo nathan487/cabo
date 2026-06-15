@@ -78,6 +78,9 @@ namespace Cabo.Client
         // Players (seat order)
         public List<PlayerInfo> Players = new();
 
+        string _requestedCharacterId = "pomelo";
+        bool _hasRequestedCharacterId;
+
         // My hand
         public List<CardState> MyCards = new();
 
@@ -115,6 +118,7 @@ namespace Cabo.Client
         // Inter-round
         public bool GameStartConfirmed;
         public bool RoundJustRevealed;
+        public bool GameOverPending;
 
         // Scoring
         public List<RoundResult> LastRoundResults = new();
@@ -148,6 +152,11 @@ namespace Cabo.Client
         public List<int> LastActionSelectedSlots = new();
 
         // Helpers
+        public void SetRequestedCharacterId(string characterId)
+        {
+            _requestedCharacterId = NormalizeCharacterId(characterId);
+            _hasRequestedCharacterId = true;
+        }
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
         public bool IsMyselfHost => Players.Exists(player => player.PlayerId == MyPlayerId && player.IsHost);
 
@@ -315,12 +324,25 @@ namespace Cabo.Client
                 return;
             }
 
+            var knownCharacterIds = new Dictionary<long, string>();
+            foreach (var player in Players)
+            {
+                if (!string.IsNullOrWhiteSpace(player.CharacterId))
+                    knownCharacterIds[player.PlayerId] = player.CharacterId;
+            }
+
             Players.Clear();
             foreach (var p in room.Players)
                 Players.Add(new PlayerInfo
                 {
                     PlayerId = p.PlayerId, Nickname = p.Nickname,
-                    CharacterId = NormalizeCharacterId(p.CharacterId),
+                    CharacterId = p.PlayerId == MyPlayerId && _hasRequestedCharacterId
+                        ? _requestedCharacterId
+                        : !string.IsNullOrWhiteSpace(p.CharacterId)
+                        ? NormalizeCharacterId(p.CharacterId)
+                        : knownCharacterIds.TryGetValue(p.PlayerId, out var knownCharacterId)
+                            ? NormalizeCharacterId(knownCharacterId)
+                            : "pomelo",
                     SeatId = p.SeatId, IsReady = p.IsReady,
                     IsHost = p.IsHost, TotalScore = p.TotalScore
                 });
@@ -329,13 +351,9 @@ namespace Cabo.Client
         void HandlePlayerJoin(PlayerJoinNotify notify)
         {
             var pj = notify.Player;
-            if (pj != null && !Players.Exists(p => p.PlayerId == pj.PlayerId))
-                Players.Add(new PlayerInfo
-                {
-                    PlayerId = pj.PlayerId, Nickname = pj.Nickname,
-                    CharacterId = NormalizeCharacterId(pj.CharacterId),
-                    SeatId = pj.SeatId, IsReady = pj.IsReady, IsHost = pj.IsHost
-                });
+            if (pj != null)
+                UpsertPlayer(pj.PlayerId, pj.Nickname, pj.CharacterId, pj.SeatId,
+                    pj.IsReady, pj.IsHost, pj.TotalScore);
         }
 
         void HandlePlayerLeave(PlayerLeaveNotify notify)
@@ -412,6 +430,7 @@ namespace Cabo.Client
             Phase = GamePhase.Playing;
             ResetEarlyEndState();
             RoundJustRevealed = false;
+            GameOverPending = false;
             GameStartConfirmed = false;
             RoundNumber = notify.RoundNumber;
             CurrentPlayerId = notify.FirstPlayerId;
@@ -774,6 +793,7 @@ namespace Cabo.Client
         void HandleRoundReveal(RoundRevealNotify rrn)
         {
             Phase = GamePhase.RoundReveal; RoundJustRevealed = true;
+            GameOverPending = false;
             GameStartConfirmed = false;
             SteadyCallerId = rrn.SteadyCallerId;
             LastRoundResults.Clear();
@@ -783,13 +803,15 @@ namespace Cabo.Client
                 {
                     PlayerId = sc.PlayerId, HandTotal = sc.HandTotal, Penalty = sc.Penalty,
                     RoundScore = sc.RoundScore, CumulativeScore = sc.CumulativeScore,
-                    IsSteadyCaller = sc.IsSteadyCaller, IsLowest = sc.IsLowest, IsKamikaze = sc.IsKamikaze
+                    IsSteadyCaller = sc.IsSteadyCaller, IsLowest = sc.IsLowest, IsKamikaze = sc.IsKamikaze,
+                    CharacterId = NormalizeCharacterId(sc.CharacterId)
                 };
                 var pl = Players.Find(p => p.PlayerId == sc.PlayerId);
                 if (pl != null)
                 {
                     rr.Nickname = pl.Nickname;
-                    rr.CharacterId = NormalizeCharacterId(pl.CharacterId);
+                    if (string.IsNullOrWhiteSpace(sc.CharacterId))
+                        rr.CharacterId = NormalizeCharacterId(pl.CharacterId);
                 }
                 foreach (var rh in rrn.RevealedHands)
                     if (rh.PlayerId == sc.PlayerId) { rr.CardValues.AddRange(rh.CardValues); break; }
@@ -814,7 +836,6 @@ namespace Cabo.Client
         void HandleGameOver(GameOverNotify go)
         {
             Debug.Log($"[GameState] GameOverNotify rankings={go.Rankings.Count}");
-            Phase = GamePhase.GameOver;
             ResetEarlyEndState();
             FinalRankings.Clear();
             foreach (var r in go.Rankings)
@@ -823,6 +844,20 @@ namespace Cabo.Client
                     Rank = r.Rank, PlayerId = r.PlayerId, Nickname = r.Nickname,
                     FinalScore = r.FinalScore, IsWinner = r.IsWinner
                 });
+
+            GameOverPending = RoundJustRevealed && LastRoundResults.Count > 0;
+            Phase = GameOverPending ? GamePhase.RoundReveal : GamePhase.GameOver;
+        }
+
+        public bool CompletePendingGameOverPresentation()
+        {
+            if (!GameOverPending)
+                return false;
+
+            GameOverPending = false;
+            RoundJustRevealed = false;
+            Phase = GamePhase.GameOver;
+            return true;
         }
 
         void HandleEndGameEarlyRejectedNotify(EndGameEarlyRejectedNotify notify)
@@ -874,6 +909,7 @@ namespace Cabo.Client
             SteadyCallerId = 0;
             GameStartConfirmed = false;
             RoundJustRevealed = false;
+            GameOverPending = false;
             LastRoundResults.Clear();
             FinalRankings.Clear();
             LastPeekedValue = -1;
@@ -908,6 +944,8 @@ namespace Cabo.Client
         public void ReturnHome()
         {
             ResetEarlyEndState();
+            _requestedCharacterId = "pomelo";
+            _hasRequestedCharacterId = false;
             Phase = GamePhase.Lobby;
             MyPlayerId = 0;
             RoomId = 0;
@@ -933,6 +971,7 @@ namespace Cabo.Client
             SteadyCallerId = 0;
             GameStartConfirmed = false;
             RoundJustRevealed = false;
+            GameOverPending = false;
             LastRoundResults.Clear();
             FinalRankings.Clear();
             RoomChatMessages.Clear();
@@ -965,7 +1004,10 @@ namespace Cabo.Client
             if (existing != null)
             {
                 existing.Nickname = nickname;
-                existing.CharacterId = NormalizeCharacterId(characterId);
+                if (playerId == MyPlayerId && _hasRequestedCharacterId)
+                    existing.CharacterId = _requestedCharacterId;
+                else if (!string.IsNullOrWhiteSpace(characterId))
+                    existing.CharacterId = NormalizeCharacterId(characterId);
                 existing.SeatId = seatId;
                 existing.IsReady = isReady;
                 existing.IsHost = isHost;
@@ -977,7 +1019,9 @@ namespace Cabo.Client
             {
                 PlayerId = playerId,
                 Nickname = nickname,
-                CharacterId = NormalizeCharacterId(characterId),
+                CharacterId = playerId == MyPlayerId && _hasRequestedCharacterId
+                    ? _requestedCharacterId
+                    : NormalizeCharacterId(characterId),
                 SeatId = seatId,
                 IsReady = isReady,
                 IsHost = isHost,
@@ -987,7 +1031,16 @@ namespace Cabo.Client
 
         static string NormalizeCharacterId(string characterId)
         {
-            return string.IsNullOrWhiteSpace(characterId) ? "pomelo" : characterId;
+            var normalized = characterId?.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "strawberry":
+                case "oat":
+                case "bean":
+                    return normalized;
+                default:
+                    return "pomelo";
+            }
         }
 
         string FormatSlot(int slotIndex)

@@ -492,6 +492,7 @@ void GameService::revealAndScore(GameRoom& room) {
 
             auto* sc = rn->add_scores();
             sc->set_player_id(p->playerId);
+            sc->set_character_id(p->characterId);
             sc->set_hand_total(p->roundScore());
             sc->set_penalty(p->playerId != kamikazePlayerId ? 50 : 0);
             sc->set_round_score(p->playerId == kamikazePlayerId ? 0 : 50);
@@ -536,6 +537,7 @@ void GameService::revealAndScore(GameRoom& room) {
 
             auto* sc = rn->add_scores();
             sc->set_player_id(p->playerId);
+            sc->set_character_id(p->characterId);
             sc->set_hand_total(p->roundScore());
             sc->set_penalty(penalty);
             sc->set_round_score(roundSc);

@@ -45,6 +45,7 @@ namespace Cabo.Client.Art
         public string displayName;
         public Sprite portraitSprite;
         public GameObject settlementPrefab;
+        public Sprite gameOverDefeatSprite;
     }
 
     [CreateAssetMenu(fileName = "CaboArtCatalog", menuName = "Cabo/Art Catalog")]

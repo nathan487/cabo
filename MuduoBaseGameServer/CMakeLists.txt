@@ -35,6 +35,23 @@ else()
 endif()
 
 set(PROTO_SRC_DIR "${CMAKE_SOURCE_DIR}/src/proto")
+set(PROTO_SCHEMA_DIR "${CMAKE_SOURCE_DIR}/../Proto")
+
+if(NOT Protobuf_PROTOC_EXECUTABLE)
+    find_program(Protobuf_PROTOC_EXECUTABLE protoc
+        HINTS "$ENV{HOME}/anaconda3/bin")
+endif()
+if(NOT Protobuf_PROTOC_EXECUTABLE)
+    message(FATAL_ERROR "protoc is required to build GameServer")
+endif()
+
+set(PROTO_FILES
+    ${PROTO_SCHEMA_DIR}/common.proto
+    ${PROTO_SCHEMA_DIR}/room.proto
+    ${PROTO_SCHEMA_DIR}/game.proto
+    ${PROTO_SCHEMA_DIR}/sync.proto
+    ${PROTO_SCHEMA_DIR}/messages.proto
+)
 
 set(PROTO_SRCS
     ${PROTO_SRC_DIR}/common.pb.cc
@@ -43,6 +60,27 @@ set(PROTO_SRCS
     ${PROTO_SRC_DIR}/game.pb.cc
     ${PROTO_SRC_DIR}/sync.pb.cc
 )
+
+set(PROTO_HDRS
+    ${PROTO_SRC_DIR}/common.pb.h
+    ${PROTO_SRC_DIR}/messages.pb.h
+    ${PROTO_SRC_DIR}/room.pb.h
+    ${PROTO_SRC_DIR}/game.pb.h
+    ${PROTO_SRC_DIR}/sync.pb.h
+)
+
+add_custom_command(
+    OUTPUT ${PROTO_SRCS} ${PROTO_HDRS}
+    COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+        --cpp_out=${PROTO_SRC_DIR}
+        --proto_path=${PROTO_SCHEMA_DIR}
+        ${PROTO_FILES}
+    DEPENDS ${PROTO_FILES}
+    COMMENT "Generating C++ protobuf sources"
+    VERBATIM
+)
+
+add_custom_target(generate_game_protos DEPENDS ${PROTO_SRCS} ${PROTO_HDRS})
 
 set(GAME_SERVER_SRCS
     src/common/WebSocketCodec.cc
@@ -55,6 +93,7 @@ set(GAME_SERVER_SRCS
 )
 
 add_executable(GameServer ${GAME_SERVER_SRCS})
+add_dependencies(GameServer generate_game_protos)
 
 # Protobuf 3.20 anaconda build: InternalMetadata destructor is not exported.
 # NDEBUG triggers the inline definition in metadata_lite.h.
@@ -97,9 +136,7 @@ target_link_libraries(websocket_codec_test
 # ============================================================
 # Regenerate protobuf C++ code (run manually when .proto changes)
 # ============================================================
-# protoc --cpp_out=src/proto --proto_path=../../Proto \
-#   ../../Proto/common.proto ../../Proto/room.proto \
-#   ../../Proto/game.proto ../../Proto/sync.proto ../../Proto/messages.proto
+# Protobuf C++ files are regenerated automatically from ../Proto.
 
 # ============================================================
 # How to run:

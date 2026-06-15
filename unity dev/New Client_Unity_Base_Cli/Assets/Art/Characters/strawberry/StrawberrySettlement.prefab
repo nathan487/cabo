@@ -1319,6 +1319,7 @@ MonoBehaviour:
   propRenderer: {fileID: 5045038239165354555}
   upperArmLength: 0.48
   forearmLength: 0.6833147
+  gameOverDefeatSprite: {fileID: 0}
 --- !u!1 &7458589635304213597
 GameObject:
   m_ObjectHideFlags: 0

@@ -43,6 +43,7 @@ namespace Cabo.Client.Art
         Camera _camera;
         RenderTexture _output;
         Coroutine _playback;
+        Coroutine _finalePlayback;
         Transform _actorRoot;
         int _roundNumber = -1;
         int _completedRoundNumber = -1;
@@ -125,11 +126,22 @@ namespace Cabo.Client.Art
             _playback = StartCoroutine(PlayPilotLoop());
         }
 
+        public void PlayGameOverFinale(int actorIndex, Action completeHandler)
+        {
+            if (_finalePlayback != null)
+                return;
+
+            _finalePlayback = StartCoroutine(PlayGameOverFinaleRoutine(actorIndex, completeHandler));
+        }
+
         public void StopPlayback()
         {
             if (_playback != null)
                 StopCoroutine(_playback);
+            if (_finalePlayback != null)
+                StopCoroutine(_finalePlayback);
             _playback = null;
+            _finalePlayback = null;
             for (int i = 0; i < _actors.Count; i++)
             {
                 if (_actors[i] != null)
@@ -165,8 +177,25 @@ namespace Cabo.Client.Art
                 go.transform.localPosition = new Vector3(start + spacing * i, -0.25f, 0f);
                 go.transform.localScale = Vector3.one * scale;
                 var actor = go.GetComponent<SettlementCharacterActor>();
+                if (actor != null)
+                    actor.ConfigureGameOverDefeat(character.gameOverDefeatSprite);
                 _actors.Add(actor);
             }
+        }
+
+        IEnumerator PlayGameOverFinaleRoutine(int actorIndex, Action completeHandler)
+        {
+            yield return new WaitForSecondsRealtime(0.35f);
+            CaboAudio.Play(CaboSfx.Penalty, 0.88f);
+
+            if (actorIndex >= 0 && actorIndex < _actors.Count && _actors[actorIndex] != null)
+                yield return _actors[actorIndex].PlayGameOverDefeat();
+            else
+                yield return new WaitForSecondsRealtime(0.5f);
+
+            yield return new WaitForSecondsRealtime(0.45f);
+            _finalePlayback = null;
+            completeHandler?.Invoke();
         }
 
         IEnumerator PlayResults(IReadOnlyList<RoundResult> results)

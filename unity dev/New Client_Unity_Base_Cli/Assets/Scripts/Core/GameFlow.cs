@@ -107,14 +107,18 @@ namespace Cabo.Client
         public void CreateRoom(string nickname, string characterId)
         {
             _nickname = NormalizeNickname(nickname);
-            Gateway.SendCreateRoom(_nickname, NormalizeCharacterId(characterId));
+            var normalizedCharacterId = NormalizeCharacterId(characterId);
+            State.SetRequestedCharacterId(normalizedCharacterId);
+            Gateway.SendCreateRoom(_nickname, normalizedCharacterId);
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
         }
 
         public void JoinRoom(string roomCode, string nickname, string characterId)
         {
             _nickname = NormalizeNickname(nickname);
-            Gateway.SendJoinRoom(roomCode, _nickname, NormalizeCharacterId(characterId));
+            var normalizedCharacterId = NormalizeCharacterId(characterId);
+            State.SetRequestedCharacterId(normalizedCharacterId);
+            Gateway.SendJoinRoom(roomCode, _nickname, normalizedCharacterId);
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
         }
 
@@ -127,7 +131,15 @@ namespace Cabo.Client
         static string NormalizeCharacterId(string characterId)
         {
             var trimmed = characterId?.Trim().ToLowerInvariant();
-            return string.IsNullOrEmpty(trimmed) ? "pomelo" : trimmed;
+            switch (trimmed)
+            {
+                case "strawberry":
+                case "oat":
+                case "bean":
+                    return trimmed;
+                default:
+                    return "pomelo";
+            }
         }
 
         static bool TryNormalizeServerUrl(string address, out string url)
@@ -246,6 +258,16 @@ namespace Cabo.Client
                 return;
 
             LeaveRoomToHome();
+        }
+
+        public void CompletePendingGameOverPresentation()
+        {
+            if (!State.CompletePendingGameOverPresentation())
+                return;
+
+            Flow = FlowState.GameOver;
+            SubState = GameSubState.Idle;
+            StateChanged?.Invoke();
         }
 
         public void RequestEarlyEndGame()

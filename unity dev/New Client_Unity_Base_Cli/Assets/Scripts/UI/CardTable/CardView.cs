@@ -74,7 +74,7 @@ namespace Cabo.Client.UI.CardTable
             labelGo.transform.SetParent(transform, false);
             var labelRect = labelGo.GetComponent<RectTransform>();
             labelRect.anchorMin = new Vector2(0.04f, 0.70f);
-            labelRect.anchorMax = new Vector2(0.38f, 0.97f);
+            labelRect.anchorMax = new Vector2(0.56f, 0.97f);
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
 
@@ -82,6 +82,8 @@ namespace Cabo.Client.UI.CardTable
             _label.alignment = TextAnchor.UpperLeft;
             _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             _label.fontStyle = FontStyle.Bold;
+            _label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _label.verticalOverflow = VerticalWrapMode.Overflow;
             _label.raycastTarget = false;
             var valueOutline = labelGo.AddComponent<Outline>();
             valueOutline.effectColor = new Color(1f, 1f, 1f, 0.95f);
@@ -150,7 +152,7 @@ namespace Cabo.Client.UI.CardTable
             _label.alignment = TextAnchor.UpperLeft;
             var labelRect = _label.rectTransform;
             labelRect.anchorMin = new Vector2(0.04f, 0.70f);
-            labelRect.anchorMax = new Vector2(0.38f, 0.97f);
+            labelRect.anchorMax = new Vector2(0.56f, 0.97f);
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
             _label.fontSize = Mathf.Max(10, Mathf.RoundToInt(RectTransform.sizeDelta.y * 0.22f));
