@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cabo.Client.Art;
 using Cabo.Client.UI.CardTable;
 using Game.Common;
+using Game.Room;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -123,6 +124,7 @@ namespace Cabo.Client.UI
 
         readonly HashSet<int> _selectedOwnSlots = new();
         readonly List<TableFeedEntry> _gameLogEntries = new();
+        readonly HashSet<string> _seenChatBubbleMessages = new();
         long _selectedOpponentPlayerId;
         int _selectedOpponentSlot = -1;
         long _lastLoggedActionSequence;
@@ -156,6 +158,7 @@ namespace Cabo.Client.UI
         bool _hideActionPanelDuringTransient;
         bool _showChat;
         bool _rulesVisible;
+        bool _chatBubblesInitialized;
         bool _cardTableRefreshQueued;
         bool _layoutRefreshQueued;
         bool _uiActionQueued;
@@ -1623,6 +1626,7 @@ namespace Cabo.Client.UI
 
         void RenderSocialPanel(GameState state)
         {
+            UpdateChatBubbles(state);
             StyleSocialTabState(_logTabButton, !_showChat);
             StyleSocialTabState(_chatTabButton, _showChat);
 
@@ -1647,6 +1651,61 @@ namespace Cabo.Client.UI
 
             _lastRenderedSocialShowChat = _showChat;
             _lastRenderedSocialActionSequence = state.LastActionSequence;
+        }
+
+        void UpdateChatBubbles(GameState state)
+        {
+            if (state?.RoomChatMessages == null)
+                return;
+
+            if (!_chatBubblesInitialized)
+            {
+                for (int i = 0; i < state.RoomChatMessages.Count; i++)
+                    _seenChatBubbleMessages.Add(ChatBubbleKey(state.RoomChatMessages[i]));
+                _chatBubblesInitialized = true;
+                return;
+            }
+
+            RoomChatMessage latestText = null;
+            for (int i = 0; i < state.RoomChatMessages.Count; i++)
+            {
+                var message = state.RoomChatMessages[i];
+                if (message == null || !_seenChatBubbleMessages.Add(ChatBubbleKey(message)))
+                    continue;
+                if (message.Type == RoomChatType.Text && !string.IsNullOrWhiteSpace(message.Text))
+                    latestText = message;
+            }
+
+            if (latestText == null)
+                return;
+
+            var seat = GetSeatView(latestText.SenderPlayerId);
+            seat?.ShowChatBubble(TruncateChatBubble(latestText.Text));
+        }
+
+        SeatView GetSeatView(long playerId)
+        {
+            if (playerId == _flow.State.MyPlayerId)
+                return _selfSeat;
+
+            var indices = BuildOpponentIndices(_flow.State);
+            for (int i = 0; i < indices.Count && i < _opponentSeats.Length; i++)
+                if (_flow.State.Players[indices[i]].PlayerId == playerId)
+                    return _opponentSeats[i];
+            return null;
+        }
+
+        static string ChatBubbleKey(RoomChatMessage message)
+        {
+            if (message == null)
+                return "null";
+            return $"{message.RoomId}:{message.MessageId}:{message.ServerTimeMs}:{message.SenderPlayerId}";
+        }
+
+        static string TruncateChatBubble(string text)
+        {
+            string trimmed = text?.Trim() ?? "";
+            return trimmed.Length <= 15 ? trimmed : trimmed.Substring(0, 15) + "...";
         }
 
         void RenderFeed(List<TableFeedEntry> entries, string emptyText)
@@ -5285,8 +5344,13 @@ namespace Cabo.Client.UI
             readonly Label _score;
             readonly Label _tag;
             readonly VisualElement _avatarSlot;
+            readonly VisualElement _chatBubble;
+            readonly Label _chatBubbleLabel;
             string _avatarCacheKey;
             Sprite _stationBackground;
+            IVisualElementScheduledItem _bubbleDelayItem;
+            IVisualElementScheduledItem _bubbleFadeItem;
+            int _bubbleVersion;
 
             public SeatView(string name, bool isSelf)
             {
@@ -5304,7 +5368,7 @@ namespace Cabo.Client.UI
                 Root.style.borderRightColor = UITheme.PanelBorder;
                 Root.style.borderBottomColor = UITheme.PanelBorder;
                 Root.style.borderLeftColor = UITheme.PanelBorder;
-                Root.style.overflow = Overflow.Hidden;
+                Root.style.overflow = Overflow.Visible;
                 Root.style.paddingLeft = 12;
                 Root.style.paddingRight = 12;
                 Root.style.paddingTop = 8;
@@ -5374,6 +5438,44 @@ namespace Cabo.Client.UI
                 CardRow.style.alignItems = Align.Center;
                 CardRow.style.marginTop = 6;
                 Root.Add(CardRow);
+
+                _chatBubble = new VisualElement { name = $"ChatBubble-{name}" };
+                _chatBubble.style.position = Position.Absolute;
+                _chatBubble.style.minWidth = 38;
+                _chatBubble.style.maxWidth = 210;
+                _chatBubble.style.flexGrow = 0;
+                _chatBubble.style.flexShrink = 1;
+                _chatBubble.style.paddingLeft = 12;
+                _chatBubble.style.paddingRight = 12;
+                _chatBubble.style.paddingTop = 7;
+                _chatBubble.style.paddingBottom = 7;
+                _chatBubble.style.backgroundColor = new Color(1f, 0.995f, 0.97f, 1f);
+                _chatBubble.style.borderTopLeftRadius = 999;
+                _chatBubble.style.borderTopRightRadius = 999;
+                _chatBubble.style.borderBottomLeftRadius = 999;
+                _chatBubble.style.borderBottomRightRadius = 999;
+                _chatBubble.style.borderTopWidth = 2;
+                _chatBubble.style.borderRightWidth = 2;
+                _chatBubble.style.borderBottomWidth = 2;
+                _chatBubble.style.borderLeftWidth = 2;
+                var bubbleBorder = new Color(0.16f, 0.14f, 0.12f, 1f);
+                _chatBubble.style.borderTopColor = bubbleBorder;
+                _chatBubble.style.borderRightColor = bubbleBorder;
+                _chatBubble.style.borderBottomColor = bubbleBorder;
+                _chatBubble.style.borderLeftColor = bubbleBorder;
+                _chatBubble.style.display = DisplayStyle.None;
+                _chatBubble.pickingMode = PickingMode.Ignore;
+
+                _chatBubbleLabel = new Label();
+                _chatBubbleLabel.style.fontSize = 13;
+                _chatBubbleLabel.style.whiteSpace = WhiteSpace.Normal;
+                _chatBubbleLabel.style.color = UITheme.TextPrimary;
+                _chatBubbleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                _chatBubbleLabel.pickingMode = PickingMode.Ignore;
+                _chatBubble.Add(_chatBubbleLabel);
+                ConfigureBubbleTail(_chatBubble, name, bubbleBorder);
+                ConfigureBubblePosition(_chatBubble, name);
+                Root.Add(_chatBubble);
             }
 
             public void SetStationBackground(Sprite stationArt)
@@ -5392,6 +5494,165 @@ namespace Cabo.Client.UI
             public void Clear()
             {
                 CardRow.Clear();
+                HideChatBubble();
+            }
+
+            public void ShowChatBubble(string text)
+            {
+                if (string.IsNullOrWhiteSpace(text))
+                    return;
+
+                _bubbleVersion++;
+                int version = _bubbleVersion;
+                _bubbleDelayItem?.Pause();
+                _bubbleFadeItem?.Pause();
+                _chatBubbleLabel.text = text;
+                _chatBubble.style.opacity = 1f;
+                _chatBubble.style.display = DisplayStyle.Flex;
+                _chatBubble.BringToFront();
+                _bubbleDelayItem = _chatBubble.schedule.Execute(() => BeginBubbleFade(version));
+                _bubbleDelayItem.ExecuteLater(3150);
+            }
+
+            void BeginBubbleFade(int version)
+            {
+                if (version != _bubbleVersion)
+                    return;
+
+                int step = 0;
+                _bubbleFadeItem = _chatBubble.schedule.Execute(() =>
+                {
+                    if (version != _bubbleVersion)
+                    {
+                        _bubbleFadeItem?.Pause();
+                        return;
+                    }
+
+                    step++;
+                    _chatBubble.style.opacity = Mathf.Clamp01(1f - step / 7f);
+                    if (step < 7)
+                        return;
+
+                    _bubbleFadeItem?.Pause();
+                    _chatBubble.style.display = DisplayStyle.None;
+                    _chatBubble.style.opacity = 1f;
+                });
+                _bubbleFadeItem.Every(50);
+            }
+
+            void HideChatBubble()
+            {
+                _bubbleVersion++;
+                _bubbleDelayItem?.Pause();
+                _bubbleFadeItem?.Pause();
+                _chatBubble.style.display = DisplayStyle.None;
+                _chatBubble.style.opacity = 1f;
+            }
+
+            static void ConfigureBubblePosition(VisualElement bubble, string seatName)
+            {
+                if (seatName == "self")
+                {
+                    bubble.style.left = 44;
+                    bubble.style.top = -54;
+                }
+                else if (seatName == "top")
+                {
+                    bubble.style.left = 44;
+                    bubble.style.top = 42;
+                }
+                else if (seatName == "left")
+                {
+                    bubble.style.left = 42;
+                    bubble.style.top = 8;
+                    bubble.style.maxWidth = 160;
+                }
+                else
+                {
+                    bubble.style.right = 42;
+                    bubble.style.top = 8;
+                    bubble.style.maxWidth = 160;
+                }
+            }
+
+            static void ConfigureBubbleTail(VisualElement bubble, string seatName, Color borderColor)
+            {
+                string direction = seatName == "self" ? "down" : seatName == "top" ? "up" : seatName == "left" ? "left" : "right";
+                var outer = CreateTriangle(direction, 10, borderColor);
+                var inner = CreateTriangle(direction, 7, new Color(1f, 0.995f, 0.97f, 1f));
+                PositionTail(outer, direction, false);
+                PositionTail(inner, direction, true);
+                bubble.Add(outer);
+                bubble.Add(inner);
+            }
+
+            static VisualElement CreateTriangle(string direction, float size, Color color)
+            {
+                var triangle = new VisualElement();
+                triangle.style.position = Position.Absolute;
+                triangle.style.width = 0;
+                triangle.style.height = 0;
+                triangle.pickingMode = PickingMode.Ignore;
+                if (direction == "up" || direction == "down")
+                {
+                    triangle.style.borderLeftWidth = size;
+                    triangle.style.borderRightWidth = size;
+                    triangle.style.borderLeftColor = Color.clear;
+                    triangle.style.borderRightColor = Color.clear;
+                    if (direction == "up")
+                    {
+                        triangle.style.borderBottomWidth = size + 3;
+                        triangle.style.borderBottomColor = color;
+                    }
+                    else
+                    {
+                        triangle.style.borderTopWidth = size + 3;
+                        triangle.style.borderTopColor = color;
+                    }
+                }
+                else
+                {
+                    triangle.style.borderTopWidth = size;
+                    triangle.style.borderBottomWidth = size;
+                    triangle.style.borderTopColor = Color.clear;
+                    triangle.style.borderBottomColor = Color.clear;
+                    if (direction == "left")
+                    {
+                        triangle.style.borderRightWidth = size + 3;
+                        triangle.style.borderRightColor = color;
+                    }
+                    else
+                    {
+                        triangle.style.borderLeftWidth = size + 3;
+                        triangle.style.borderLeftColor = color;
+                    }
+                }
+                return triangle;
+            }
+
+            static void PositionTail(VisualElement tail, string direction, bool inner)
+            {
+                float inset = inner ? 2f : 0f;
+                if (direction == "up")
+                {
+                    tail.style.left = 18 + inset;
+                    tail.style.top = inner ? -7 : -11;
+                }
+                else if (direction == "down")
+                {
+                    tail.style.left = 18 + inset;
+                    tail.style.bottom = inner ? -7 : -11;
+                }
+                else if (direction == "left")
+                {
+                    tail.style.left = inner ? -7 : -11;
+                    tail.style.top = 14 + inset;
+                }
+                else
+                {
+                    tail.style.right = inner ? -7 : -11;
+                    tail.style.top = 14 + inset;
+                }
             }
 
             public void RenderHeader(string name, int score, bool isCurrentTurn, string tag, bool isCaboCaller = false, string avatarPath = "")
