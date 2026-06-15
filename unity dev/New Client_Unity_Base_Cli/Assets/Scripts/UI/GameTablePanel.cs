@@ -621,14 +621,7 @@ namespace Cabo.Client.UI
                 && GetEndGameModalKind(_flow.State) == EndGameModalKind.None);
             if (!visible)
             {
-                HideRulesOverlay();
-                HideAllChatBubbles();
-                SynchronizeChatBubbleHistory();
-                HideTableCharacterStage();
-                _showLocalEndGameConfirm = false;
-                ApplyEndGameModal(EndGameModalKind.None, "", "");
-                ClearTransientAnimationState();
-                HideSettlementStage();
+                ResetPresentationForRoomExit();
             }
         }
 
@@ -654,6 +647,47 @@ namespace Cabo.Client.UI
             || Time.realtimeSinceStartup < _animationQueueUntil
             || _cardTableView.HasActiveTransientAnimation
             || _inspectionActive;
+
+        void ResetPresentationForRoomExit()
+        {
+            HideRulesOverlay();
+            HideAllChatBubbles();
+            SynchronizeChatBubbleHistory();
+            HideTableCharacterStage();
+            _showLocalEndGameConfirm = false;
+            ApplyEndGameModal(EndGameModalKind.None, "", "");
+            ClearTransientAnimationState();
+            DestroySettlementStage();
+
+            _selectedOwnSlots.Clear();
+            _selectedOpponentPlayerId = 0;
+            _selectedOpponentSlot = -1;
+            _gameLogEntries.Clear();
+            _seenChatBubbleMessages.Clear();
+            _chatBubbleRoomId = 0;
+            _chatBubblesInitialized = false;
+
+            _lastLoggedActionSequence = 0;
+            _lastRenderedSocialActionSequence = -1;
+            _lastRenderedSocialShowChat = false;
+            _lastAnimatedActionSequence = 0;
+            _lastLocalDrawSequence = 0;
+            _lastRenderedRoundNumber = -1;
+            _stableDiscardTopValue = int.MinValue;
+            _stableDiscardPileCount = -1;
+
+            _settlementScoreRows.Clear();
+            _settlementPlaybackComplete = false;
+            _settlementRoundNumber = -1;
+            _settlementGateLabel = null;
+            _interRoundReadyButton = null;
+            _interRoundStartButton = null;
+            _interRoundReadyCanUse = false;
+            _interRoundStartCanUse = false;
+            _gameOverFinalePlaying = false;
+            _gameOverFinaleRound = -1;
+            _victorySfxPlayed = false;
+        }
 
         public void SetAnimationQueueDrainedCallback(Action callback)
         {
@@ -4651,6 +4685,16 @@ namespace Cabo.Client.UI
                 return;
             _settlementStage.StopPlayback();
             _settlementStage.gameObject.SetActive(false);
+        }
+
+        void DestroySettlementStage()
+        {
+            if (_settlementStage == null)
+                return;
+
+            _settlementStage.StopPlayback();
+            UnityEngine.Object.Destroy(_settlementStage.gameObject);
+            _settlementStage = null;
         }
 
         void RenderTableCharacter(GameState state)
