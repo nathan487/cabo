@@ -38,6 +38,24 @@ namespace Cabo.Client.UI
         const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
+        const string RulesText =
+            "\u3010\u76ee\u6807\u3011\n"
+            + "\u5c3d\u91cf\u8ba9\u81ea\u5df1\u7684\u624b\u724c\u7cd6\u5206\u603b\u503c\u66f4\u4f4e\u3002\u6bcf\u8f6e\u7ed3\u675f\u540e\u7d2f\u52a0\u5f97\u5206\uff0c\u6709\u4eba\u7d2f\u8ba1\u8fbe\u5230100\u5206\u65f6\u6e38\u620f\u7ed3\u675f\uff0c\u603b\u5206\u6700\u4f4e\u8005\u80dc\u5229\u3002\n\n"
+            + "\u3010\u5f00\u5c40\u3011\n"
+            + "\u6bcf\u4eba\u83b7\u5f974\u5f20\u6697\u724c\uff0c\u53ea\u80fd\u5077\u770b\u81ea\u5df1\u5176\u4e2d2\u5f20\u3002\u8bf7\u8bb0\u4f4f\u724c\u7684\u4f4d\u7f6e\uff0c\u4e0d\u8981\u968f\u610f\u7ffb\u5f00\u3002\n\n"
+            + "\u3010\u56de\u5408\u6d41\u7a0b\u3011\n"
+            + "1. \u4ece\u724c\u5e93\u62bd\u4e00\u5f20\uff0c\u6216\u62ff\u53d6\u5f03\u724c\u5806\u9876\u724c\u3002\n"
+            + "2. \u62bd\u5230\u7684\u724c\u53ef\u4e0e\u81ea\u5df1\u4e00\u5f20\u6216\u591a\u5f20\u540c\u503c\u624b\u724c\u66ff\u6362\uff0c\u4e5f\u53ef\u76f4\u63a5\u5f03\u6389\u3002\n"
+            + "3. \u591a\u5f20\u66ff\u6362\u82e5\u5224\u5b9a\u5931\u8d25\uff0c\u4f1a\u53d7\u5230\u989d\u5916\u62bd\u724c\u60e9\u7f5a\u3002\n\n"
+            + "\u3010\u7279\u6b8a\u6280\u80fd\u3011\n"
+            + "7-8 \u81ea\u68c0\uff1a\u5077\u770b\u81ea\u5df1\u4e00\u5f20\u6697\u724c\u3002\n"
+            + "9-10 \u4fa6\u67e5\uff1a\u5077\u770b\u4e00\u540d\u5bf9\u624b\u7684\u4e00\u5f20\u6697\u724c\u3002\n"
+            + "11-12 \u4ea4\u6362\uff1a\u5c06\u81ea\u5df1\u4e00\u5f20\u724c\u4e0e\u5bf9\u624b\u4e00\u5f20\u724c\u4ea4\u6362\uff0c\u4e0d\u67e5\u770b\u724c\u9762\u3002\n"
+            + "\u6280\u80fd\u53ea\u5728\u4ece\u724c\u5e93\u62bd\u5230\u5bf9\u5e94\u724c\u5e76\u9009\u62e9\u5f03\u6389\u65f6\u53d1\u52a8\u3002\n\n"
+            + "\u3010CABO\u4e0e\u7ed3\u7b97\u3011\n"
+            + "\u8ba4\u4e3a\u81ea\u5df1\u624b\u724c\u5f88\u4f4e\u65f6\u53ef\u547c\u558aCABO\u3002\u5176\u4ed6\u73a9\u5bb6\u5404\u5b8c\u6210\u6700\u540e\u4e00\u56de\u5408\u540e\u5168\u5458\u4eae\u724c\u3002\u624b\u724c\u7cd6\u5206\u8ba1\u5165\u672c\u8f6e\u5f97\u5206\uff0c\u7279\u6b8a\u7ed3\u679c\u53ef\u89e6\u53d1\u5956\u52b1\u6216\u60e9\u7f5a\u3002\n\n"
+            + "\u3010\u672c\u5730\u6807\u8bb0\u3011\n"
+            + "\u4f60\u5077\u770b\u8fc7\u7684\u5bf9\u624b\u724c\u4f1a\u663e\u793a\u201c\u5df2\u770b\u201d\u6807\u8bb0\uff1b\u81ea\u5df1\u5df2\u88ab\u516c\u5f00\u7684\u724c\u4f1a\u663e\u793a\u6a59\u8272\u201c\u516c\u5f00\u201d\u6807\u8bb0\u3002\u8fd9\u4e9b\u4fe1\u606f\u4ec5\u5bf9\u672c\u5730\u73a9\u5bb6\u53ef\u89c1\u3002";
 
         enum EndGameModalKind
         {
@@ -84,6 +102,8 @@ namespace Cabo.Client.UI
         readonly RoomChatPanel _roomChatPanel;
         readonly Button _logTabButton;
         readonly Button _chatTabButton;
+        readonly Button _rulesButton;
+        readonly VisualElement _rulesOverlay;
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
         SettlementStageRuntime _settlementStage;
@@ -135,6 +155,7 @@ namespace Cabo.Client.UI
         bool _inspectionActive;
         bool _hideActionPanelDuringTransient;
         bool _showChat;
+        bool _rulesVisible;
         bool _cardTableRefreshQueued;
         bool _layoutRefreshQueued;
         bool _uiActionQueued;
@@ -402,6 +423,7 @@ namespace Cabo.Client.UI
             _socialPanel.style.flexShrink = 0;
             _socialPanel.style.minHeight = 0;
             _socialPanel.style.height = Length.Percent(100);
+            _socialPanel.style.position = Position.Relative;
             _socialPanel.style.alignSelf = Align.Stretch;
             _socialPanel.style.marginLeft = 12;
             _socialPanel.style.paddingLeft = 10;
@@ -456,7 +478,32 @@ namespace Cabo.Client.UI
             _roomChatPanel.Root.style.minHeight = 0;
             _socialPanel.Add(_roomChatPanel.Root);
 
+            _rulesOverlay = CreateRulesOverlay();
+            _socialPanel.Add(_rulesOverlay);
+
             _playArea.Add(_selfSeat.Root);
+
+            _rulesButton = new Button(ToggleRulesOverlay)
+            {
+                text = "?",
+                tooltip = "\u67e5\u770b\u6e38\u620f\u89c4\u5219"
+            };
+            _rulesButton.style.position = Position.Absolute;
+            _rulesButton.style.left = 0;
+            _rulesButton.style.top = 0;
+            _rulesButton.style.width = 24;
+            _rulesButton.style.height = 24;
+            _rulesButton.style.minWidth = 24;
+            _rulesButton.style.paddingLeft = 0;
+            _rulesButton.style.paddingRight = 0;
+            _rulesButton.style.paddingTop = 0;
+            _rulesButton.style.paddingBottom = 0;
+            _rulesButton.style.fontSize = 16;
+            _rulesButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _rulesButton.style.unityTextAlign = TextAnchor.MiddleCenter;
+            StyleTableButton(_rulesButton, true);
+            _playArea.Add(_rulesButton);
+            _rulesButton.BringToFront();
 
             _endGameButton = new Button(() => ShowLocalEndGameConfirm())
             {
@@ -481,6 +528,74 @@ namespace Cabo.Client.UI
             root.Add(_endGameButton);
             _endGameButton.BringToFront();
             _endGameModalOverlay.BringToFront();
+        }
+
+        VisualElement CreateRulesOverlay()
+        {
+            var overlay = new VisualElement { name = "RulesOverlay" };
+            overlay.style.position = Position.Absolute;
+            overlay.style.left = 0;
+            overlay.style.right = 0;
+            overlay.style.top = 0;
+            overlay.style.bottom = 0;
+            overlay.style.paddingLeft = 12;
+            overlay.style.paddingRight = 12;
+            overlay.style.paddingTop = 12;
+            overlay.style.paddingBottom = 12;
+            overlay.style.backgroundColor = new Color(0.99f, 0.96f, 0.87f, 0.99f);
+            overlay.style.display = DisplayStyle.None;
+
+            var title = new Label("\u6e38\u620f\u89c4\u5219");
+            title.style.fontSize = 18;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            title.style.marginBottom = 8;
+            overlay.Add(title);
+
+            var close = new Button(HideRulesOverlay) { text = "X", tooltip = "\u5173\u95ed\u89c4\u5219" };
+            close.style.position = Position.Absolute;
+            close.style.right = 8;
+            close.style.top = 8;
+            close.style.width = 24;
+            close.style.height = 24;
+            close.style.minWidth = 24;
+            close.style.paddingLeft = 0;
+            close.style.paddingRight = 0;
+            close.style.paddingTop = 0;
+            close.style.paddingBottom = 0;
+            close.style.unityFontStyleAndWeight = FontStyle.Bold;
+            StyleTableButton(close, true);
+            overlay.Add(close);
+
+            var scroll = new ScrollView(ScrollViewMode.Vertical);
+            scroll.style.flexGrow = 1;
+            scroll.style.flexShrink = 1;
+            scroll.style.minHeight = 0;
+            scroll.style.marginTop = 4;
+            var body = new Label(RulesText);
+            body.style.fontSize = 12;
+            body.style.whiteSpace = WhiteSpace.Normal;
+            body.style.color = UITheme.TextPrimary;
+            body.style.paddingLeft = 2;
+            body.style.paddingRight = 6;
+            body.style.paddingBottom = 12;
+            scroll.Add(body);
+            overlay.Add(scroll);
+            return overlay;
+        }
+
+        void ToggleRulesOverlay()
+        {
+            _rulesVisible = !_rulesVisible;
+            _rulesOverlay.style.display = _rulesVisible ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_rulesVisible)
+                _rulesOverlay.BringToFront();
+        }
+
+        void HideRulesOverlay()
+        {
+            _rulesVisible = false;
+            _rulesOverlay.style.display = DisplayStyle.None;
         }
 
         public void SetVisible(bool visible)
