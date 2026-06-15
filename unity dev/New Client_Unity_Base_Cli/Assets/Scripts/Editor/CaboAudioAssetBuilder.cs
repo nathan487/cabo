@@ -10,6 +10,7 @@ namespace Cabo.Client.Editor
         public const string AudioFolder = "Assets/Art/Audio/SFX";
         public const string BgmFolder = "Assets/Art/Audio/BGM";
         public const string BgmPath = BgmFolder + "/sweet_shop_loop.wav";
+        public const string CaboVoicePath = AudioFolder + "/cabo_girl.mp3";
         const int SampleRate = 44100;
 
         static readonly string[] ClipNames =
@@ -60,6 +61,9 @@ namespace Cabo.Client.Editor
 
         public static string PathFor(string clipName)
         {
+            if (string.Equals(clipName, "cabo", StringComparison.OrdinalIgnoreCase)
+                && File.Exists(ToFullPath(CaboVoicePath)))
+                return CaboVoicePath;
             return $"{AudioFolder}/{clipName}.wav";
         }
 

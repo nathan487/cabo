@@ -202,7 +202,7 @@ MonoBehaviour:
   discardSfx: {fileID: 8300000, guid: bfc305f223f36d144ae4bb3d40c18465, type: 3}
   swapSfx: {fileID: 8300000, guid: e7a9b824102d25642833686839ffad7a, type: 3}
   skillSfx: {fileID: 8300000, guid: 2a1d60db65b5d0a43b67bb895bb4990d, type: 3}
-  caboSfx: {fileID: 8300000, guid: 2860b61f619a1194c8e9e1f78f2db0ab, type: 3}
+  caboSfx: {fileID: 8300000, guid: 2507579dd6ef2fb46bbb7969ae747f28, type: 3}
   eatSfx: {fileID: 8300000, guid: d17e6768d5adac341bc400744abdea7b, type: 3}
   penaltySfx: {fileID: 8300000, guid: 227ac6094f22e7041a8ad671bbccc5a7, type: 3}
   victorySfx: {fileID: 8300000, guid: 9c0eb4bbf109dfb43990ce443baacd02, type: 3}
