@@ -14,6 +14,8 @@ namespace Cabo.Client.Art
         public static readonly Vector2 HeadCenterPx = new Vector2(538f, 308f);
         public static readonly Vector2 LeftEyeCenterPx = new Vector2(456f, 431f);
         public static readonly Vector2 RightEyeCenterPx = new Vector2(603f, 431f);
+        public static readonly Vector2 LeftBrowCenterPx = new Vector2(456f, 386f);
+        public static readonly Vector2 RightBrowCenterPx = new Vector2(603f, 386f);
         public static readonly Vector2 MouthCenterPx = new Vector2(530f, 503f);
         public static readonly Vector2 BodyNeckPx = new Vector2(538f, 550f);
 
@@ -28,6 +30,7 @@ namespace Cabo.Client.Art
         public static readonly Vector2 BodyScale = new Vector2(1.30f, 1.18f);
         public static readonly Vector2 HeadScale = new Vector2(1.195f, 1.178f);
         public static readonly Vector2 EyeScale = new Vector2(1.12f, 1.18f);
+        public static readonly Vector2 BrowScale = new Vector2(0.90f, 0.90f);
         public static readonly Vector2 MouthScale = new Vector2(1.10f, 1.10f);
         public static readonly Vector2 LegScale = Vector2.one;
         public const float ForearmScale = 1.11f;

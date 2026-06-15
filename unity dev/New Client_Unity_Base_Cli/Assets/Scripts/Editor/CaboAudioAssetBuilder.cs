@@ -24,7 +24,8 @@ namespace Cabo.Client.Editor
             WriteDiscard();
             WriteSwap();
             WriteSkill();
-            WriteCabo();
+            if (!File.Exists(ToFullPath(PathFor("cabo"))))
+                WriteCabo();
             WriteEat();
             WritePenalty();
             WriteVictory();

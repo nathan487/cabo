@@ -51,6 +51,15 @@ namespace Cabo.Client.Art
 
         public RenderTexture Output => _output;
 
+        public Vector2 GetActorNameViewportPosition(int actorIndex)
+        {
+            if (_camera == null || actorIndex < 0 || actorIndex >= _actors.Count || _actors[actorIndex] == null)
+                return new Vector2(0.5f, 0.12f);
+
+            Vector3 point = _camera.WorldToViewportPoint(_actors[actorIndex].NameAnchorWorldPosition);
+            return new Vector2(Mathf.Clamp01(point.x), Mathf.Clamp01(point.y));
+        }
+
         public static SettlementStageRuntime Create(Transform parent)
         {
             var go = new GameObject("SettlementCharacterStage");

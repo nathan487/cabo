@@ -15,8 +15,7 @@ namespace Cabo.Client.Editor
         const string BackgroundFolder = "Assets/Art/UI/Backgrounds";
         const string TableStationFolder = "Assets/Art/UI/TableStations";
         const string SettlementPropsFolder = "Assets/Art/SettlementProps/Pilot";
-        const string PomeloPrefabPath = "Assets/Art/Characters/pomelo/PomeloSettlement.prefab";
-        const string PomeloPortraitPath = "Assets/Art/Characters/pomelo/Parts/head.png";
+        const string CharacterFolder = "Assets/Art/Characters";
 
         static readonly string[] FileNames =
         {
@@ -88,8 +87,29 @@ namespace Cabo.Client.Editor
                 {
                     characterId = "pomelo",
                     displayName = "\u67da\u67da",
-                    portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>(PomeloPortraitPath),
-                    settlementPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PomeloPrefabPath)
+                    portraitSprite = LoadCharacterPortrait("pomelo"),
+                    settlementPrefab = LoadCharacterPrefab("pomelo", "PomeloSettlement")
+                },
+                new CharacterDefinition
+                {
+                    characterId = "strawberry",
+                    displayName = "\u5c0f\u8393",
+                    portraitSprite = LoadCharacterPortrait("strawberry"),
+                    settlementPrefab = LoadCharacterPrefab("strawberry", "StrawberrySettlement")
+                },
+                new CharacterDefinition
+                {
+                    characterId = "oat",
+                    displayName = "\u963f\u9ea6",
+                    portraitSprite = LoadCharacterPortrait("oat"),
+                    settlementPrefab = LoadCharacterPrefab("oat", "OatSettlement")
+                },
+                new CharacterDefinition
+                {
+                    characterId = "bean",
+                    displayName = "\u8c46\u8c46",
+                    portraitSprite = LoadCharacterPortrait("bean"),
+                    settlementPrefab = LoadCharacterPrefab("bean", "BeanSettlement")
                 }
             };
             catalog.cardBack = AssetDatabase.LoadAssetAtPath<Sprite>(CardBackPath);
@@ -120,7 +140,7 @@ namespace Cabo.Client.Editor
             if (errors.Count > 0)
                 throw new InvalidOperationException("Cabo art catalog is incomplete:\n- " + string.Join("\n- ", errors));
 
-            Debug.Log("[Cabo] Art catalog rebuilt: 14 foods, themed table art, pomelo settlement actor, and 9 SFX clips.");
+            Debug.Log("[Cabo] Art catalog rebuilt: 14 foods, four settlement characters, themed table art, and 9 SFX clips.");
         }
 
         [MenuItem("Cabo/Validate Art Catalog")]
@@ -148,7 +168,10 @@ namespace Cabo.Client.Editor
             ConfigureFolder(BackgroundFolder, 2048);
             ConfigureFolder(TableStationFolder, 2048);
             ConfigureFolder(SettlementPropsFolder, 1024, 256f);
-            ConfigureFolder("Assets/Art/Characters/pomelo/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/pomelo/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/strawberry/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/oat/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/bean/Parts", 1024, 256f);
             AssetDatabase.Refresh();
         }
 
@@ -244,11 +267,38 @@ namespace Cabo.Client.Editor
             ValidateSfx(catalog.eatSfx, "Eat", errors);
             ValidateSfx(catalog.penaltySfx, "Penalty", errors);
             ValidateSfx(catalog.victorySfx, "Victory", errors);
-            if (catalog.characters == null || catalog.characters.Length == 0)
-                errors.Add("At least one character definition is required");
-            else if (catalog.characters[0].settlementPrefab == null)
-                errors.Add("Default character settlement prefab is missing");
+            if (catalog.characters == null || catalog.characters.Length != 4)
+                errors.Add("Character definitions must contain pomelo, strawberry, oat, and bean");
+            else
+            {
+                var characterIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < catalog.characters.Length; i++)
+                {
+                    var character = catalog.characters[i];
+                    if (character == null)
+                    {
+                        errors.Add($"Character definition slot {i} is null");
+                        continue;
+                    }
+                    if (!characterIds.Add(character.characterId))
+                        errors.Add($"Duplicate character id '{character.characterId}'");
+                    if (character.portraitSprite == null)
+                        errors.Add($"Character '{character.characterId}' portrait is missing");
+                    if (character.settlementPrefab == null)
+                        errors.Add($"Character '{character.characterId}' settlement prefab is missing");
+                }
+            }
             return errors;
+        }
+
+        static Sprite LoadCharacterPortrait(string characterId)
+        {
+            return AssetDatabase.LoadAssetAtPath<Sprite>($"{CharacterFolder}/{characterId}/portrait.png");
+        }
+
+        static GameObject LoadCharacterPrefab(string characterId, string prefabName)
+        {
+            return AssetDatabase.LoadAssetAtPath<GameObject>($"{CharacterFolder}/{characterId}/{prefabName}.prefab");
         }
 
         static AudioClip LoadSfx(string name)

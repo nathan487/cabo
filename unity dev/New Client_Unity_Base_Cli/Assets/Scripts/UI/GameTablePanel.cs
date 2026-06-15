@@ -4250,6 +4250,18 @@ namespace Cabo.Client.UI
                 HandleSettlementCue,
                 HandleSettlementPlaybackComplete);
 
+            var stageFrame = new VisualElement
+            {
+                name = "SettlementCharacterStageFrame",
+                pickingMode = PickingMode.Ignore
+            };
+            stageFrame.style.position = Position.Relative;
+            stageFrame.style.height = 230;
+            stageFrame.style.flexGrow = 1;
+            stageFrame.style.flexShrink = 1;
+            stageFrame.style.minWidth = 0;
+            stageFrame.style.marginRight = 8;
+
             var stageImage = new Image
             {
                 name = "SettlementCharacterStageImage",
@@ -4257,12 +4269,57 @@ namespace Cabo.Client.UI
                 scaleMode = ScaleMode.ScaleToFit,
                 pickingMode = PickingMode.Ignore
             };
-            stageImage.style.height = 230;
-            stageImage.style.flexGrow = 1;
-            stageImage.style.flexShrink = 1;
-            stageImage.style.minWidth = 0;
-            stageImage.style.marginRight = 8;
-            (parent ?? _actionPanel).Insert(0, stageImage);
+            stageImage.style.position = Position.Absolute;
+            stageImage.style.left = 0;
+            stageImage.style.right = 0;
+            stageImage.style.top = 0;
+            stageImage.style.bottom = 0;
+            stageFrame.Add(stageImage);
+
+            int actorCount = Mathf.Max(1, state.LastRoundResults.Count);
+            float nicknameWidth = actorCount >= 4 ? 64f : actorCount == 3 ? 80f : 108f;
+            float nicknameFontSize = actorCount >= 4 ? 10f : actorCount == 3 ? 11f : 12f;
+            for (int i = 0; i < state.LastRoundResults.Count; i++)
+            {
+                var result = state.LastRoundResults[i];
+                Vector2 viewport = _settlementStage.GetActorNameViewportPosition(i);
+                var nickname = new Label(string.IsNullOrWhiteSpace(result.Nickname) ? $"玩家 {i + 1}" : result.Nickname)
+                {
+                    name = $"SettlementNickname_{i + 1}",
+                    pickingMode = PickingMode.Ignore
+                };
+                nickname.style.position = Position.Absolute;
+                nickname.style.left = Length.Percent(viewport.x * 100f);
+                nickname.style.top = Length.Percent((1f - viewport.y) * 100f);
+                nickname.style.width = nicknameWidth;
+                nickname.style.height = 22;
+                nickname.style.marginLeft = -nicknameWidth * 0.5f;
+                nickname.style.marginTop = -11;
+                nickname.style.paddingLeft = 4;
+                nickname.style.paddingRight = 4;
+                nickname.style.unityTextAlign = TextAnchor.MiddleCenter;
+                nickname.style.unityFontStyleAndWeight = FontStyle.Bold;
+                nickname.style.fontSize = nicknameFontSize;
+                nickname.style.color = UITheme.TextPrimary;
+                nickname.style.backgroundColor = new Color(1f, 0.97f, 0.84f, 0.94f);
+                nickname.style.borderLeftWidth = 1;
+                nickname.style.borderRightWidth = 1;
+                nickname.style.borderTopWidth = 1;
+                nickname.style.borderBottomWidth = 1;
+                nickname.style.borderLeftColor = UITheme.PanelBorder;
+                nickname.style.borderRightColor = UITheme.PanelBorder;
+                nickname.style.borderTopColor = UITheme.PanelBorder;
+                nickname.style.borderBottomColor = UITheme.PanelBorder;
+                nickname.style.borderTopLeftRadius = 12;
+                nickname.style.borderTopRightRadius = 12;
+                nickname.style.borderBottomLeftRadius = 12;
+                nickname.style.borderBottomRightRadius = 12;
+                nickname.style.overflow = Overflow.Hidden;
+                nickname.style.textOverflow = TextOverflow.Ellipsis;
+                stageFrame.Add(nickname);
+            }
+
+            (parent ?? _actionPanel).Insert(0, stageFrame);
         }
 
         void HideSettlementStage()

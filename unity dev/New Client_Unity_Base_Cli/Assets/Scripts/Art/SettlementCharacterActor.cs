@@ -58,6 +58,10 @@ namespace Cabo.Client.Art
         bool _leftHandIsRaised;
         bool _rightHandIsRaised;
 
+        public Vector3 NameAnchorWorldPosition => headBone != null
+            ? headBone.TransformPoint(new Vector3(0f, 1.12f, 0f))
+            : transform.position + Vector3.up * 2f;
+
         void Awake()
         {
             if (bodyBone != null) _bodyStart = bodyBone.localPosition;
