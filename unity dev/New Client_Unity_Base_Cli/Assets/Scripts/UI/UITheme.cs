@@ -10,7 +10,16 @@ namespace Cabo.Client.UI
     /// </summary>
     public static class UITheme
     {
+        public const string PrimaryButtonClass = "cabo-button-primary";
+        public const string SecondaryButtonClass = "cabo-button-secondary";
+        public const string SoftButtonClass = "cabo-button-soft";
+        public const string DangerButtonClass = "cabo-button-danger";
+        public const string TitleTextClass = "cabo-title-text";
+
         static Texture2D _hostCrownIcon;
+        static Font _bodyFont;
+        static Font _displayFont;
+        static bool _fontsLoaded;
 
         public static readonly Color AppBackground = new(0.96f, 0.90f, 0.78f, 1f);
         public static readonly Color AppBackgroundSoft = new(0.99f, 0.94f, 0.83f, 1f);
@@ -28,15 +37,31 @@ namespace Cabo.Client.UI
         public static readonly Color TableSoftBorder = new(0.31f, 0.24f, 0.14f, 0.72f);
         public static readonly Color TableBorder = new(0.16f, 0.34f, 0.20f, 1f);
 
-        public static readonly Color TextPrimary = new(0.08f, 0.12f, 0.09f, 1f);
-        public static readonly Color TextSecondary = new(0.22f, 0.31f, 0.23f, 1f);
-        public static readonly Color TextMuted = new(0.36f, 0.42f, 0.34f, 1f);
-        public static readonly Color TextOnAccent = new(0.16f, 0.08f, 0.03f, 1f);
+        public static readonly Color TextPrimary = new(0.22f, 0.15f, 0.20f, 1f);
+        public static readonly Color TextSecondary = new(0.31f, 0.25f, 0.29f, 1f);
+        public static readonly Color TextMuted = new(0.43f, 0.37f, 0.40f, 1f);
+        public static readonly Color TextOnAccent = new(1.00f, 0.98f, 0.93f, 1f);
         public static readonly Color TextOnDanger = Color.white;
 
-        public static readonly Color AccentPeach = new(0.88f, 0.42f, 0.24f, 1f);
-        public static readonly Color AccentPeachHover = new(0.96f, 0.54f, 0.32f, 1f);
-        public static readonly Color AccentPeachBorder = new(0.47f, 0.18f, 0.09f, 1f);
+        public static readonly Color AccentPeach = new(0.85f, 0.37f, 0.48f, 1f);
+        public static readonly Color AccentPeachHover = new(0.92f, 0.48f, 0.57f, 1f);
+        public static readonly Color AccentPeachPressed = new(0.72f, 0.27f, 0.40f, 1f);
+        public static readonly Color AccentPeachBorder = new(0.48f, 0.18f, 0.29f, 1f);
+
+        public static readonly Color AccentMint = new(0.55f, 0.78f, 0.69f, 1f);
+        public static readonly Color AccentMintHover = new(0.64f, 0.85f, 0.76f, 1f);
+        public static readonly Color AccentMintPressed = new(0.44f, 0.69f, 0.59f, 1f);
+        public static readonly Color AccentMintBorder = new(0.22f, 0.42f, 0.35f, 1f);
+
+        public static readonly Color AccentButter = new(0.95f, 0.83f, 0.56f, 1f);
+        public static readonly Color AccentButterHover = new(1.00f, 0.90f, 0.67f, 1f);
+        public static readonly Color AccentButterPressed = new(0.86f, 0.73f, 0.43f, 1f);
+        public static readonly Color AccentButterBorder = new(0.54f, 0.40f, 0.20f, 1f);
+
+        public static readonly Color AccentDanger = new(0.78f, 0.32f, 0.32f, 1f);
+        public static readonly Color AccentDangerHover = new(0.87f, 0.41f, 0.38f, 1f);
+        public static readonly Color AccentDangerPressed = new(0.65f, 0.25f, 0.28f, 1f);
+        public static readonly Color AccentDangerBorder = new(0.43f, 0.16f, 0.20f, 1f);
 
         public static readonly Color ButtonDisabled = new(0.73f, 0.69f, 0.61f, 1f);
         public static readonly Color ButtonDisabledBorder = new(0.43f, 0.38f, 0.31f, 1f);
@@ -82,6 +107,7 @@ namespace Cabo.Client.UI
             if (root == null) return;
             root.style.backgroundColor = Color.clear;
             root.style.color = TextPrimary;
+            ApplyBodyFont(root);
         }
 
         public static void ApplyPanel(VisualElement element, Color? surface = null, Color? border = null, float radius = 8f, float borderWidth = 1f)
@@ -96,12 +122,153 @@ namespace Cabo.Client.UI
         public static void ApplyButton(Button button, bool enabled)
         {
             if (button == null) return;
-            button.style.color = enabled ? TextOnAccent : TextDisabled;
-            button.style.backgroundColor = enabled ? AccentPeach : ButtonDisabled;
-            SetRadius(button, 6f);
-            SetBorderWidth(button, 1f);
-            SetBorderColor(button, enabled ? AccentPeachBorder : ButtonDisabledBorder);
+            if (ContainsLatinLetter(button.text))
+                ApplyBodyFont(button);
+            else
+                ApplyDisplayFont(button);
+            ApplyButtonColors(button, enabled, false, false);
+            bool compact = button.resolvedStyle.height > 0f && button.resolvedStyle.height <= 36f;
+            SetRadius(button, compact ? 9f : 14f);
+            button.style.borderTopWidth = 2f;
+            button.style.borderRightWidth = 2f;
+            button.style.borderLeftWidth = 2f;
+            button.style.borderBottomWidth = compact ? 2f : 4f;
+            if (!compact)
+            {
+                button.style.paddingTop = 8f;
+                button.style.paddingBottom = 9f;
+                button.style.paddingLeft = 16f;
+                button.style.paddingRight = 16f;
+            }
             button.style.unityTextAlign = TextAnchor.MiddleCenter;
+
+            const string boundClass = "cabo-themed-button-bound";
+            if (button.ClassListContains(boundClass))
+                return;
+
+            button.AddToClassList(boundClass);
+            button.RegisterCallback<PointerEnterEvent>(_ => ApplyButtonColors(button, button.enabledSelf, true, false));
+            button.RegisterCallback<PointerLeaveEvent>(_ => ApplyButtonColors(button, button.enabledSelf, false, false));
+            button.RegisterCallback<PointerDownEvent>(_ => ApplyButtonColors(button, button.enabledSelf, false, true));
+            button.RegisterCallback<PointerUpEvent>(_ => ApplyButtonColors(button, button.enabledSelf, true, false));
+        }
+
+        public static void SetButtonRole(Button button, string roleClass)
+        {
+            if (button == null) return;
+            button.RemoveFromClassList(PrimaryButtonClass);
+            button.RemoveFromClassList(SecondaryButtonClass);
+            button.RemoveFromClassList(SoftButtonClass);
+            button.RemoveFromClassList(DangerButtonClass);
+            if (!string.IsNullOrEmpty(roleClass))
+                button.AddToClassList(roleClass);
+        }
+
+        public static void ApplyBodyFont(VisualElement element)
+        {
+            if (element == null) return;
+            EnsureFontsLoaded();
+            if (_bodyFont != null)
+                element.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(_bodyFont));
+        }
+
+        public static void ApplyDisplayFont(VisualElement element)
+        {
+            if (element == null) return;
+            EnsureFontsLoaded();
+            if (_displayFont != null)
+                element.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(_displayFont));
+        }
+
+        public static void ApplyTitle(Label label)
+        {
+            if (label == null) return;
+            label.AddToClassList(TitleTextClass);
+            if (ContainsLatinLetter(label.text))
+            {
+                ApplyBodyFont(label);
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            }
+            else
+            {
+                ApplyDisplayFont(label);
+                label.style.unityFontStyleAndWeight = FontStyle.Normal;
+            }
+        }
+
+        static void ApplyButtonColors(Button button, bool enabled, bool hovered, bool pressed)
+        {
+            if (!enabled)
+            {
+                button.style.color = TextDisabled;
+                button.style.backgroundColor = ButtonDisabled;
+                SetBorderColor(button, ButtonDisabledBorder);
+                return;
+            }
+
+            Color normal;
+            Color hover;
+            Color down;
+            Color border;
+            Color text;
+            if (button.ClassListContains(DangerButtonClass))
+            {
+                normal = AccentDanger;
+                hover = AccentDangerHover;
+                down = AccentDangerPressed;
+                border = AccentDangerBorder;
+                text = TextOnDanger;
+            }
+            else if (button.ClassListContains(SecondaryButtonClass))
+            {
+                normal = AccentMint;
+                hover = AccentMintHover;
+                down = AccentMintPressed;
+                border = AccentMintBorder;
+                text = TextPrimary;
+            }
+            else if (button.ClassListContains(SoftButtonClass))
+            {
+                normal = AccentButter;
+                hover = AccentButterHover;
+                down = AccentButterPressed;
+                border = AccentButterBorder;
+                text = TextPrimary;
+            }
+            else
+            {
+                normal = AccentPeach;
+                hover = AccentPeachHover;
+                down = AccentPeachPressed;
+                border = AccentPeachBorder;
+                text = TextOnAccent;
+            }
+
+            button.style.color = text;
+            button.style.backgroundColor = pressed ? down : hovered ? hover : normal;
+            SetBorderColor(button, border);
+        }
+
+        static void EnsureFontsLoaded()
+        {
+            if (_fontsLoaded) return;
+            _fontsLoaded = true;
+            _bodyFont = Resources.Load<Font>("Fonts/Theme/NotoSansSC-Variable")
+                ?? Resources.Load<Font>("Fonts/CaboChinese");
+            _displayFont = Resources.Load<Font>("Fonts/Theme/ZCOOLKuaiLe-Regular")
+                ?? _bodyFont;
+        }
+
+        static bool ContainsLatinLetter(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'))
+                    return true;
+            }
+            return false;
         }
 
         public static void SetBorderColor(VisualElement element, Color color)

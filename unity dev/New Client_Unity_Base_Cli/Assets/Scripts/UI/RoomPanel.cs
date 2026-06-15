@@ -46,7 +46,8 @@ namespace Cabo.Client.UI
             _homeScroll.Add(_container);
 
             _title = new Label("\u7CD6\u7CD6 CABO");
-            _title.style.fontSize = 28;
+            _title.style.fontSize = 34;
+            _title.style.letterSpacing = 1.5f;
             _title.style.unityFontStyleAndWeight = FontStyle.Bold;
             _title.style.unityTextAlign = TextAnchor.MiddleCenter;
             _title.style.color = UITheme.TextPrimary;
@@ -67,6 +68,7 @@ namespace Cabo.Client.UI
                 _status.text = $"已复制房间码：{roomCode}";
             });
             _btnCopyRoomCode.text = "复制房间码";
+            UITheme.SetButtonRole(_btnCopyRoomCode, UITheme.SoftButtonClass);
             _btnCopyRoomCode.style.alignSelf = Align.Center;
             _btnCopyRoomCode.style.marginTop = 8;
             _btnCopyRoomCode.style.fontSize = 14;
@@ -99,6 +101,7 @@ namespace Cabo.Client.UI
                 _flow.ConnectToServerAddress(_serverAddressInput.value);
             });
             _btnConnect.text = "连接";
+            UITheme.SetButtonRole(_btnConnect, UITheme.SecondaryButtonClass);
             _btnConnect.style.fontSize = 16;
             _btnConnect.style.height = 44;
             _btnConnect.style.minWidth = 132;
@@ -220,6 +223,7 @@ namespace Cabo.Client.UI
                 _flow.CreateRoom(nickname, PlayerProfileStore.SelectedCharacterId);
             });
             _btnCreate.text = "创建房间";
+            UITheme.SetButtonRole(_btnCreate, UITheme.PrimaryButtonClass);
             _btnCreate.style.marginRight = 10;
             _btnCreate.style.fontSize = 18;
             _homeButtonRow.Add(_btnCreate);
@@ -230,12 +234,14 @@ namespace Cabo.Client.UI
                 Render();
             });
             _btnShowJoin.text = "加入房间";
+            UITheme.SetButtonRole(_btnShowJoin, UITheme.SecondaryButtonClass);
             _btnShowJoin.style.marginRight = 10;
             _btnShowJoin.style.fontSize = 18;
             _homeButtonRow.Add(_btnShowJoin);
 
             _btnExitGame = new Button(() => _flow.ExitGame());
             _btnExitGame.text = "退出游戏";
+            UITheme.SetButtonRole(_btnExitGame, UITheme.DangerButtonClass);
             _btnExitGame.style.fontSize = 18;
             _homeButtonRow.Add(_btnExitGame);
 
@@ -273,6 +279,7 @@ namespace Cabo.Client.UI
                 _flow.JoinRoom(code, nickname, PlayerProfileStore.SelectedCharacterId);
             });
             _btnConfirmJoin.text = "确认加入";
+            UITheme.SetButtonRole(_btnConfirmJoin, UITheme.PrimaryButtonClass);
             _btnConfirmJoin.style.fontSize = 16;
             _btnConfirmJoin.style.height = 44;
             _joinFormRow.Add(_btnConfirmJoin);
@@ -288,12 +295,14 @@ namespace Cabo.Client.UI
 
             _btnReady = new Button(() => { _flow.SendReady(); _status.text = "已发送准备。"; });
             _btnReady.text = "准备";
+            UITheme.SetButtonRole(_btnReady, UITheme.SecondaryButtonClass);
             _btnReady.style.marginRight = 10;
             _btnReady.style.fontSize = 18;
             _roomButtonRow.Add(_btnReady);
 
             _btnStart = new Button(() => { _flow.SendStartGame(); _status.text = "正在开始游戏..."; });
             _btnStart.text = "开始游戏";
+            UITheme.SetButtonRole(_btnStart, UITheme.PrimaryButtonClass);
             _btnStart.style.marginRight = 10;
             _btnStart.style.fontSize = 18;
             _roomButtonRow.Add(_btnStart);
@@ -304,6 +313,7 @@ namespace Cabo.Client.UI
                 _flow.LeaveRoomToHome();
             });
             _btnLeaveRoom.text = "退出房间";
+            UITheme.SetButtonRole(_btnLeaveRoom, UITheme.DangerButtonClass);
             _btnLeaveRoom.style.fontSize = 18;
             _roomButtonRow.Add(_btnLeaveRoom);
 

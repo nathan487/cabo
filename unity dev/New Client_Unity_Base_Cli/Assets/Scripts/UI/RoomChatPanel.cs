@@ -138,6 +138,7 @@ namespace Cabo.Client.UI
             _inputRow.Add(_input);
 
             _emojiButton = new Button(ToggleStickerPopup) { name = "RoomChatEmojiButton", text = _compact ? "E" : "Emoji" };
+            UITheme.SetButtonRole(_emojiButton, UITheme.SoftButtonClass);
             _emojiButton.style.minWidth = _compact ? 32 : 68;
             _emojiButton.style.width = _compact ? 32 : 68;
             _emojiButton.style.maxWidth = _compact ? 32 : 68;
@@ -150,6 +151,7 @@ namespace Cabo.Client.UI
             _inputRow.Add(_emojiButton);
 
             _sendButton = new Button(SendText) { name = "RoomChatSendButton", text = _compact ? ">" : "Send" };
+            UITheme.SetButtonRole(_sendButton, UITheme.SecondaryButtonClass);
             _sendButton.style.minWidth = _compact ? 48 : 72;
             _sendButton.style.width = _compact ? 48 : 72;
             _sendButton.style.maxWidth = _compact ? 48 : 72;

@@ -3,15 +3,15 @@
     --cabo-bg-soft: rgb(252, 240, 212);
     --cabo-panel: rgb(255, 247, 222);
     --cabo-panel-alt: rgb(232, 212, 171);
-    --cabo-panel-border: rgb(120, 89, 51);
+    --cabo-panel-border: rgb(99, 62, 75);
     --cabo-table: rgb(158, 199, 145);
     --cabo-table-border: rgb(41, 87, 51);
-    --cabo-text-primary: rgb(20, 31, 23);
-    --cabo-text-secondary: rgb(56, 79, 59);
-    --cabo-text-muted: rgb(92, 107, 87);
-    --cabo-accent-peach: rgb(224, 107, 61);
-    --cabo-accent-peach-hover: rgb(245, 138, 82);
-    --cabo-accent-peach-border: rgb(120, 46, 23);
+    --cabo-text-primary: rgb(56, 38, 51);
+    --cabo-text-secondary: rgb(79, 64, 74);
+    --cabo-text-muted: rgb(110, 94, 102);
+    --cabo-accent-peach: rgb(217, 94, 122);
+    --cabo-accent-peach-hover: rgb(235, 122, 146);
+    --cabo-accent-peach-border: rgb(122, 46, 74);
     --cabo-button-disabled: rgb(186, 176, 156);
     --cabo-button-disabled-border: rgb(110, 97, 79);
     --cabo-text-disabled: rgb(61, 56, 46);
@@ -25,18 +25,39 @@ Label {
 }
 
 Button {
-    color: rgb(61, 38, 23);
+    color: rgb(255, 250, 238);
     background-color: var(--cabo-accent-peach);
-    border-radius: 6px;
-    border-width: 1px;
+    border-radius: 14px;
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 4px;
+    border-left-width: 2px;
     border-color: var(--cabo-accent-peach-border);
     padding-top: 8px;
     padding-bottom: 8px;
-    padding-left: 14px;
-    padding-right: 14px;
+    padding-left: 16px;
+    padding-right: 16px;
     min-width: 104px;
     white-space: normal;
     -unity-text-align: middle-center;
+}
+
+Button.cabo-button-secondary {
+    color: var(--cabo-text-primary);
+    background-color: rgb(140, 199, 176);
+    border-color: rgb(56, 107, 89);
+}
+
+Button.cabo-button-soft {
+    color: var(--cabo-text-primary);
+    background-color: rgb(243, 213, 143);
+    border-color: rgb(138, 102, 51);
+}
+
+Button.cabo-button-danger {
+    color: rgb(255, 255, 255);
+    background-color: rgb(199, 81, 81);
+    border-color: rgb(110, 41, 51);
 }
 
 Button:hover {
@@ -57,9 +78,11 @@ TextField .unity-base-text-field__input,
 TextField .unity-text-field__input {
     color: var(--cabo-text-primary);
     background-color: var(--cabo-input-bg);
-    border-radius: 6px;
-    border-width: 1px;
+    border-radius: 12px;
+    border-width: 2px;
     border-color: var(--cabo-input-border);
+    padding-left: 12px;
+    padding-right: 12px;
 }
 
 TextField:focus .unity-base-text-field__input,

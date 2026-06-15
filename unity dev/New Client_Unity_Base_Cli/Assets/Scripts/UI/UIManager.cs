@@ -172,6 +172,10 @@ namespace Cabo.Client.UI
 
             Root.Query<Label>().ForEach(label =>
             {
+                if (label.ClassListContains(UITheme.TitleTextClass) || label.resolvedStyle.fontSize >= 20f)
+                    UITheme.ApplyTitle(label);
+                else
+                    UITheme.ApplyBodyFont(label);
                 if (IsOnBrightSurface(label))
                     return;
                 label.style.color = UITheme.TextPrimary;
@@ -184,6 +188,7 @@ namespace Cabo.Client.UI
 
             Root.Query<TextField>().ForEach(field =>
             {
+                UITheme.ApplyBodyFont(field);
                 EnsureImeSupport(field);
             });
         }

@@ -511,6 +511,7 @@ namespace Cabo.Client.UI
             _rulesButton.style.fontSize = 16;
             _rulesButton.style.unityFontStyleAndWeight = FontStyle.Bold;
             _rulesButton.style.unityTextAlign = TextAnchor.MiddleCenter;
+            UITheme.SetButtonRole(_rulesButton, UITheme.SoftButtonClass);
             StyleTableButton(_rulesButton, true);
             _playArea.Add(_rulesButton);
             _rulesButton.BringToFront();
@@ -534,6 +535,7 @@ namespace Cabo.Client.UI
             _endGameButton.style.unityFontStyleAndWeight = FontStyle.Bold;
             _endGameButton.style.unityTextAlign = TextAnchor.MiddleCenter;
             _endGameButton.style.display = DisplayStyle.None;
+            UITheme.SetButtonRole(_endGameButton, UITheme.DangerButtonClass);
             StyleTableButton(_endGameButton, true);
             root.Add(_endGameButton);
             _endGameButton.BringToFront();
@@ -574,6 +576,7 @@ namespace Cabo.Client.UI
             close.style.paddingTop = 0;
             close.style.paddingBottom = 0;
             close.style.unityFontStyleAndWeight = FontStyle.Bold;
+            UITheme.SetButtonRole(close, UITheme.DangerButtonClass);
             StyleTableButton(close, true);
             overlay.Add(close);
 
@@ -804,6 +807,8 @@ namespace Cabo.Client.UI
             _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = $"第 {state.RoundNumber} 轮 · 结算小剧场";
             _turnLabel.text = "角色吃下最终餐盘食物，糖能逐项累加";
+            StyleOverlayHeading(_roundLabel, true);
+            StyleOverlayHeading(_turnLabel, false);
             HideSeatsForOverlay();
             RenderPiles(state);
             RenderSocialPanel(state);
@@ -901,6 +906,8 @@ namespace Cabo.Client.UI
             _turnLabel.style.display = DisplayStyle.Flex;
             _roundLabel.text = "糖糖餐桌岛 · 宴会落幕";
             _turnLabel.text = "累计糖能最低的玩家赢得健康餐桌冠军";
+            StyleOverlayHeading(_roundLabel, true);
+            StyleOverlayHeading(_turnLabel, false);
             HideSeatsForOverlay();
             _drawnCardSlot.Clear();
             _drawPile.Clear();
@@ -5441,6 +5448,21 @@ namespace Cabo.Client.UI
             label.style.unityFontStyleAndWeight = FontStyle.Bold;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
             label.style.marginBottom = 8;
+            UITheme.ApplyTitle(label);
+        }
+
+        static void StyleOverlayHeading(Label label, bool prominent)
+        {
+            label.style.alignSelf = Align.Center;
+            label.style.color = new Color(1f, 0.97f, 0.86f, 1f);
+            label.style.backgroundColor = new Color(0.16f, 0.08f, 0.20f, prominent ? 0.86f : 0.72f);
+            label.style.paddingLeft = prominent ? 18f : 12f;
+            label.style.paddingRight = prominent ? 18f : 12f;
+            label.style.paddingTop = prominent ? 5f : 3f;
+            label.style.paddingBottom = prominent ? 6f : 4f;
+            UITheme.SetRadius(label, prominent ? 14f : 10f);
+            if (prominent)
+                UITheme.ApplyTitle(label);
         }
 
         sealed class SettlementScoreRowView
