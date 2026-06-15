@@ -232,7 +232,7 @@ namespace Cabo.Client
                 int my = MyPlayerIndex;
                 if (my < 0 || Players.Count < 4) return new();
                 int n = Players.Count;
-                return new() { (my + 2) % n, (my + 3) % n, (my + 1) % n };
+                return new() { (my + 2) % n, (my + 1) % n, (my + 3) % n };
             }
         }
 
@@ -329,7 +329,7 @@ namespace Cabo.Client
             if (room == null) return;
             RoomId = room.RoomId; RoomCode = room.RoomCode;
 
-            if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal)
+            if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal || Phase == GamePhase.GameOver)
             {
                 foreach (var p in room.Players)
                     UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore, false);
@@ -794,7 +794,13 @@ namespace Cabo.Client
 
             bool exchanged = action.ExchangeResult?.Success ?? false;
             if (exchanged && (action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard))
-                ClearPeekedCardsForPlayer(action.SourcePlayerId);
+            {
+                var changedSlots = action.ExchangeResult.SelectedSlotIndices;
+                if (changedSlots != null && changedSlots.Count > 0)
+                    RemapPeekedCardsAfterExchange(action.SourcePlayerId, changedSlots);
+                else if (action.SourceSlot >= 0)
+                    _peekedCards.Remove((action.SourcePlayerId, action.SourceSlot));
+            }
 
             if (action.ActionType == ActionType.UseSkill && action.SkillUsed == SkillType.Swap && action.SwapOccurred)
             {
@@ -817,9 +823,42 @@ namespace Cabo.Client
                     _myRevealedSlots.Add(card.SlotIndex);
         }
 
-        void ClearPeekedCardsForPlayer(long playerId)
+        void RemapPeekedCardsAfterExchange(long playerId, IEnumerable<int> changedSlots)
         {
+            var removedSlots = new SortedSet<int>();
+            foreach (int slot in changedSlots)
+                if (slot >= 0)
+                    removedSlots.Add(slot);
+
+            if (removedSlots.Count == 0)
+                return;
+            if (removedSlots.Count == 1)
+            {
+                foreach (int slot in removedSlots)
+                    _peekedCards.Remove((playerId, slot));
+                return;
+            }
+
+            var knownSlots = new List<int>();
+            foreach (var card in _peekedCards)
+                if (card.PlayerId == playerId)
+                    knownSlots.Add(card.SlotIndex);
+
             _peekedCards.RemoveWhere(card => card.PlayerId == playerId);
+            foreach (int oldSlot in knownSlots)
+            {
+                if (removedSlots.Contains(oldSlot))
+                    continue;
+
+                int shift = 0;
+                foreach (int removedSlot in removedSlots)
+                {
+                    if (removedSlot >= oldSlot)
+                        break;
+                    shift++;
+                }
+                _peekedCards.Add((playerId, oldSlot - shift));
+            }
         }
 
         void ClearLocalCardKnowledge()
@@ -910,11 +949,17 @@ namespace Cabo.Client
             ResetEarlyEndState();
             FinalRankings.Clear();
             foreach (var r in go.Rankings)
+            {
                 FinalRankings.Add(new FinalRank
                 {
                     Rank = r.Rank, PlayerId = r.PlayerId, Nickname = r.Nickname,
                     FinalScore = r.FinalScore, IsWinner = r.IsWinner
                 });
+
+                var player = Players.Find(p => p.PlayerId == r.PlayerId);
+                if (player != null)
+                    player.TotalScore = r.FinalScore;
+            }
 
             GameOverPending = RoundJustRevealed && LastRoundResults.Count > 0;
             Phase = GameOverPending ? GamePhase.RoundReveal : GamePhase.GameOver;
@@ -1008,6 +1053,7 @@ namespace Cabo.Client
             foreach (var player in Players)
             {
                 player.IsReady = false;
+                player.TotalScore = 0;
                 player.CardCount = 0;
                 player.PublicCards.Clear();
             }
