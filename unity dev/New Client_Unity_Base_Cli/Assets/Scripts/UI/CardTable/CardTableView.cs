@@ -1284,6 +1284,9 @@ namespace Cabo.Client.UI.CardTable
                 sourceCard.SetSize(sharedSize);
                 targetCard.SetSize(sharedSize);
             }
+
+            FlipForSwapDestination(sourceCard, action.TargetPlayerId, action.TargetSlot);
+            FlipForSwapDestination(targetCard, action.SourcePlayerId, action.SourceSlot);
             sourceCard.MoveTo(targetSlot.AnchoredPosition, SwapDuration);
             yield return targetCard.MoveTo(sourceSlot.AnchoredPosition, SwapDuration);
 
@@ -1294,6 +1297,24 @@ namespace Cabo.Client.UI.CardTable
             _animatingPlayers.Remove(action.SourcePlayerId);
             _animatingPlayers.Remove(action.TargetPlayerId);
             Reconcile();
+        }
+
+        void FlipForSwapDestination(CardView card, long destinationPlayerId, int destinationSlot)
+        {
+            if (card == null || _lastState == null)
+                return;
+
+            bool faceUp = _lastState.TryGetVisibleCardValue(destinationPlayerId, destinationSlot, out int value);
+            float duration = SwapDuration * 0.72f;
+            if (faceUp)
+            {
+                if (!card.FaceUp || card.Value != value)
+                    card.FlipToFront(value, duration);
+            }
+            else if (card.FaceUp)
+            {
+                card.FlipToBack(duration);
+            }
         }
 
         IEnumerator PlayPeekSelf(CardTableActionSnapshot action)
@@ -1428,7 +1449,7 @@ namespace Cabo.Client.UI.CardTable
             // 被看者视角和其他对手视角：如果原本是牌面，翻到牌背
             else if (wasOriginallyFaceUp && card.FaceUp)
             {
-                yield return FlipCardToBack(card, 0.18f);
+                yield return card.FlipToBack(0.18f);
             }
             else
             {
@@ -1440,7 +1461,7 @@ namespace Cabo.Client.UI.CardTable
             // 发动者视角：翻回牌背再移动回去
             if (sourcePlayerId == _myPlayerId && card.FaceUp)
             {
-                yield return FlipCardToBack(card, 0.18f);
+                yield return card.FlipToBack(0.18f);
             }
 
             yield return card.MoveTo(start, MoveDuration);
@@ -1463,33 +1484,6 @@ namespace Cabo.Client.UI.CardTable
             }
 
             return start + new Vector2(0f, Mathf.Max(42f, size.y * 0.55f));
-        }
-
-        IEnumerator FlipCardToBack(CardView card, float duration)
-        {
-            if (card == null)
-                yield break;
-
-            float half = duration * 0.5f;
-            yield return ScaleCardX(card, 1f, 0.05f, half);
-            card.ShowBack();
-            yield return ScaleCardX(card, 0.05f, 1f, half);
-        }
-
-        IEnumerator ScaleCardX(CardView card, float from, float to, float duration)
-        {
-            if (card == null)
-                yield break;
-
-            float elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                card.RectTransform.localScale = new Vector3(Mathf.Lerp(from, to, t), 1f, 1f);
-                yield return null;
-            }
-            card.RectTransform.localScale = new Vector3(to, 1f, 1f);
         }
 
         Vector2 GetInspectionDisplaySize(Vector2 fallback)

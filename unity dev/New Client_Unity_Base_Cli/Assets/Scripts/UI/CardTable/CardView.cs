@@ -337,6 +337,14 @@ namespace Cabo.Client.UI.CardTable
             return _flipRoutine;
         }
 
+        public Coroutine FlipToBack(float duration)
+        {
+            if (_flipRoutine != null)
+                StopCoroutine(_flipRoutine);
+            _flipRoutine = StartCoroutine(FlipBackRoutine(Mathf.Max(0.05f, duration)));
+            return _flipRoutine;
+        }
+
         public void SetVisible(bool visible)
         {
             gameObject.SetActive(visible);
@@ -364,6 +372,15 @@ namespace Cabo.Client.UI.CardTable
             float half = duration * 0.5f;
             yield return ScaleX(1f, 0.05f, half);
             ShowFront(value);
+            yield return ScaleX(0.05f, 1f, half);
+            _flipRoutine = null;
+        }
+
+        IEnumerator FlipBackRoutine(float duration)
+        {
+            float half = duration * 0.5f;
+            yield return ScaleX(1f, 0.05f, half);
+            ShowBack();
             yield return ScaleX(0.05f, 1f, half);
             _flipRoutine = null;
         }
