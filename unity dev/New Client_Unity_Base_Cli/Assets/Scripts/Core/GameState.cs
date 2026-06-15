@@ -80,6 +80,7 @@ namespace Cabo.Client
 
         string _requestedCharacterId = "pomelo";
         bool _hasRequestedCharacterId;
+        readonly Dictionary<long, string> _knownCharacterIds = new();
 
         // My hand
         public List<CardState> MyCards = new();
@@ -158,6 +159,8 @@ namespace Cabo.Client
         {
             _requestedCharacterId = NormalizeCharacterId(characterId);
             _hasRequestedCharacterId = true;
+            if (MyPlayerId > 0)
+                RememberCharacterId(MyPlayerId, _requestedCharacterId);
         }
         public bool IsMyTurn => CurrentPlayerId == MyPlayerId;
         public bool IsMyselfHost => Players.Exists(player => player.PlayerId == MyPlayerId && player.IsHost);
@@ -306,6 +309,8 @@ namespace Cabo.Client
             if (rsp.Error?.Code != 0) return;
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             RoomCode = rsp.RoomCode; Phase = GamePhase.WaitingRoom;
+            if (_hasRequestedCharacterId)
+                RememberCharacterId(MyPlayerId, _requestedCharacterId);
             Debug.Log($"[GameState] CreateRoom: {RoomCode} player={MyPlayerId}");
         }
 
@@ -314,6 +319,8 @@ namespace Cabo.Client
             if (rsp.Error?.Code != 0) return;
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             Phase = GamePhase.WaitingRoom;
+            if (_hasRequestedCharacterId)
+                RememberCharacterId(MyPlayerId, _requestedCharacterId);
             Debug.Log($"[GameState] JoinRoom: {RoomId} player={MyPlayerId}");
         }
 
@@ -336,11 +343,10 @@ namespace Cabo.Client
                 return;
             }
 
-            var knownCharacterIds = new Dictionary<long, string>();
             foreach (var player in Players)
             {
                 if (!string.IsNullOrWhiteSpace(player.CharacterId))
-                    knownCharacterIds[player.PlayerId] = player.CharacterId;
+                    RememberCharacterId(player.PlayerId, player.CharacterId);
             }
 
             Players.Clear();
@@ -348,13 +354,7 @@ namespace Cabo.Client
                 Players.Add(new PlayerInfo
                 {
                     PlayerId = p.PlayerId, Nickname = p.Nickname,
-                    CharacterId = p.PlayerId == MyPlayerId && _hasRequestedCharacterId
-                        ? _requestedCharacterId
-                        : !string.IsNullOrWhiteSpace(p.CharacterId)
-                        ? NormalizeCharacterId(p.CharacterId)
-                        : knownCharacterIds.TryGetValue(p.PlayerId, out var knownCharacterId)
-                            ? NormalizeCharacterId(knownCharacterId)
-                            : "pomelo",
+                    CharacterId = ResolveIncomingCharacterId(p.PlayerId, p.CharacterId),
                     SeatId = p.SeatId, IsReady = p.IsReady,
                     IsHost = p.IsHost, TotalScore = p.TotalScore
                 });
@@ -501,6 +501,7 @@ namespace Cabo.Client
                             PlayerId = oh.PlayerId,
                             Nickname = $"玩家 {Players.Count + 1}",
                             SeatId = Players.Count,
+                            CharacterId = ResolveIncomingCharacterId(oh.PlayerId, ""),
                             CardCount = oh.CardCount
                         };
                         ApplyVisibleCards(opponent, oh.VisibleCards);
@@ -914,14 +915,15 @@ namespace Cabo.Client
                     PlayerId = sc.PlayerId, HandTotal = sc.HandTotal, Penalty = sc.Penalty,
                     RoundScore = sc.RoundScore, CumulativeScore = sc.CumulativeScore,
                     IsSteadyCaller = sc.IsSteadyCaller, IsLowest = sc.IsLowest, IsKamikaze = sc.IsKamikaze,
-                    CharacterId = NormalizeCharacterId(sc.CharacterId)
+                    CharacterId = ResolveIncomingCharacterId(sc.PlayerId, sc.CharacterId)
                 };
                 var pl = Players.Find(p => p.PlayerId == sc.PlayerId);
                 if (pl != null)
                 {
                     rr.Nickname = pl.Nickname;
-                    if (string.IsNullOrWhiteSpace(sc.CharacterId))
-                        rr.CharacterId = NormalizeCharacterId(pl.CharacterId);
+                    rr.CharacterId = ResolveIncomingCharacterId(sc.PlayerId, string.IsNullOrWhiteSpace(sc.CharacterId)
+                        ? pl.CharacterId
+                        : sc.CharacterId);
                 }
                 foreach (var rh in rrn.RevealedHands)
                     if (rh.PlayerId == sc.PlayerId) { rr.CardValues.AddRange(rh.CardValues); break; }
@@ -1065,6 +1067,7 @@ namespace Cabo.Client
             ClearLocalCardKnowledge();
             _requestedCharacterId = "pomelo";
             _hasRequestedCharacterId = false;
+            _knownCharacterIds.Clear();
             Phase = GamePhase.Lobby;
             MyPlayerId = 0;
             RoomId = 0;
@@ -1124,10 +1127,7 @@ namespace Cabo.Client
             if (existing != null)
             {
                 existing.Nickname = nickname;
-                if (playerId == MyPlayerId && _hasRequestedCharacterId)
-                    existing.CharacterId = _requestedCharacterId;
-                else if (!string.IsNullOrWhiteSpace(characterId))
-                    existing.CharacterId = NormalizeCharacterId(characterId);
+                existing.CharacterId = ResolveIncomingCharacterId(playerId, characterId);
                 existing.SeatId = seatId;
                 existing.IsReady = isReady;
                 existing.IsHost = isHost;
@@ -1140,14 +1140,60 @@ namespace Cabo.Client
             {
                 PlayerId = playerId,
                 Nickname = nickname,
-                CharacterId = playerId == MyPlayerId && _hasRequestedCharacterId
-                    ? _requestedCharacterId
-                    : NormalizeCharacterId(characterId),
+                CharacterId = ResolveIncomingCharacterId(playerId, characterId),
                 SeatId = seatId,
                 IsReady = isReady,
                 IsHost = isHost,
                 TotalScore = totalScore
             });
+        }
+
+        string ResolveIncomingCharacterId(long playerId, string characterId)
+        {
+            if (playerId == MyPlayerId && _hasRequestedCharacterId)
+            {
+                RememberCharacterId(playerId, _requestedCharacterId);
+                return _requestedCharacterId;
+            }
+
+            var incoming = NormalizeCharacterIdOrEmpty(characterId);
+            if (!string.IsNullOrEmpty(incoming))
+            {
+                if (incoming == "pomelo"
+                    && _knownCharacterIds.TryGetValue(playerId, out var existingKnown)
+                    && existingKnown != "pomelo")
+                {
+                    return existingKnown;
+                }
+
+                RememberCharacterId(playerId, incoming);
+                return incoming;
+            }
+
+            if (_knownCharacterIds.TryGetValue(playerId, out var knownCharacterId))
+                return knownCharacterId;
+
+            return "pomelo";
+        }
+
+        void RememberCharacterId(long playerId, string characterId)
+        {
+            if (playerId <= 0)
+                return;
+
+            var normalized = NormalizeCharacterIdOrEmpty(characterId);
+            if (string.IsNullOrEmpty(normalized))
+                return;
+
+            _knownCharacterIds[playerId] = normalized;
+        }
+
+        static string NormalizeCharacterIdOrEmpty(string characterId)
+        {
+            if (string.IsNullOrWhiteSpace(characterId))
+                return "";
+
+            return NormalizeCharacterId(characterId);
         }
 
         static string NormalizeCharacterId(string characterId)
