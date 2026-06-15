@@ -662,6 +662,8 @@ namespace Cabo.Client.UI
 
         public void Tick()
         {
+            RefreshChatBubblePositions();
+
             if (HasLayoutChanged())
                 ScheduleLayoutRefresh();
 
@@ -675,6 +677,14 @@ namespace Cabo.Client.UI
             PlayFlyCard(_inspectionReturnStart, _inspectionReturnEnd, false, 0, _inspectionReturnColor, SkillMoveDuration);
 
             _temporaryHiddenCard = null;
+        }
+
+        void RefreshChatBubblePositions()
+        {
+            _topSeat?.RefreshChatBubblePosition();
+            _leftSeat?.RefreshChatBubblePosition();
+            _rightSeat?.RefreshChatBubblePosition();
+            _selfSeat?.RefreshChatBubblePosition();
         }
 
         public void RenderGame()
@@ -5490,17 +5500,24 @@ namespace Cabo.Client.UI
             readonly Label _score;
             readonly Label _tag;
             readonly VisualElement _avatarSlot;
+            readonly VisualElement _avatarImageHost;
             readonly VisualElement _chatBubble;
             readonly Label _chatBubbleLabel;
             readonly Image _tableCharacterImage;
+            readonly string _seatName;
+            readonly float _chatBubbleMaxWidth;
+            float _chatBubbleWidth = 66f;
             string _avatarCacheKey;
             Sprite _stationBackground;
             IVisualElementScheduledItem _bubbleDelayItem;
             IVisualElementScheduledItem _bubbleFadeItem;
+            IVisualElementScheduledItem _bubblePositionItem;
             int _bubbleVersion;
 
             public SeatView(string name, bool isSelf)
             {
+                _seatName = name;
+                _chatBubbleMaxWidth = name == "left" || name == "right" ? 132f : 210f;
                 Root = new VisualElement { name = $"Seat-{name}" };
                 Root.style.backgroundColor = UITheme.TableSeatGlass;
                 Root.style.borderTopLeftRadius = 16;
@@ -5563,7 +5580,13 @@ namespace Cabo.Client.UI
 
                 _avatarSlot = new VisualElement();
                 _avatarSlot.style.marginRight = 7;
+                _avatarSlot.style.position = Position.Relative;
+                _avatarSlot.style.overflow = Overflow.Visible;
                 header.Add(_avatarSlot);
+
+                _avatarImageHost = new VisualElement { name = $"AvatarImage-{name}" };
+                _avatarImageHost.style.flexShrink = 0;
+                _avatarSlot.Add(_avatarImageHost);
 
                 _tag = new Label();
                 _tag.style.fontSize = 10;
@@ -5603,7 +5626,8 @@ namespace Cabo.Client.UI
                 _chatBubble = new VisualElement { name = $"ChatBubble-{name}" };
                 _chatBubble.style.position = Position.Absolute;
                 _chatBubble.style.minWidth = 38;
-                _chatBubble.style.maxWidth = 210;
+                _chatBubble.style.minHeight = 42;
+                _chatBubble.style.maxWidth = _chatBubbleMaxWidth;
                 _chatBubble.style.flexGrow = 0;
                 _chatBubble.style.flexShrink = 1;
                 _chatBubble.style.paddingLeft = 12;
@@ -5627,16 +5651,18 @@ namespace Cabo.Client.UI
                 _chatBubble.style.display = DisplayStyle.None;
                 _chatBubble.pickingMode = PickingMode.Ignore;
 
-                _chatBubbleLabel = new Label();
-                _chatBubbleLabel.style.fontSize = 13;
+                _chatBubbleLabel = new Label { name = $"ChatBubbleText-{name}" };
+                _chatBubbleLabel.style.position = Position.Absolute;
+                _chatBubbleLabel.style.fontSize = 15;
+                _chatBubbleLabel.style.minHeight = 18;
                 _chatBubbleLabel.style.whiteSpace = WhiteSpace.Normal;
                 _chatBubbleLabel.style.color = UITheme.TextPrimary;
                 _chatBubbleLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                _chatBubbleLabel.style.display = DisplayStyle.None;
                 _chatBubbleLabel.pickingMode = PickingMode.Ignore;
-                _chatBubble.Add(_chatBubbleLabel);
                 ConfigureBubbleTail(_chatBubble, name, bubbleBorder);
-                ConfigureBubblePosition(_chatBubble, name);
                 Root.Add(_chatBubble);
+                Root.Add(_chatBubbleLabel);
             }
 
             public void SetStationBackground(Sprite stationArt)
@@ -5677,9 +5703,25 @@ namespace Cabo.Client.UI
                 _bubbleDelayItem?.Pause();
                 _bubbleFadeItem?.Pause();
                 _chatBubbleLabel.text = text;
+                var chatFont = Resources.Load<Font>("Fonts/CaboChinese");
+                if (chatFont != null)
+                    _chatBubbleLabel.style.unityFontDefinition = new StyleFontDefinition(FontDefinition.FromFont(chatFont));
+                else
+                    UITheme.ApplyBodyFont(_chatBubbleLabel);
+                _chatBubbleLabel.style.color = UITheme.TextPrimary;
+                int characterCount = StringInfo.ParseCombiningCharacters(text).Length;
+                _chatBubbleWidth = Mathf.Clamp(42f + characterCount * 16f, 66f, _chatBubbleMaxWidth);
+                _chatBubble.style.width = _chatBubbleWidth;
                 _chatBubble.style.opacity = 1f;
                 _chatBubble.style.display = DisplayStyle.Flex;
+                _chatBubbleLabel.style.opacity = 1f;
+                _chatBubbleLabel.style.display = DisplayStyle.Flex;
+                ConfigureBubblePosition();
+                _bubblePositionItem?.Pause();
+                _bubblePositionItem = _chatBubble.schedule.Execute(ConfigureBubblePosition);
+                _bubblePositionItem.ExecuteLater(1);
                 _chatBubble.BringToFront();
+                _chatBubbleLabel.BringToFront();
                 _bubbleDelayItem = _chatBubble.schedule.Execute(() => BeginBubbleFade(version));
                 _bubbleDelayItem.ExecuteLater(3150);
             }
@@ -5700,12 +5742,15 @@ namespace Cabo.Client.UI
 
                     step++;
                     _chatBubble.style.opacity = Mathf.Clamp01(1f - step / 7f);
+                    _chatBubbleLabel.style.opacity = _chatBubble.style.opacity.value;
                     if (step < 7)
                         return;
 
                     _bubbleFadeItem?.Pause();
                     _chatBubble.style.display = DisplayStyle.None;
+                    _chatBubbleLabel.style.display = DisplayStyle.None;
                     _chatBubble.style.opacity = 1f;
+                    _chatBubbleLabel.style.opacity = 1f;
                 });
                 _bubbleFadeItem.Every(50);
             }
@@ -5715,39 +5760,70 @@ namespace Cabo.Client.UI
                 _bubbleVersion++;
                 _bubbleDelayItem?.Pause();
                 _bubbleFadeItem?.Pause();
+                _bubblePositionItem?.Pause();
                 _chatBubble.style.display = DisplayStyle.None;
+                _chatBubbleLabel.style.display = DisplayStyle.None;
                 _chatBubble.style.opacity = 1f;
+                _chatBubbleLabel.style.opacity = 1f;
             }
 
-            static void ConfigureBubblePosition(VisualElement bubble, string seatName)
+            public void RefreshChatBubblePosition()
             {
-                if (seatName == "self")
+                if (_chatBubble == null || _chatBubble.resolvedStyle.display == DisplayStyle.None)
+                    return;
+                ConfigureBubblePosition();
+            }
+
+            void ConfigureBubblePosition()
+            {
+                Rect avatarBounds = _avatarSlot.worldBound;
+                Rect rootBounds = Root.worldBound;
+                if (avatarBounds.width <= 0f || rootBounds.width <= 0f)
+                    return;
+
+                float avatarCenterX = avatarBounds.center.x - rootBounds.xMin;
+                float avatarCenterY = avatarBounds.center.y - rootBounds.yMin;
+                const float bubbleHeight = 42f;
+                float left;
+                float top;
+                if (_seatName == "self")
                 {
-                    bubble.style.left = 44;
-                    bubble.style.top = -54;
+                    left = avatarCenterX - 18f;
+                    top = avatarBounds.yMin - rootBounds.yMin - bubbleHeight - 6f;
                 }
-                else if (seatName == "top")
+                else if (_seatName == "top")
                 {
-                    bubble.style.left = 44;
-                    bubble.style.top = 42;
+                    left = avatarBounds.xMax - rootBounds.xMin + 6f;
+                    top = avatarCenterY - 21f;
                 }
-                else if (seatName == "left")
+                else if (_seatName == "left")
                 {
-                    bubble.style.left = 42;
-                    bubble.style.top = 8;
-                    bubble.style.maxWidth = 160;
+                    left = avatarBounds.xMax - rootBounds.xMin + 6f;
+                    top = avatarCenterY - 21f;
                 }
                 else
                 {
-                    bubble.style.right = 42;
-                    bubble.style.top = 8;
-                    bubble.style.maxWidth = 160;
+                    left = avatarBounds.xMin - rootBounds.xMin - _chatBubbleWidth - 6f;
+                    top = avatarCenterY - 21f;
                 }
+                SetBubbleRect(left, top, bubbleHeight);
+            }
+
+            void SetBubbleRect(float left, float top, float bubbleHeight)
+            {
+                _chatBubble.style.left = left;
+                _chatBubble.style.top = top;
+                _chatBubble.style.width = _chatBubbleWidth;
+                _chatBubble.style.minHeight = bubbleHeight;
+                _chatBubbleLabel.style.left = left + 12f;
+                _chatBubbleLabel.style.top = top + 8f;
+                _chatBubbleLabel.style.width = Mathf.Max(36f, _chatBubbleWidth - 24f);
+                _chatBubbleLabel.style.height = Mathf.Max(18f, bubbleHeight - 16f);
             }
 
             static void ConfigureBubbleTail(VisualElement bubble, string seatName, Color borderColor)
             {
-                string direction = seatName == "self" ? "down" : seatName == "top" ? "up" : seatName == "left" ? "left" : "right";
+                string direction = seatName == "self" ? "down" : seatName == "top" ? "left" : seatName == "left" ? "left" : "right";
                 var outer = CreateTriangle(direction, 10, borderColor);
                 var inner = CreateTriangle(direction, 7, new Color(1f, 0.995f, 0.97f, 1f));
                 PositionTail(outer, direction, false);
@@ -5805,23 +5881,23 @@ namespace Cabo.Client.UI
                 float inset = inner ? 2f : 0f;
                 if (direction == "up")
                 {
-                    tail.style.left = 18 + inset;
+                    tail.style.left = 8 + inset;
                     tail.style.top = inner ? -7 : -11;
                 }
                 else if (direction == "down")
                 {
-                    tail.style.left = 18 + inset;
+                    tail.style.left = 8 + inset;
                     tail.style.bottom = inner ? -7 : -11;
                 }
                 else if (direction == "left")
                 {
                     tail.style.left = inner ? -7 : -11;
-                    tail.style.top = 14 + inset;
+                    tail.style.top = 9 + inset;
                 }
                 else
                 {
                     tail.style.right = inner ? -7 : -11;
-                    tail.style.top = 14 + inset;
+                    tail.style.top = 9 + inset;
                 }
             }
 
@@ -5830,8 +5906,8 @@ namespace Cabo.Client.UI
                 string avatarKey = $"{name}|{avatarPath}";
                 if (_avatarCacheKey != avatarKey)
                 {
-                    _avatarSlot.Clear();
-                    _avatarSlot.Add(PlayerProfileStore.CreateAvatarVisual(name, avatarPath, 32));
+                    _avatarImageHost.Clear();
+                    _avatarImageHost.Add(PlayerProfileStore.CreateAvatarVisual(name, avatarPath, 32));
                     _avatarCacheKey = avatarKey;
                 }
                 _name.text = name;
