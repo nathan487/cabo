@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using Cabo.Client.Art;
 using Cabo.Client.UI;
 
 namespace Cabo.Client
@@ -65,6 +66,7 @@ namespace Cabo.Client
             _ui = gameObject.AddComponent<UIManager>();
             _ui.uiDocument = _uiDoc;
             _ui.Initialize(_flow);
+            CaboAudio.PlayBGM();
 
             Debug.Log($"[GameBootstrap] Started - connect from the home screen ({serverHost}:{serverPort} default)");
         }

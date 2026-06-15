@@ -125,6 +125,7 @@ namespace Cabo.Client.Editor
             catalog.seatLeftBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_left_garden.png");
             catalog.seatRightBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/seat_right_strawberry.png");
             catalog.tableCenterBackground = AssetDatabase.LoadAssetAtPath<Sprite>($"{TableStationFolder}/table_center_island.png");
+            catalog.bgmClip = AssetDatabase.LoadAssetAtPath<AudioClip>(CaboAudioAssetBuilder.BgmPath);
             catalog.drawSfx = LoadSfx("draw");
             catalog.flipSfx = LoadSfx("flip");
             catalog.discardSfx = LoadSfx("discard");
@@ -266,6 +267,7 @@ namespace Cabo.Client.Editor
             if (catalog.seatLeftBackground == null) errors.Add("Left player station is missing");
             if (catalog.seatRightBackground == null) errors.Add("Right player station is missing");
             if (catalog.tableCenterBackground == null) errors.Add("Center table illustration is missing");
+            if (catalog.bgmClip == null) errors.Add("Background music clip is missing");
             ValidateSfx(catalog.drawSfx, "Draw", errors);
             ValidateSfx(catalog.flipSfx, "Flip", errors);
             ValidateSfx(catalog.discardSfx, "Discard", errors);

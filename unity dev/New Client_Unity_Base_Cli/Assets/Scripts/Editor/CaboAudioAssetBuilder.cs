@@ -8,6 +8,8 @@ namespace Cabo.Client.Editor
     public static class CaboAudioAssetBuilder
     {
         public const string AudioFolder = "Assets/Art/Audio/SFX";
+        public const string BgmFolder = "Assets/Art/Audio/BGM";
+        public const string BgmPath = BgmFolder + "/sweet_shop_loop.wav";
         const int SampleRate = 44100;
 
         static readonly string[] ClipNames =
@@ -29,9 +31,10 @@ namespace Cabo.Client.Editor
             WriteEat();
             WritePenalty();
             WriteVictory();
+            EnsureBgmAsset();
             AssetDatabase.Refresh();
             ConfigureImporters();
-            Debug.Log("[CaboAudio] Generated 9 original kitchen-table SFX clips.");
+            Debug.Log("[CaboAudio] Generated 9 original kitchen-table SFX clips and one original BGM loop.");
         }
 
         public static void EnsureAudioAssets()
@@ -44,7 +47,15 @@ namespace Cabo.Client.Editor
                     return;
                 }
             }
+            EnsureBgmAsset();
             ConfigureImporters();
+        }
+
+        public static void EnsureBgmAsset()
+        {
+            Directory.CreateDirectory(ToFullPath(BgmFolder));
+            if (!File.Exists(ToFullPath(BgmPath)))
+                WriteSweetShopBgm();
         }
 
         public static string PathFor(string clipName)
@@ -165,7 +176,46 @@ namespace Cabo.Client.Editor
             });
         }
 
+        static void WriteSweetShopBgm()
+        {
+            const float duration = 16f;
+            float[] melody =
+            {
+                659.25f, 783.99f, 880f, 783.99f, 659.25f, 587.33f, 523.25f, 587.33f,
+                659.25f, 783.99f, 987.77f, 880f, 783.99f, 659.25f, 587.33f, 523.25f,
+                587.33f, 659.25f, 783.99f, 659.25f, 587.33f, 523.25f, 493.88f, 523.25f,
+                659.25f, 587.33f, 523.25f, 493.88f, 523.25f, 587.33f, 659.25f, 523.25f
+            };
+            float[] bass = { 130.81f, 110f, 146.83f, 98f, 130.81f, 110f, 146.83f, 98f };
+
+            WritePath(BgmPath, duration, t =>
+            {
+                int melodyIndex = Mathf.Min(melody.Length - 1, Mathf.FloorToInt(t / 0.5f));
+                float melodyLocal = t - melodyIndex * 0.5f;
+                float melodyEnvelope = NoteEnvelope(melodyLocal, 0.5f, 0.035f, 0.12f);
+                float mallet = Sine(melody[melodyIndex], t)
+                    + 0.24f * Sine(melody[melodyIndex] * 2f, t)
+                    + 0.10f * Sine(melody[melodyIndex] * 3f, t);
+
+                int bassIndex = Mathf.Min(bass.Length - 1, Mathf.FloorToInt(t / 2f));
+                float bassLocal = t - bassIndex * 2f;
+                float bassEnvelope = NoteEnvelope(bassLocal, 1.7f, 0.08f, 0.32f);
+                float warmBass = Sine(bass[bassIndex], t) + 0.18f * Sine(bass[bassIndex] * 2f, t);
+
+                float beatLocal = t % 0.5f;
+                float softBeat = Sine(92f - beatLocal * 36f, t) * Mathf.Exp(-beatLocal * 17f);
+                return 0.19f * mallet * melodyEnvelope
+                    + 0.12f * warmBass * bassEnvelope
+                    + 0.035f * softBeat;
+            });
+        }
+
         static void Write(string clipName, float duration, Func<float, float> signal)
+        {
+            WritePath(PathFor(clipName), duration, signal);
+        }
+
+        static void WritePath(string assetPath, float duration, Func<float, float> signal)
         {
             int sampleCount = Mathf.CeilToInt(duration * SampleRate);
             var samples = new short[sampleCount];
@@ -175,7 +225,7 @@ namespace Cabo.Client.Editor
                 samples[i] = (short)Mathf.RoundToInt(sample * short.MaxValue);
             }
 
-            string fullPath = ToFullPath(PathFor(clipName));
+            string fullPath = ToFullPath(assetPath);
             using (var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write))
             using (var writer = new BinaryWriter(stream))
             {
@@ -217,6 +267,21 @@ namespace Cabo.Client.Editor
                 importer.defaultSampleSettings = settings;
                 importer.SaveAndReimport();
             }
+
+            var bgmImporter = AssetImporter.GetAtPath(BgmPath) as AudioImporter;
+            if (bgmImporter != null)
+            {
+                bgmImporter.forceToMono = true;
+                bgmImporter.loadInBackground = true;
+                var settings = bgmImporter.defaultSampleSettings;
+                settings.loadType = AudioClipLoadType.CompressedInMemory;
+                settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                settings.quality = 0.72f;
+                settings.sampleRateSetting = AudioSampleRateSetting.PreserveSampleRate;
+                settings.preloadAudioData = true;
+                bgmImporter.defaultSampleSettings = settings;
+                bgmImporter.SaveAndReimport();
+            }
         }
 
         static float Sine(float frequency, float time)
@@ -234,6 +299,13 @@ namespace Cabo.Client.Editor
         static float FadeOut(float time, float duration, float release)
         {
             return Mathf.Clamp01((duration - time) / Mathf.Max(0.001f, release));
+        }
+
+        static float NoteEnvelope(float time, float duration, float attack, float release)
+        {
+            if (time < 0f || time >= duration)
+                return 0f;
+            return Envelope(time, duration, attack, release);
         }
 
         static string ToFullPath(string assetPath)

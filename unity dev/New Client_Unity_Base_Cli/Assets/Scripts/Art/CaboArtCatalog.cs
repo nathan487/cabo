@@ -62,6 +62,7 @@ namespace Cabo.Client.Art
         public Sprite seatLeftBackground;
         public Sprite seatRightBackground;
         public Sprite tableCenterBackground;
+        public AudioClip bgmClip;
         public AudioClip drawSfx;
         public AudioClip flipSfx;
         public AudioClip discardSfx;
