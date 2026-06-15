@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Cabo.Client.Art;
 using Cabo.Client.UI.CardTable;
 using Game.Common;
@@ -125,6 +126,7 @@ namespace Cabo.Client.UI
         readonly HashSet<int> _selectedOwnSlots = new();
         readonly List<TableFeedEntry> _gameLogEntries = new();
         readonly HashSet<string> _seenChatBubbleMessages = new();
+        long _chatBubbleRoomId;
         long _selectedOpponentPlayerId;
         int _selectedOpponentSlot = -1;
         long _lastLoggedActionSequence;
@@ -611,6 +613,9 @@ namespace Cabo.Client.UI
                 && GetEndGameModalKind(_flow.State) == EndGameModalKind.None);
             if (!visible)
             {
+                HideRulesOverlay();
+                HideAllChatBubbles();
+                SynchronizeChatBubbleHistory();
                 _showLocalEndGameConfirm = false;
                 ApplyEndGameModal(EndGameModalKind.None, "", "");
                 ClearTransientAnimationState();
@@ -1658,6 +1663,14 @@ namespace Cabo.Client.UI
             if (state?.RoomChatMessages == null)
                 return;
 
+            if (_chatBubbleRoomId != state.RoomId)
+            {
+                _chatBubbleRoomId = state.RoomId;
+                _seenChatBubbleMessages.Clear();
+                _chatBubblesInitialized = false;
+                HideAllChatBubbles();
+            }
+
             if (!_chatBubblesInitialized)
             {
                 for (int i = 0; i < state.RoomChatMessages.Count; i++)
@@ -1666,21 +1679,21 @@ namespace Cabo.Client.UI
                 return;
             }
 
-            RoomChatMessage latestText = null;
+            var latestTextByPlayer = new Dictionary<long, RoomChatMessage>();
             for (int i = 0; i < state.RoomChatMessages.Count; i++)
             {
                 var message = state.RoomChatMessages[i];
                 if (message == null || !_seenChatBubbleMessages.Add(ChatBubbleKey(message)))
                     continue;
                 if (message.Type == RoomChatType.Text && !string.IsNullOrWhiteSpace(message.Text))
-                    latestText = message;
+                    latestTextByPlayer[message.SenderPlayerId] = message;
             }
 
-            if (latestText == null)
-                return;
-
-            var seat = GetSeatView(latestText.SenderPlayerId);
-            seat?.ShowChatBubble(TruncateChatBubble(latestText.Text));
+            foreach (var pair in latestTextByPlayer)
+            {
+                var seat = GetSeatView(pair.Key);
+                seat?.ShowChatBubble(TruncateChatBubble(pair.Value.Text));
+            }
         }
 
         SeatView GetSeatView(long playerId)
@@ -1705,7 +1718,30 @@ namespace Cabo.Client.UI
         static string TruncateChatBubble(string text)
         {
             string trimmed = text?.Trim() ?? "";
-            return trimmed.Length <= 15 ? trimmed : trimmed.Substring(0, 15) + "...";
+            var elements = StringInfo.ParseCombiningCharacters(trimmed);
+            if (elements.Length <= 15)
+                return trimmed;
+
+            int end = elements[15];
+            return trimmed.Substring(0, end) + "...";
+        }
+
+        void HideAllChatBubbles()
+        {
+            _topSeat.HideChatBubble();
+            _leftSeat.HideChatBubble();
+            _rightSeat.HideChatBubble();
+            _selfSeat.HideChatBubble();
+        }
+
+        void SynchronizeChatBubbleHistory()
+        {
+            var state = _flow.State;
+            _chatBubbleRoomId = state.RoomId;
+            _seenChatBubbleMessages.Clear();
+            for (int i = 0; i < state.RoomChatMessages.Count; i++)
+                _seenChatBubbleMessages.Add(ChatBubbleKey(state.RoomChatMessages[i]));
+            _chatBubblesInitialized = true;
         }
 
         void RenderFeed(List<TableFeedEntry> entries, string emptyText)
@@ -5540,7 +5576,7 @@ namespace Cabo.Client.UI
                 _bubbleFadeItem.Every(50);
             }
 
-            void HideChatBubble()
+            public void HideChatBubble()
             {
                 _bubbleVersion++;
                 _bubbleDelayItem?.Pause();
