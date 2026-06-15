@@ -109,6 +109,7 @@ namespace Cabo.Client.UI
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
         SettlementStageRuntime _settlementStage;
+        TableCharacterRuntime _tableCharacterStage;
         readonly List<SettlementScoreRowView> _settlementScoreRows = new();
         Button _interRoundReadyButton;
         Button _interRoundStartButton;
@@ -165,6 +166,10 @@ namespace Cabo.Client.UI
         bool _layoutRefreshQueued;
         bool _uiActionQueued;
         bool _isVisible;
+        int _tableCharacterRound = -1;
+        int _tableCharacterCardCount = -1;
+        int _tableCharacterKnownTotal;
+        long _tableCharacterActionSequence;
         Rect _lastRootBounds;
         int _lastScreenWidth;
         int _lastScreenHeight;
@@ -616,6 +621,7 @@ namespace Cabo.Client.UI
                 HideRulesOverlay();
                 HideAllChatBubbles();
                 SynchronizeChatBubbleHistory();
+                HideTableCharacterStage();
                 _showLocalEndGameConfirm = false;
                 ApplyEndGameModal(EndGameModalKind.None, "", "");
                 ClearTransientAnimationState();
@@ -636,9 +642,15 @@ namespace Cabo.Client.UI
                 CardTableView.DestroyView(_cardTableView);
             if (_settlementStage != null)
                 UnityEngine.Object.Destroy(_settlementStage.gameObject);
+            if (_tableCharacterStage != null)
+                UnityEngine.Object.Destroy(_tableCharacterStage.gameObject);
         }
 
-        public bool HasPendingActionAnimation => Time.realtimeSinceStartup < _animationQueueUntil;
+        public bool HasPendingActionAnimation =>
+            (_flow != null && _flow.State.LastActionSequence > _lastAnimatedActionSequence)
+            || Time.realtimeSinceStartup < _animationQueueUntil
+            || _cardTableView.HasActiveTransientAnimation
+            || _inspectionActive;
 
         public void SetAnimationQueueDrainedCallback(Action callback)
         {
@@ -702,6 +714,7 @@ namespace Cabo.Client.UI
 
             bool holdPendingSelfExchangeView = pendingAction == null && ShouldHoldPendingSelfExchangeView(state);
             RenderSeats(state, visualCurrentPlayerId, holdPendingSelfExchangeView);
+            RenderTableCharacter(state);
             RenderPiles(state, freezePileVisuals);
             if (pendingAction != null)
                 FinalizeActionAnimationSnapshot(pendingAction);
@@ -783,6 +796,7 @@ namespace Cabo.Client.UI
         public void RenderReveal()
         {
             ClearTransientAnimationState();
+            HideTableCharacterStage();
             _cardTableView.SetVisible(false);
             var state = _flow.State;
             ConfigureActionPanelForOverlay();
@@ -874,6 +888,7 @@ namespace Cabo.Client.UI
             }
             ClearTransientAnimationState();
             HideSettlementStage();
+            HideTableCharacterStage();
             _cardTableView.SetVisible(false);
             ConfigureActionPanelForOverlay();
             _actionPanel.style.width = Length.Percent(70);
@@ -4621,6 +4636,79 @@ namespace Cabo.Client.UI
             _settlementStage.gameObject.SetActive(false);
         }
 
+        void RenderTableCharacter(GameState state)
+        {
+            var me = state?.Players.Find(player => player.PlayerId == state.MyPlayerId);
+            if (me == null || state.Phase != GamePhase.Playing)
+            {
+                HideTableCharacterStage();
+                return;
+            }
+
+            if (_tableCharacterStage == null)
+                _tableCharacterStage = TableCharacterRuntime.Create(_ownerTransform);
+
+            _tableCharacterStage.Show(me.CharacterId);
+            _selfSeat.SetCharacterTexture(_tableCharacterStage.Output, true);
+
+            int knownTotal = 0;
+            for (int i = 0; i < state.MyCards.Count; i++)
+            {
+                var card = state.MyCards[i];
+                if (card != null && card.IsKnown)
+                    knownTotal += card.Value;
+            }
+
+            if (_tableCharacterRound != state.RoundNumber)
+            {
+                _tableCharacterRound = state.RoundNumber;
+                _tableCharacterCardCount = state.MyCards.Count;
+                _tableCharacterKnownTotal = knownTotal;
+                _tableCharacterActionSequence = state.LastActionSequence;
+                return;
+            }
+
+            if (state.LastActionSequence > _tableCharacterActionSequence)
+            {
+                if (DidLastActionChangeMyHand(state))
+                {
+                    int delta = state.MyCards.Count == _tableCharacterCardCount
+                        ? knownTotal - _tableCharacterKnownTotal
+                        : state.MyCards.Count > _tableCharacterCardCount ? 1 : -1;
+                    _tableCharacterStage.ReactToHandChange(delta);
+                }
+                _tableCharacterActionSequence = state.LastActionSequence;
+            }
+
+            _tableCharacterCardCount = state.MyCards.Count;
+            _tableCharacterKnownTotal = knownTotal;
+        }
+
+        static bool DidLastActionChangeMyHand(GameState state)
+        {
+            if (state == null)
+                return false;
+
+            if ((state.LastActionType == ActionType.ReplaceWithDrawn || state.LastActionType == ActionType.TakeFromDiscard)
+                && state.LastActionSourcePlayerId == state.MyPlayerId)
+                return true;
+
+            return state.LastActionType == ActionType.UseSkill
+                && state.LastActionSkill == SkillType.Swap
+                && state.LastActionSwapOccurred
+                && (state.LastActionSourcePlayerId == state.MyPlayerId || state.LastActionTargetPlayerId == state.MyPlayerId);
+        }
+
+        void HideTableCharacterStage()
+        {
+            _selfSeat.SetCharacterTexture(null, false);
+            _tableCharacterStage?.Hide();
+            _tableCharacterRound = -1;
+            _tableCharacterCardCount = -1;
+            _tableCharacterKnownTotal = 0;
+            _tableCharacterActionSequence = 0;
+        }
+
         void AddGameOverFinaleGate(bool playbackComplete)
         {
             _interRoundReadyButton = null;
@@ -5382,6 +5470,7 @@ namespace Cabo.Client.UI
             readonly VisualElement _avatarSlot;
             readonly VisualElement _chatBubble;
             readonly Label _chatBubbleLabel;
+            readonly Image _tableCharacterImage;
             string _avatarCacheKey;
             Sprite _stationBackground;
             IVisualElementScheduledItem _bubbleDelayItem;
@@ -5416,6 +5505,20 @@ namespace Cabo.Client.UI
                 {
                     Root.style.minHeight = 150;
                     Root.style.flexDirection = FlexDirection.Column;
+
+                    _tableCharacterImage = new Image
+                    {
+                        name = "SelfTableCharacter",
+                        scaleMode = ScaleMode.ScaleToFit,
+                        pickingMode = PickingMode.Ignore
+                    };
+                    _tableCharacterImage.style.position = Position.Absolute;
+                    _tableCharacterImage.style.left = 16;
+                    _tableCharacterImage.style.bottom = -8;
+                    _tableCharacterImage.style.width = 170;
+                    _tableCharacterImage.style.height = 208;
+                    _tableCharacterImage.style.display = DisplayStyle.None;
+                    Root.Add(_tableCharacterImage);
                 }
                 else if (name == "left" || name == "right")
                 {
@@ -5525,6 +5628,15 @@ namespace Cabo.Client.UI
                     : new StyleBackground(StyleKeyword.None);
                 Root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
                 Root.style.backgroundColor = stationArt != null ? Color.white : UITheme.TableSeatGlass;
+            }
+
+            public void SetCharacterTexture(Texture texture, bool visible)
+            {
+                if (_tableCharacterImage == null)
+                    return;
+
+                _tableCharacterImage.image = texture;
+                _tableCharacterImage.style.display = visible && texture != null ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
             public void Clear()
