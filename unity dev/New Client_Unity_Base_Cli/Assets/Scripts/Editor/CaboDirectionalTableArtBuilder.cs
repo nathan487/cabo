@@ -20,8 +20,8 @@ namespace Cabo.Client.Editor
         [MenuItem("Cabo/Art/Generate Directional Table Art")]
         public static void Generate()
         {
-            EnsureAssets(true);
-            Debug.Log("[Cabo] Generated 3 backgrounds and 16 directional table station images.");
+            EnsureAssets(false);
+            Debug.Log("[Cabo] Directional table art checked. Existing authored backgrounds and tablecloths were preserved.");
         }
 
         public static void EnsureAssets(bool overwrite = false)
