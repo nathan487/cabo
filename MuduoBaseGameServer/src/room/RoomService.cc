@@ -25,7 +25,8 @@ std::string trimAsciiWhitespace(const std::string& input) {
 std::string normalizeCharacterId(const std::string& input) {
     const std::string value = trimAsciiWhitespace(input);
     if (value == "pomelo" || value == "strawberry"
-        || value == "oat" || value == "bean")
+        || value == "oat" || value == "bean"
+        || value == "trainee" || value == "milkdragon")
         return value;
     return "pomelo";
 }

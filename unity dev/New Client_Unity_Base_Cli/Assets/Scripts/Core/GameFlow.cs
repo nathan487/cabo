@@ -136,6 +136,8 @@ namespace Cabo.Client
                 case "strawberry":
                 case "oat":
                 case "bean":
+                case "trainee":
+                case "milkdragon":
                     return trimmed;
                 default:
                     return "pomelo";

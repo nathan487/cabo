@@ -18,6 +18,7 @@ namespace Cabo.Client.Art
         public bool singleSegmentArms;
         public Vector2 leftRestTarget = new Vector2(-0.92f, -0.30f);
         public Vector2 rightRestTarget = new Vector2(0.92f, -0.30f);
+        public Vector2 nameAnchorOffset = new Vector2(0f, 1.12f);
 
         [Header("Face")]
         public SpriteRenderer leftEye;
@@ -43,6 +44,25 @@ namespace Cabo.Client.Art
         public Sprite leftHandRaised;
         public Sprite rightHandRaised;
         public SpriteRenderer propRenderer;
+        public SpriteRenderer idlePropRenderer;
+
+        [Header("Food poses")]
+        public Vector2 bowlLeftTarget = new Vector2(-0.38f, 0.42f);
+        public Vector2 bowlRightTarget = new Vector2(0.38f, 0.42f);
+        public Vector2 bowlPropPosition = new Vector2(0f, 0.90f);
+        public float bowlPropScale = 0.34f;
+        public Vector2 drinkRightTarget = new Vector2(0.24f, 1.03f);
+        public Vector2 drinkPropPosition = new Vector2(0.24f, 1.08f);
+        public float drinkPropScale = 0.30f;
+        public float drinkPropRotation = 12f;
+        public Vector2 handheldLeftTarget = new Vector2(-0.22f, 0.78f);
+        public Vector2 handheldRightTarget = new Vector2(0.26f, 0.98f);
+        public Vector2 handheldPropPosition = new Vector2(0.04f, 1.00f);
+        public float handheldPropScale = 0.30f;
+        public float handheldPropRotation = -8f;
+        public Vector2 propEnterOffset = new Vector2(0.72f, 0.66f);
+        public float propScaleMultiplier = 1.4f;
+        public float animationDurationMultiplier = 1.6f;
 
         [Header("Rig dimensions")]
         public float upperArmLength = 0.48f;
@@ -50,6 +70,7 @@ namespace Cabo.Client.Art
 
         [Header("Game over")]
         [SerializeField] Sprite gameOverDefeatSprite;
+        public float gameOverDefeatScale = 0.68f;
 
         Coroutine _routine;
         SpriteRenderer _gameOverDefeatRenderer;
@@ -65,7 +86,7 @@ namespace Cabo.Client.Art
         bool _rightHandIsRaised;
 
         public Vector3 NameAnchorWorldPosition => headBone != null
-            ? headBone.TransformPoint(new Vector3(0f, 1.12f, 0f))
+            ? headBone.TransformPoint(new Vector3(nameAnchorOffset.x, nameAnchorOffset.y, 0f))
             : transform.position + Vector3.up * 2f;
 
         void Awake()
@@ -108,6 +129,8 @@ namespace Cabo.Client.Art
             if (rightEye != null) rightEye.sprite = rightEyeOpen;
             if (mouth != null) mouth.sprite = mouthNeutral;
             SetRaisedHands(false, false);
+            if (idlePropRenderer != null)
+                idlePropRenderer.enabled = true;
             if (propRenderer != null)
             {
                 propRenderer.sprite = null;
@@ -122,7 +145,7 @@ namespace Cabo.Client.Art
                 _gameOverDefeatRenderer.color = Color.white;
                 _gameOverDefeatRenderer.transform.localPosition = Vector3.zero;
                 _gameOverDefeatRenderer.transform.localRotation = Quaternion.identity;
-                _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * gameOverDefeatScale;
             }
         }
 
@@ -139,7 +162,7 @@ namespace Cabo.Client.Art
             }
 
             _gameOverDefeatRenderer.sprite = gameOverDefeatSprite;
-            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * gameOverDefeatScale;
         }
 
         public void StopPlayback()
@@ -165,8 +188,10 @@ namespace Cabo.Client.Art
         IEnumerator ConsumeRoutine(FoodCardDefinition food)
         {
             ResetPose();
+            if (idlePropRenderer != null)
+                idlePropRenderer.enabled = false;
             propRenderer.sprite = food.consumeSprite;
-            mouth.sprite = mouthEat;
+            if (mouth != null) mouth.sprite = mouthEat;
 
             Vector2 leftHold;
             Vector2 rightHold;
@@ -178,50 +203,52 @@ namespace Cabo.Client.Art
             {
                 case ConsumePose.Bowl:
                     SetRaisedHands(true, true);
-                    leftHold = new Vector2(-0.38f, 0.42f);
-                    rightHold = new Vector2(0.38f, 0.42f);
-                    propPosition = new Vector3(0f, 0.90f, 0f);
-                    propScale = Vector3.one * 0.34f;
+                    leftHold = bowlLeftTarget;
+                    rightHold = bowlRightTarget;
+                    propPosition = new Vector3(bowlPropPosition.x, bowlPropPosition.y, 0f);
+                    propScale = Vector3.one * bowlPropScale;
                     propRotation = 0f;
                     break;
                 case ConsumePose.Drink:
                     SetRaisedHands(false, true);
                     leftHold = leftRestTarget;
-                    rightHold = new Vector2(0.24f, 1.03f);
-                    propPosition = new Vector3(0.24f, 1.08f, 0f);
-                    propScale = Vector3.one * 0.30f;
-                    propRotation = 12f;
+                    rightHold = drinkRightTarget;
+                    propPosition = new Vector3(drinkPropPosition.x, drinkPropPosition.y, 0f);
+                    propScale = Vector3.one * drinkPropScale;
+                    propRotation = drinkPropRotation;
                     break;
                 default:
                     SetRaisedHands(true, true);
-                    leftHold = new Vector2(-0.22f, 0.78f);
-                    rightHold = new Vector2(0.26f, 0.98f);
-                    propPosition = new Vector3(0.04f, 1.00f, 0f);
-                    propScale = Vector3.one * 0.30f;
-                    propRotation = -8f;
+                    leftHold = handheldLeftTarget;
+                    rightHold = handheldRightTarget;
+                    propPosition = new Vector3(handheldPropPosition.x, handheldPropPosition.y, 0f);
+                    propScale = Vector3.one * handheldPropScale;
+                    propRotation = handheldPropRotation;
                     break;
             }
 
+            propScale *= Mathf.Max(0.01f, propScaleMultiplier);
+
             propRenderer.transform.SetParent(visualRoot, false);
-            Vector3 propStart = propPosition + new Vector3(0.72f, 0.66f, 0f);
+            Vector3 propStart = propPosition + new Vector3(propEnterOffset.x, propEnterOffset.y, 0f);
             propRenderer.transform.localPosition = propStart;
             propRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, propRotation);
             propRenderer.transform.localScale = propScale * 0.62f;
 
-            yield return MoveProp(propStart, propPosition, propScale * 0.62f, propScale, 0.34f);
-            yield return MoveTargets(leftRestTarget, rightRestTarget, leftHold, rightHold, 0.42f);
-            yield return Bounce(0.16f, 0.10f);
-            mouth.sprite = mouthChew;
-            leftEye.sprite = leftEyeClosed;
-            rightEye.sprite = rightEyeClosed;
+            yield return MoveProp(propStart, propPosition, propScale * 0.62f, propScale, Duration(0.34f));
+            yield return MoveTargets(leftRestTarget, rightRestTarget, leftHold, rightHold, Duration(0.42f));
+            yield return Bounce(0.16f, Duration(0.10f));
+            if (mouth != null) mouth.sprite = mouthChew;
+            if (leftEye != null) leftEye.sprite = leftEyeClosed;
+            if (rightEye != null) rightEye.sprite = rightEyeClosed;
             if (food.consumedSprite != null)
                 propRenderer.sprite = food.consumedSprite;
-            yield return Chew(0.52f);
-            mouth.sprite = mouthHappy;
-            yield return Bounce(0.12f, 0.12f);
-            yield return MoveTargets(leftHold, rightHold, leftRestTarget, rightRestTarget, 0.36f);
+            yield return Chew(Duration(0.52f));
+            if (mouth != null) mouth.sprite = mouthHappy;
+            yield return Bounce(0.12f, Duration(0.12f));
+            yield return MoveTargets(leftHold, rightHold, leftRestTarget, rightRestTarget, Duration(0.36f));
             ResetPose();
-            yield return new WaitForSecondsRealtime(0.12f);
+            yield return new WaitForSecondsRealtime(Duration(0.12f));
         }
 
         public IEnumerator PlayPenaltyReaction()
@@ -295,7 +322,7 @@ namespace Cabo.Client.Art
             _gameOverDefeatRenderer.enabled = true;
             _gameOverDefeatRenderer.color = new Color(1f, 1f, 1f, 0f);
             _gameOverDefeatRenderer.transform.localPosition = new Vector3(0f, -0.02f, 0f);
-            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.50f;
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * (gameOverDefeatScale * 0.74f);
 
             elapsed = 0f;
             const float popDuration = 0.42f;
@@ -304,7 +331,7 @@ namespace Cabo.Client.Art
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / popDuration));
                 _gameOverDefeatRenderer.color = new Color(1f, 1f, 1f, t);
-                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.50f, 0.74f, t);
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(gameOverDefeatScale * 0.74f, gameOverDefeatScale * 1.09f, t);
                 yield return null;
             }
 
@@ -314,7 +341,7 @@ namespace Cabo.Client.Art
             {
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / settleDuration));
-                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.74f, 0.68f, t);
+                _gameOverDefeatRenderer.transform.localScale = Vector3.one * Mathf.Lerp(gameOverDefeatScale * 1.09f, gameOverDefeatScale, t);
                 yield return null;
             }
 
@@ -335,7 +362,12 @@ namespace Cabo.Client.Art
 
             _gameOverDefeatRenderer.transform.localPosition = new Vector3(0f, -0.02f, 0f);
             _gameOverDefeatRenderer.transform.localRotation = Quaternion.identity;
-            _gameOverDefeatRenderer.transform.localScale = Vector3.one * 0.68f;
+            _gameOverDefeatRenderer.transform.localScale = Vector3.one * gameOverDefeatScale;
+        }
+
+        float Duration(float baseDuration)
+        {
+            return baseDuration * Mathf.Max(0.05f, animationDurationMultiplier);
         }
 
         IEnumerator SobFallback(float duration)

@@ -320,7 +320,7 @@ namespace Cabo.Client
             if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal)
             {
                 foreach (var p in room.Players)
-                    UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore);
+                    UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore, false);
                 return;
             }
 
@@ -493,6 +493,13 @@ namespace Cabo.Client
                         ApplyVisibleCards(opponent, oh.VisibleCards);
                         Players.Add(opponent);
                     }
+                }
+
+                foreach (var score in notify.YourView.Scores)
+                {
+                    var player = Players.Find(x => x.PlayerId == score.PlayerId);
+                    if (player != null)
+                        player.TotalScore = score.TotalScore;
                 }
             }
             Debug.Log($"[GameState] GameStart: round={RoundNumber} firstPlayer={CurrentPlayerId} cards={MyCards.Count}");
@@ -998,7 +1005,8 @@ namespace Cabo.Client
             LastActionSelectedSlots.Clear();
         }
 
-        void UpsertPlayer(long playerId, string nickname, string characterId, int seatId, bool isReady, bool isHost, int totalScore)
+        void UpsertPlayer(long playerId, string nickname, string characterId, int seatId, bool isReady, bool isHost,
+            int totalScore, bool updateScore = true)
         {
             var existing = Players.Find(x => x.PlayerId == playerId);
             if (existing != null)
@@ -1011,7 +1019,8 @@ namespace Cabo.Client
                 existing.SeatId = seatId;
                 existing.IsReady = isReady;
                 existing.IsHost = isHost;
-                existing.TotalScore = totalScore;
+                if (updateScore)
+                    existing.TotalScore = totalScore;
                 return;
             }
 
@@ -1037,6 +1046,8 @@ namespace Cabo.Client
                 case "strawberry":
                 case "oat":
                 case "bean":
+                case "trainee":
+                case "milkdragon":
                     return normalized;
                 default:
                     return "pomelo";

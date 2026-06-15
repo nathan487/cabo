@@ -4138,12 +4138,12 @@ namespace Cabo.Client.UI
             {
                 case SettlementCueType.FoodStarted:
                     var food = CaboArt.GetFood(cue.CardValue);
-                    view.Effect.text = $"正在品尝 {food?.displayName ?? cue.CardValue.ToString()}  +{cue.CardValue}";
+                    view.Effect.text = $"正在品尝 {food?.displayName ?? cue.CardValue.ToString()}";
                     break;
                 case SettlementCueType.FoodConsumed:
                     view.Score.text = $"餐盘糖能 {cue.RunningHandTotal} / {result.HandTotal}\n" +
                         $"服务端本轮 {result.RoundScore:+0;-0;0}  · 累计 {result.CumulativeScore}";
-                    view.Effect.text = $"食物 +{cue.CardValue}";
+                    view.Effect.text = $"已吃完 {CaboArt.GetFood(cue.CardValue)?.displayName ?? "本道食物"}";
                     break;
                 case SettlementCueType.Penalty:
                     view.Effect.text = $"翻车小点心 +{cue.Amount}";
@@ -4332,7 +4332,7 @@ namespace Cabo.Client.UI
                 pickingMode = PickingMode.Ignore
             };
             stageFrame.style.position = Position.Relative;
-            stageFrame.style.height = 230;
+            stageFrame.style.height = 300;
             stageFrame.style.flexGrow = 1;
             stageFrame.style.flexShrink = 1;
             stageFrame.style.minWidth = 0;

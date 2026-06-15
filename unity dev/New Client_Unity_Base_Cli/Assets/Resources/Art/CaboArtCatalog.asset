@@ -160,6 +160,16 @@ MonoBehaviour:
     portraitSprite: {fileID: 21300000, guid: 6f544cf55be564543aa29c45711a602f, type: 3}
     settlementPrefab: {fileID: 7537269471778311518, guid: eeae92236360a0248b5a735a01c2f75b, type: 3}
     gameOverDefeatSprite: {fileID: 21300000, guid: 47ba564cbc91a2f49818e8dd2bf1b3ad, type: 3}
+  - characterId: trainee
+    displayName: "\u4E2A\u4EBA\u7EC3\u4E60\u751F"
+    portraitSprite: {fileID: 21300000, guid: 23f22b8daf9ce804aab70e914b2536fd, type: 3}
+    settlementPrefab: {fileID: 4697323173013242718, guid: 38c431d1bf46fc44f9664dfb826e39e4, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: 811dfb7c477fd484db352daad2d589b6, type: 3}
+  - characterId: milkdragon
+    displayName: "\u5976\u9F99"
+    portraitSprite: {fileID: 21300000, guid: 0d94b4a3ae5b8e34799fd8d6b3bfbae4, type: 3}
+    settlementPrefab: {fileID: 1360752265365731589, guid: 55430708e50dc71419730ebbf8bc7bb4, type: 3}
+    gameOverDefeatSprite: {fileID: 21300000, guid: 23ac5b74d31d1794bb9458f123ca4c5f, type: 3}
   cardBack: {fileID: 21300000, guid: d413b6caa91ed5747aa3512043c6ead8, type: 3}
   homeBackground: {fileID: 21300000, guid: c1121bef4153e564ea58ea42b5b94a72, type: 3}
   tableBackground: {fileID: 21300000, guid: fff8df3d45ecb48438fb0ab1ec645b8f, type: 3}

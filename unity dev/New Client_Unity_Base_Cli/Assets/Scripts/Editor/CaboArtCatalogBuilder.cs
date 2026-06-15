@@ -114,6 +114,22 @@ namespace Cabo.Client.Editor
                     portraitSprite = LoadCharacterPortrait("bean"),
                     settlementPrefab = LoadCharacterPrefab("bean", "BeanSettlement"),
                     gameOverDefeatSprite = LoadCharacterDefeatSprite("bean")
+                },
+                new CharacterDefinition
+                {
+                    characterId = "trainee",
+                    displayName = "\u4e2a\u4eba\u7ec3\u4e60\u751f",
+                    portraitSprite = LoadCharacterPortrait("trainee"),
+                    settlementPrefab = LoadCharacterPrefab("trainee", "TraineeSettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("trainee")
+                },
+                new CharacterDefinition
+                {
+                    characterId = "milkdragon",
+                    displayName = "\u5976\u9f99",
+                    portraitSprite = LoadCharacterPortrait("milkdragon"),
+                    settlementPrefab = LoadCharacterPrefab("milkdragon", "MilkDragonSettlement"),
+                    gameOverDefeatSprite = LoadCharacterDefeatSprite("milkdragon")
                 }
             };
             catalog.cardBack = AssetDatabase.LoadAssetAtPath<Sprite>(CardBackPath);
@@ -145,7 +161,7 @@ namespace Cabo.Client.Editor
             if (errors.Count > 0)
                 throw new InvalidOperationException("Cabo art catalog is incomplete:\n- " + string.Join("\n- ", errors));
 
-            Debug.Log("[Cabo] Art catalog rebuilt: 14 foods, four settlement characters, themed table art, and 9 SFX clips.");
+            Debug.Log("[Cabo] Art catalog rebuilt: 14 foods, six settlement characters, themed table art, and 9 SFX clips.");
         }
 
         [MenuItem("Cabo/Validate Art Catalog")]
@@ -177,10 +193,14 @@ namespace Cabo.Client.Editor
             ConfigureFolder($"{CharacterFolder}/strawberry/Parts", 1024, 256f);
             ConfigureFolder($"{CharacterFolder}/oat/Parts", 1024, 256f);
             ConfigureFolder($"{CharacterFolder}/bean/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/trainee/Parts", 1024, 256f);
+            ConfigureFolder($"{CharacterFolder}/milkdragon/Parts", 1024, 256f);
             ConfigureAsset($"{CharacterFolder}/pomelo/gameover_defeat_v1.png", 2048, 256f);
             ConfigureAsset($"{CharacterFolder}/strawberry/gameover_defeat_v1.png", 2048, 256f);
             ConfigureAsset($"{CharacterFolder}/oat/gameover_defeat_v1.png", 2048, 256f);
             ConfigureAsset($"{CharacterFolder}/bean/gameover_defeat_v1.png", 2048, 256f);
+            ConfigureAsset($"{CharacterFolder}/trainee/gameover_defeat_v1.png", 2048, 256f);
+            ConfigureAsset($"{CharacterFolder}/milkdragon/gameover_defeat_v1.png", 2048, 256f);
             AssetDatabase.Refresh();
         }
 
@@ -277,8 +297,8 @@ namespace Cabo.Client.Editor
             ValidateSfx(catalog.eatSfx, "Eat", errors);
             ValidateSfx(catalog.penaltySfx, "Penalty", errors);
             ValidateSfx(catalog.victorySfx, "Victory", errors);
-            if (catalog.characters == null || catalog.characters.Length != 4)
-                errors.Add("Character definitions must contain pomelo, strawberry, oat, and bean");
+            if (catalog.characters == null || catalog.characters.Length != 6)
+                errors.Add("Character definitions must contain pomelo, strawberry, oat, bean, trainee, and milkdragon");
             else
             {
                 var characterIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

@@ -1218,6 +1218,7 @@ MonoBehaviour:
   singleSegmentArms: 1
   leftRestTarget: {x: -0.984375, y: -0.3828125}
   rightRestTarget: {x: 0.984375, y: -0.3828125}
+  nameAnchorOffset: {x: 0, y: 1.12}
   leftEye: {fileID: 4327793218743588802}
   rightEye: {fileID: 2191733665470244061}
   mouth: {fileID: 3995543030184938483}
@@ -1239,9 +1240,27 @@ MonoBehaviour:
   leftHandRaised: {fileID: 21300000, guid: d5f29962b2f43194e8165d65d9f929b2, type: 3}
   rightHandRaised: {fileID: 21300000, guid: 456f5d91411d199469daaff35596cac5, type: 3}
   propRenderer: {fileID: 4705084907359346415}
+  idlePropRenderer: {fileID: 0}
+  bowlLeftTarget: {x: -0.38, y: 0.42}
+  bowlRightTarget: {x: 0.38, y: 0.42}
+  bowlPropPosition: {x: 0, y: 0.9}
+  bowlPropScale: 0.34
+  drinkRightTarget: {x: 0.24, y: 1.03}
+  drinkPropPosition: {x: 0.24, y: 1.08}
+  drinkPropScale: 0.3
+  drinkPropRotation: 12
+  handheldLeftTarget: {x: -0.22, y: 0.78}
+  handheldRightTarget: {x: 0.26, y: 0.98}
+  handheldPropPosition: {x: 0.04, y: 1}
+  handheldPropScale: 0.3
+  handheldPropRotation: -8
+  propEnterOffset: {x: 0.72, y: 0.66}
+  propScaleMultiplier: 1.4
+  animationDurationMultiplier: 1.6
   upperArmLength: 0.48
   forearmLength: 0.6833147
   gameOverDefeatSprite: {fileID: 0}
+  gameOverDefeatScale: 0.68
 --- !u!1 &7555874544104210627
 GameObject:
   m_ObjectHideFlags: 0

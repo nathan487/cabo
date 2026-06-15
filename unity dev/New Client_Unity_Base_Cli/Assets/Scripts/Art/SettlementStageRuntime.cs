@@ -37,7 +37,7 @@ namespace Cabo.Client.Art
     public sealed class SettlementStageRuntime : MonoBehaviour
     {
         const int TextureWidth = 1024;
-        const int TextureHeight = 420;
+        const int TextureHeight = 560;
 
         readonly List<SettlementCharacterActor> _actors = new();
         Camera _camera;
@@ -89,7 +89,7 @@ namespace Cabo.Client.Art
             cameraObject.transform.localPosition = new Vector3(0f, 0.15f, -10f);
             _camera = cameraObject.AddComponent<Camera>();
             _camera.orthographic = true;
-            _camera.orthographicSize = 2.55f;
+            _camera.orthographicSize = 2.18f;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = Color.clear;
             _camera.allowHDR = false;
