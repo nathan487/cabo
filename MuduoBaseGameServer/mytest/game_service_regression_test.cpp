@@ -388,6 +388,33 @@ void gameOverTieBreakUsesActualRoundScore() {
             "game over tie-break should use actual last round score");
 }
 
+void callSteadyUsesPlayerVectorIndex() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(15);
+    auto p2Conn = fakeConn(16);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->players[1]->seatId = 3;
+    room->currentPlayerSeat = 1;
+    room->step = cabogame::GameStep::Playing;
+    service.games_[room->roomId] = room;
+
+    ::game::messages::ClientMessage msg;
+    auto* req = msg.mutable_call_steady_req();
+    req->set_request_id(50);
+    req->set_room_id(room->roomId);
+    req->set_player_id(10001);
+
+    service.handleCallSteady(p2Conn, msg);
+
+    require(room->steadyCallerSeat == 1,
+            "steady caller should be stored as player vector index");
+}
+
 } // namespace
 
 int main() {
@@ -398,6 +425,7 @@ int main() {
     rejectsRestartRoundWhileRoundIsActive();
     deckEmptyDrawReturnsAnError();
     gameOverTieBreakUsesActualRoundScore();
+    callSteadyUsesPlayerVectorIndex();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

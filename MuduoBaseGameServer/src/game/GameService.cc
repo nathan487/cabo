@@ -249,9 +249,11 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
             && room.currentPlayerSeat >= static_cast<int32_t>(room.players.size())) {
             room.currentPlayerSeat = 0;
         }
-        if (room.steadyCallerSeat == removedPlayer->seatId) {
+        if (room.steadyCallerSeat == removedIndex) {
             room.steadyCallerSeat = -1;
             room.finalRoundRemaining = 0;
+        } else if (room.steadyCallerSeat > removedIndex) {
+            room.steadyCallerSeat--;
         } else if (room.finalRoundRemaining > 0) {
             room.finalRoundRemaining = std::min(
                 room.finalRoundRemaining,
@@ -575,6 +577,7 @@ void GameService::revealAndScore(GameRoom& room) {
     rn->set_room_id(room.roomId);
     rn->set_round_number(room.roundNumber);
     rn->set_steady_caller_id(room.steadyCallerSeat >= 0
+        && room.steadyCallerSeat < static_cast<int32_t>(room.players.size())
         ? room.players[room.steadyCallerSeat]->playerId : 0);
 
     if (hadKamikaze) {
@@ -594,7 +597,7 @@ void GameService::revealAndScore(GameRoom& room) {
             sc->set_penalty(p->playerId != kamikazePlayerId ? 50 : 0);
             sc->set_round_score(p->lastRoundScore);
             sc->set_cumulative_score(p->totalScore);
-            sc->set_is_steady_caller(p->seatId == room.steadyCallerSeat);
+            sc->set_is_steady_caller(getPlayerSeat(room, p->playerId) == room.steadyCallerSeat);
             sc->set_is_lowest(p->playerId == kamikazePlayerId);
             sc->set_is_kamikaze(p->playerId == kamikazePlayerId);
         }
@@ -607,7 +610,7 @@ void GameService::revealAndScore(GameRoom& room) {
         }
 
         for (auto& p : room.players) {
-            bool isSteady = p->seatId == room.steadyCallerSeat;
+            bool isSteady = getPlayerSeat(room, p->playerId) == room.steadyCallerSeat;
             bool isLowest = p->roundScore() <= minScore;
 
             int32_t penalty = 0;
@@ -1337,7 +1340,7 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
         return;
     }
 
-    room->steadyCallerSeat = player->seatId;
+    room->steadyCallerSeat = getPlayerSeat(*room, req.player_id());
     room->finalRoundRemaining = static_cast<int32_t>(room->players.size()) - 1;
 
     LOG_INFO("[Game] Steady called by %s! Final round: %d turns remaining",
