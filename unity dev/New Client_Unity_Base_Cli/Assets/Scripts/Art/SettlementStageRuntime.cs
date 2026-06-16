@@ -175,12 +175,21 @@ namespace Cabo.Client.Art
                 var go = Instantiate(character.settlementPrefab, _actorRoot);
                 go.name = $"SettlementActor_{i + 1}";
                 go.transform.localPosition = new Vector3(start + spacing * i, -0.25f, 0f);
-                go.transform.localScale = Vector3.one * scale;
+                go.transform.localScale = Vector3.one * (scale * GetActorScale(characterId));
                 var actor = go.GetComponent<SettlementCharacterActor>();
                 if (actor != null)
                     actor.ConfigureGameOverDefeat(character.gameOverDefeatSprite);
                 _actors.Add(actor);
             }
+        }
+
+        static float GetActorScale(string characterId)
+        {
+            if (string.Equals(characterId, "trainee", StringComparison.OrdinalIgnoreCase))
+                return 1.14f;
+            if (string.Equals(characterId, "milkdragon", StringComparison.OrdinalIgnoreCase))
+                return 1.18f;
+            return 1f;
         }
 
         IEnumerator PlayGameOverFinaleRoutine(int actorIndex, Action completeHandler)

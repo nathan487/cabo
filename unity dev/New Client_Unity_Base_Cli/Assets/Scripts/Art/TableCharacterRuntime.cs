@@ -70,7 +70,7 @@ namespace Cabo.Client.Art
 
         public void ReactToHandChange(int delta)
         {
-            if (_actor == null || delta == 0)
+            if (_actor == null)
                 return;
 
             StopReaction();
@@ -95,7 +95,7 @@ namespace Cabo.Client.Art
             var actorObject = Instantiate(character.settlementPrefab, _actorRoot);
             actorObject.name = "TableCharacterActor";
             actorObject.transform.localPosition = new Vector3(0f, -0.28f, 0f);
-            _actorBaseScale = Vector3.one * 0.94f;
+            _actorBaseScale = Vector3.one * GetTableScale(characterId);
             actorObject.transform.localScale = _actorBaseScale;
             _actor = actorObject.GetComponent<SettlementCharacterActor>();
             _actor?.ResetPose();
@@ -103,13 +103,22 @@ namespace Cabo.Client.Art
 
         IEnumerator ReactionRoutine(int delta)
         {
-            if (delta < 0)
+            if (delta <= 0)
                 yield return _actor.PlayRewardReaction();
             else
                 yield return _actor.PlayPenaltyReaction();
 
             _actor?.ResetPose();
             _reaction = null;
+        }
+
+        static float GetTableScale(string characterId)
+        {
+            if (string.Equals(characterId, "trainee", System.StringComparison.OrdinalIgnoreCase))
+                return 1.22f;
+            if (string.Equals(characterId, "milkdragon", System.StringComparison.OrdinalIgnoreCase))
+                return 1.28f;
+            return 0.94f;
         }
 
         void Update()

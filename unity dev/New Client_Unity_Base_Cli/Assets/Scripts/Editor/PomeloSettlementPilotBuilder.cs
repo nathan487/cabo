@@ -34,6 +34,7 @@ namespace Cabo.Client.Editor
 
         sealed class CustomRig
         {
+            public bool SingleSegmentArms;
             public bool BodyIncludesLegs;
             public Vector3 BodyTop;
             public Vector2 BodyScale;
@@ -89,19 +90,20 @@ namespace Cabo.Client.Editor
         {
             return new CustomRig
             {
+                SingleSegmentArms = true,
                 BodyIncludesLegs = true,
                 BodyTop = new Vector3(0f, 0.58f, 0f),
-                BodyScale = Vector2.one * 1.15f,
-                HeadCenter = new Vector3(0f, 1.23f, 0f),
-                HeadScale = Vector2.one * 1.45f,
-                LeftShoulder = new Vector3(-0.48f, 0.37f, 0f),
-                RightShoulder = new Vector3(0.48f, 0.37f, 0f),
-                LeftRest = new Vector2(-0.70f, -0.12f),
-                RightRest = new Vector2(0.70f, -0.12f),
-                UpperArmLength = 0.48f,
-                ForearmLength = 0.50f,
-                UpperArmScale = 0.80f,
-                ForearmScale = 0.78f,
+                BodyScale = Vector2.one * 1.24f,
+                HeadCenter = new Vector3(0f, 1.30f, 0f),
+                HeadScale = Vector2.one * 1.58f,
+                LeftShoulder = new Vector3(-0.66f, 0.18f, 0f),
+                RightShoulder = new Vector3(0.66f, 0.18f, 0f),
+                LeftRest = new Vector2(-1.02f, -0.27f),
+                RightRest = new Vector2(0.78f, -0.44f),
+                UpperArmLength = 0.37f,
+                ForearmLength = 0.22f,
+                UpperArmScale = 0.92f,
+                ForearmScale = 0.72f,
                 HandScale = 0.72f,
                 LeftEye = new Vector3(-0.19f, -0.03f, 0f),
                 RightEye = new Vector3(0.19f, -0.03f, 0f),
@@ -111,17 +113,17 @@ namespace Cabo.Client.Editor
                 BrowScale = 0.55f,
                 Mouth = new Vector3(0f, -0.35f, 0f),
                 MouthScale = 0.65f,
-                IdlePropPosition = new Vector3(-0.82f, -0.12f, 0f),
-                IdlePropScale = 0.56f,
+                IdlePropPosition = new Vector3(-1.04f, -0.28f, 0f),
+                IdlePropScale = 0.94f,
                 NameAnchor = new Vector2(0f, 0.72f),
-                BowlLeft = new Vector2(-0.28f, 0.58f),
-                BowlRight = new Vector2(0.28f, 0.58f),
-                BowlProp = new Vector2(0f, 0.84f),
-                DrinkRight = new Vector2(0.20f, 0.86f),
-                DrinkProp = new Vector2(0.20f, 0.91f),
-                HandheldLeft = new Vector2(-0.18f, 0.73f),
-                HandheldRight = new Vector2(0.18f, 0.80f),
-                HandheldProp = new Vector2(0f, 0.89f),
+                BowlLeft = new Vector2(-0.34f, 0.66f),
+                BowlRight = new Vector2(0.34f, 0.66f),
+                BowlProp = new Vector2(0f, 0.91f),
+                DrinkRight = new Vector2(0.24f, 0.94f),
+                DrinkProp = new Vector2(0.24f, 1.00f),
+                HandheldLeft = new Vector2(-0.24f, 0.82f),
+                HandheldRight = new Vector2(0.24f, 0.90f),
+                HandheldProp = new Vector2(0f, 0.98f),
                 DefeatScale = 1.55f,
                 PortraitCameraY = 1.24f,
                 PortraitSize = 0.72f
@@ -133,22 +135,23 @@ namespace Cabo.Client.Editor
             return new CustomRig
             {
                 BodyIncludesLegs = false,
+                SingleSegmentArms = true,
                 BodyTop = new Vector3(0f, 0.48f, 0f),
-                BodyScale = Vector2.one,
-                HeadCenter = new Vector3(0f, 1.05f, 0f),
-                HeadScale = Vector2.one * 1.05f,
-                LeftShoulder = new Vector3(-0.46f, 0.27f, 0f),
-                RightShoulder = new Vector3(0.46f, 0.27f, 0f),
-                LeftRest = new Vector2(-0.58f, -0.35f),
-                RightRest = new Vector2(0.58f, -0.35f),
-                UpperArmLength = 0.38f,
-                ForearmLength = 0.38f,
-                UpperArmScale = 0.78f,
-                ForearmScale = 0.76f,
-                HandScale = 0.68f,
-                LeftLegTop = new Vector3(-0.27f, -0.55f, 0f),
-                RightLegTop = new Vector3(0.27f, -0.55f, 0f),
-                LegScale = 0.68f,
+                BodyScale = Vector2.one * 1.10f,
+                HeadCenter = new Vector3(0f, 1.10f, 0f),
+                HeadScale = Vector2.one * 1.18f,
+                LeftShoulder = new Vector3(-0.56f, 0.22f, 0f),
+                RightShoulder = new Vector3(0.56f, 0.22f, 0f),
+                LeftRest = new Vector2(-0.68f, -0.58f),
+                RightRest = new Vector2(0.68f, -0.58f),
+                UpperArmLength = 0.42f,
+                ForearmLength = 0.44f,
+                UpperArmScale = 1.04f,
+                ForearmScale = 1.00f,
+                HandScale = 0.76f,
+                LeftLegTop = new Vector3(-0.30f, -0.58f, 0f),
+                RightLegTop = new Vector3(0.30f, -0.58f, 0f),
+                LegScale = 0.74f,
                 LeftEye = new Vector3(-0.25f, -0.02f, 0f),
                 RightEye = new Vector3(0.25f, -0.02f, 0f),
                 EyeScale = 0.72f,
@@ -158,14 +161,14 @@ namespace Cabo.Client.Editor
                 Mouth = new Vector3(0f, -0.31f, 0f),
                 MouthScale = 0.70f,
                 NameAnchor = new Vector2(0f, 0.67f),
-                BowlLeft = new Vector2(-0.25f, 0.48f),
-                BowlRight = new Vector2(0.25f, 0.48f),
-                BowlProp = new Vector2(0f, 0.70f),
-                DrinkRight = new Vector2(0.18f, 0.72f),
-                DrinkProp = new Vector2(0.18f, 0.78f),
-                HandheldLeft = new Vector2(-0.16f, 0.62f),
-                HandheldRight = new Vector2(0.16f, 0.69f),
-                HandheldProp = new Vector2(0f, 0.76f),
+                BowlLeft = new Vector2(-0.33f, 0.54f),
+                BowlRight = new Vector2(0.33f, 0.54f),
+                BowlProp = new Vector2(0f, 0.77f),
+                DrinkRight = new Vector2(0.26f, 0.82f),
+                DrinkProp = new Vector2(0.26f, 0.88f),
+                HandheldLeft = new Vector2(-0.25f, 0.68f),
+                HandheldRight = new Vector2(0.25f, 0.76f),
+                HandheldProp = new Vector2(0f, 0.84f),
                 DefeatScale = 1.0f,
                 PortraitCameraY = 1.05f,
                 PortraitSize = 0.72f
@@ -460,7 +463,7 @@ namespace Cabo.Client.Editor
             SpriteRenderer idleProp = null;
             if (Sprite(character, "idle_prop") != null)
             {
-                idleProp = AddSprite(character, "IdleProp", visualRoot, "idle_prop", rig.IdlePropPosition, 1,
+                idleProp = AddSprite(character, "IdleProp", visualRoot, "idle_prop", rig.IdlePropPosition, 5,
                     Vector2.one * rig.IdlePropScale, 0f);
             }
 
@@ -473,7 +476,7 @@ namespace Cabo.Client.Editor
             actor.rightShoulder = rightShoulder;
             actor.rightElbow = rightElbow;
             actor.rightWrist = rightWrist;
-            actor.singleSegmentArms = false;
+            actor.singleSegmentArms = rig.SingleSegmentArms;
             actor.leftRestTarget = rig.LeftRest;
             actor.rightRestTarget = rig.RightRest;
             actor.nameAnchorOffset = rig.NameAnchor;

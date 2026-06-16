@@ -254,7 +254,12 @@ namespace Cabo.Client.Art
         public IEnumerator PlayPenaltyReaction()
         {
             ResetPose();
+            if (idlePropRenderer != null)
+                idlePropRenderer.enabled = false;
             if (mouth != null) mouth.sprite = mouthFail;
+            var leftDroop = new Vector2(leftRestTarget.x * 0.92f, leftRestTarget.y - 0.14f);
+            var rightDroop = new Vector2(rightRestTarget.x * 0.92f, rightRestTarget.y - 0.14f);
+            yield return MoveTargets(leftRestTarget, rightRestTarget, leftDroop, rightDroop, 0.16f);
             float elapsed = 0f;
             const float duration = 0.72f;
             while (elapsed < duration)
@@ -271,11 +276,18 @@ namespace Cabo.Client.Art
         public IEnumerator PlayRewardReaction()
         {
             ResetPose();
+            if (idlePropRenderer != null)
+                idlePropRenderer.enabled = false;
             if (mouth != null) mouth.sprite = mouthHappy;
             if (leftEye != null) leftEye.sprite = leftEyeClosed;
             if (rightEye != null) rightEye.sprite = rightEyeClosed;
+            SetRaisedHands(true, true);
+            var leftCheer = new Vector2(leftRestTarget.x * 1.08f, Mathf.Max(0.34f, leftRestTarget.y + 0.92f));
+            var rightCheer = new Vector2(rightRestTarget.x * 1.08f, Mathf.Max(0.34f, rightRestTarget.y + 0.92f));
+            yield return MoveTargets(leftRestTarget, rightRestTarget, leftCheer, rightCheer, 0.18f);
             yield return Bounce(0.18f, 0.22f);
             yield return Bounce(0.12f, 0.18f);
+            yield return MoveTargets(leftCheer, rightCheer, leftRestTarget, rightRestTarget, 0.16f);
             ResetPose();
         }
 
