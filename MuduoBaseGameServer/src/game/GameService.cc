@@ -62,6 +62,11 @@ bool GameService::isCurrentPlayer(GameRoom& room, int64_t playerId) {
     return room.players[room.currentPlayerSeat]->playerId == playerId;
 }
 
+bool GameService::isPlayerConnection(const PlayerGameState& player,
+                                     const TcpConnectionPtr& conn) const {
+    return player.isConnected && player.conn && conn && player.conn.get() == conn.get();
+}
+
 // ── Deck ──
 
 void GameService::initDeck(GameRoom& room) {
@@ -630,6 +635,17 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) { LOG_INFO("[Game] DrawCard: player not found"); return; }
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] DrawCard: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_draw_card_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
     if (!isCurrentPlayer(*room, req.player_id())) {
         LOG_INFO("[Game] DrawCard: NOT player %lld's turn (current seat=%d)",
                  (long long)req.player_id(), room->currentPlayerSeat);
@@ -689,6 +705,17 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] DiscardDrawn: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_discard_drawn_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
 
     // BUG-2 Fix: Verify this is actually the current player who drew the card.
     // Without this check, any player could hijack another player's drawn card action.
@@ -746,6 +773,17 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] ReplaceWithDrawn: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_replace_with_drawn_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
 
     // BUG-2 Fix: Verify this is actually the current player who drew the card.
     // Without this check, any player could hijack another player's drawn card action.
@@ -903,7 +941,19 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
     if (room->discardPile.empty()) return;
 
     auto player = getPlayer(*room, req.player_id());
-    if (!player || !isCurrentPlayer(*room, req.player_id())) return;
+    if (!player) return;
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] TakeFromDiscard: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_take_from_discard_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
+    if (!isCurrentPlayer(*room, req.player_id())) return;
 
     // BUG-1 Fix: Validate ALL inputs BEFORE popping from discard pile.
     // This prevents card loss when slot_indices is empty or contains invalid slots.
@@ -1049,6 +1099,17 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) return;
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] UseSkill: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_use_skill_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
 
     // Skill can only be used after drawing and discarding a skill card
     if (!isCurrentPlayer(*room, req.player_id())) return;
@@ -1130,14 +1191,24 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     if (!room) return;
     if (room->step == GameStep::GameOver) return;
     if (room->steadyCallerSeat >= 0) return; // Already called
+    auto player = getPlayer(*room, req.player_id());
+    if (!player) return;
+    if (!isPlayerConnection(*player, conn)) {
+        LOG_INFO("[Game] CallSteady: connection mismatch for player %lld",
+                 (long long)req.player_id());
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_call_steady_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(4006);
+        rsp->mutable_error()->set_message("Connection mismatch");
+        sendToPlayer(conn, errMsg);
+        return;
+    }
     if (!isCurrentPlayer(*room, req.player_id())) return;
     if (room->step != GameStep::Playing) {
         LOG_INFO("[Game] CallSteady: not in Playing step (current=%d)", (int)room->step);
         return;
     }
-
-    auto player = getPlayer(*room, req.player_id());
-    if (!player) return;
 
     room->steadyCallerSeat = player->seatId;
     room->finalRoundRemaining = static_cast<int32_t>(room->players.size()) - 1;
@@ -1188,7 +1259,7 @@ void GameService::handleEndGameEarly(const TcpConnectionPtr& conn,
         return;
     }
 
-    if (player->conn.get() != conn.get()) {
+    if (!isPlayerConnection(*player, conn)) {
         rsp->mutable_error()->set_code(4006);
         rsp->mutable_error()->set_message("Connection mismatch");
         sendToPlayer(conn, rspMsg);
@@ -1263,7 +1334,7 @@ void GameService::handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
         return;
     }
 
-    if (player->conn.get() != conn.get()) {
+    if (!isPlayerConnection(*player, conn)) {
         rsp->mutable_error()->set_code(4006);
         rsp->mutable_error()->set_message("Connection mismatch");
         sendToPlayer(conn, rspMsg);

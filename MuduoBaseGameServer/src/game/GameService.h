@@ -123,6 +123,8 @@ private:
     std::shared_ptr<PlayerGameState> getPlayer(GameRoom& room, int64_t playerId);
     int32_t getPlayerSeat(GameRoom& room, int64_t playerId);
     bool isCurrentPlayer(GameRoom& room, int64_t playerId);
+    bool isPlayerConnection(const PlayerGameState& player,
+                            const TcpConnectionPtr& conn) const;
 
     // Deck
     void initDeck(GameRoom& room);

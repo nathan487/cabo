@@ -130,6 +130,27 @@ target_link_libraries(websocket_codec_test
     OpenSSL::Crypto
 )
 
+add_executable(game_service_regression_test
+    mytest/game_service_regression_test.cpp
+    src/common/WebSocketCodec.cc
+    src/game/GameService.cc
+    ${PROTO_SRCS}
+)
+add_dependencies(game_service_regression_test generate_game_protos)
+target_compile_definitions(game_service_regression_test PRIVATE NDEBUG)
+target_include_directories(game_service_regression_test PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+    ${PROTO_SRC_DIR}
+    ${PROTOBUF_INCLUDE_DIR}
+)
+target_link_libraries(game_service_regression_test
+    mymuduo
+    ${PROTOBUF_LIBRARY}
+    pthread
+    OpenSSL::Crypto
+)
+
 # RPATH intentionally points only to the local muduo library.
 # Anaconda protobuf is loaded via LD_PRELOAD (avoids older anaconda libstdc++).
 
