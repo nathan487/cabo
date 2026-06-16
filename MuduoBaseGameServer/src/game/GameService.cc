@@ -322,7 +322,8 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
                                     bool swapOccurred,
                                     const ::game::common::ExchangeAttemptResult* exchangeResult,
                                     int32_t sourceSlot,
-                                    int32_t targetSlot) {
+                                    int32_t targetSlot,
+                                    bool hideIncomingValueFromOthers) {
     if (room.step == GameStep::GameOver)
         return;
 
@@ -354,7 +355,21 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
         fillVisibleHandState(hand, *p);
     }
 
-    broadcastToRoom(room, msg);
+    if (!hideIncomingValueFromOthers || !exchangeResult) {
+        broadcastToRoom(room, msg);
+        return;
+    }
+
+    for (auto& p : room.players) {
+        if (!p->conn || !p->isConnected) continue;
+        auto perPlayerMsg = msg;
+        if (p->playerId != sourcePlayerId) {
+            perPlayerMsg.mutable_action_result_notify()
+                ->mutable_exchange_result()
+                ->set_incoming_card_value(-1);
+        }
+        sendToPlayer(p->conn, perPlayerMsg);
+    }
 }
 
 // ── Turn Management ──
@@ -925,7 +940,7 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
 
     sendActionResult(*room, player->playerId,
         ::game::common::ACTION_TYPE_REPLACE_WITH_DRAWN, 0,
-        ::game::common::SKILL_TYPE_NONE, false, &exResult, -1, -1);
+        ::game::common::SKILL_TYPE_NONE, false, &exResult, -1, -1, true);
 
     room->step = GameStep::Playing;
     endTurn(*room);

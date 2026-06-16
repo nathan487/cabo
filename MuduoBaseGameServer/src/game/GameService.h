@@ -149,7 +149,8 @@ private:
                           bool swapOccurred = false,
                           const ::game::common::ExchangeAttemptResult* exchangeResult = nullptr,
                           int32_t sourceSlot = -1,
-                          int32_t targetSlot = -1);
+                          int32_t targetSlot = -1,
+                          bool hideIncomingValueFromOthers = false);
 
     // Turn management
     void endTurn(GameRoom& room);
