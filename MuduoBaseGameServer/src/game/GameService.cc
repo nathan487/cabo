@@ -202,6 +202,77 @@ void GameService::restartRound(int64_t roomId) {
     startNewRound(room);
 }
 
+void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
+    if (!conn) return;
+
+    for (auto& kv : games_) {
+        auto& room = *kv.second;
+        if (room.step == GameStep::GameOver) continue;
+
+        int32_t removedIndex = -1;
+        for (size_t i = 0; i < room.players.size(); ++i) {
+            const auto& player = room.players[i];
+            if (player->conn && player->conn.get() == conn.get()) {
+                removedIndex = static_cast<int32_t>(i);
+                break;
+            }
+        }
+        if (removedIndex < 0) continue;
+
+        auto removedPlayer = room.players[removedIndex];
+        const bool removedCurrent = removedIndex == room.currentPlayerSeat;
+        LOG_INFO("[Game] Player %lld disconnected from active game room=%lld",
+                 (long long)removedPlayer->playerId, (long long)room.roomId);
+
+        if (removedCurrent && room.step == GameStep::WaitingDrawDecision
+            && room.pendingDrawnCard.card_id() != 0) {
+            discardCard(room, room.pendingDrawnCard);
+            room.pendingDrawnCard.Clear();
+            room.pendingDrewFromDiscard = false;
+        }
+
+        room.players.erase(room.players.begin() + removedIndex);
+        if (room.hostPlayerId == removedPlayer->playerId && !room.players.empty()) {
+            room.hostPlayerId = room.players[0]->playerId;
+        }
+        if (room.currentPlayerSeat > removedIndex) {
+            room.currentPlayerSeat--;
+        }
+        if (!room.players.empty()
+            && room.currentPlayerSeat >= static_cast<int32_t>(room.players.size())) {
+            room.currentPlayerSeat = 0;
+        }
+        if (room.steadyCallerSeat == removedPlayer->seatId) {
+            room.steadyCallerSeat = -1;
+            room.finalRoundRemaining = 0;
+        } else if (room.finalRoundRemaining > 0) {
+            room.finalRoundRemaining = std::min(
+                room.finalRoundRemaining,
+                static_cast<int32_t>(room.players.size()) - 1);
+        }
+        clearPendingEndGameRequest(room);
+
+        if (room.players.empty()) {
+            room.step = GameStep::GameOver;
+            if (gameFinishedFunc_) gameFinishedFunc_(room.roomId);
+            continue;
+        }
+
+        if (room.players.size() < 2) {
+            room.step = GameStep::GameOver;
+            std::vector<std::shared_ptr<PlayerGameState>> ranked = room.players;
+            broadcastGameOver(room, ranked, { ranked[0]->playerId });
+            if (gameFinishedFunc_) gameFinishedFunc_(room.roomId);
+            continue;
+        }
+
+        if (removedCurrent) {
+            room.step = GameStep::Playing;
+            sendTurnStart(room);
+        }
+    }
+}
+
 void GameService::startNewRound(GameRoom& room) {
     room.roundNumber++;
     room.steadyCallerSeat = -1;

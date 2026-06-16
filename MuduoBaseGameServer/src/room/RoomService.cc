@@ -349,7 +349,7 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
 
 // ── Handle LeaveRoom ──
 
-void RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
+bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
                                    const ::game::messages::ClientMessage& msg) {
     const auto& req = msg.leave_room_req();
     int64_t playerId = req.player_id();
@@ -370,7 +370,7 @@ void RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
         }
     }
 
-    if (!room) return;
+    if (!room) return false;
 
     int64_t newHostId = 0;
     {
@@ -384,7 +384,7 @@ void RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
             rsp->mutable_error()->set_code(2004);
             rsp->mutable_error()->set_message("Player connection mismatch");
             sendTo(conn, rspMsg);
-            return;
+            return false;
         }
         players.erase(
             std::remove_if(players.begin(), players.end(),
@@ -412,6 +412,8 @@ void RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
         if (p->conn && p->isConnected)
             sendRoomState(room->roomId, p->conn);
     }
+
+    return true;
 }
 
 // ── Handle Ready ──

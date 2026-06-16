@@ -99,6 +99,7 @@ public:
     bool hasGame(int64_t roomId) const;
     bool isGameOver(int64_t roomId) const;
     void restartRound(int64_t roomId);
+    void onConnectionClosed(const TcpConnectionPtr& conn);
 
     // Player action handlers
     void handleDrawCard(const TcpConnectionPtr& conn,

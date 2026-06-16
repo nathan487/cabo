@@ -42,7 +42,9 @@ public:
         dispatcher_.registerHandler(12, // leave_room_req
             [this](const cabogame::TcpConnectionPtr& conn,
                    const ::game::messages::ClientMessage& msg) {
-                roomService_.handleLeaveRoom(conn, msg);
+                if (roomService_.handleLeaveRoom(conn, msg)) {
+                    gameService_.onConnectionClosed(conn);
+                }
             });
         dispatcher_.registerHandler(13, // ready_req
             [this](const cabogame::TcpConnectionPtr& conn,
@@ -173,6 +175,7 @@ private:
             LOG_INFO("GameServer - connection DOWN : %s",
                      conn->peerAddress().toIpPort().c_str());
             codecs_.erase(conn.get());
+            gameService_.onConnectionClosed(conn);
             roomService_.onConnectionClosed(conn);
         }
     }

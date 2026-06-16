@@ -235,12 +235,46 @@ void rejectsSkillTypeMismatch() {
             "mismatched skill should receive an error response");
 }
 
+void removesDisconnectedPlayerFromActiveGame() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(7);
+    auto p2Conn = fakeConn(8);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::Playing;
+    room->currentPlayerSeat = 0;
+    service.games_[room->roomId] = room;
+
+    service.onConnectionClosed(p1Conn);
+
+    require(room->players.size() == 1,
+            "disconnected player should be removed from game state");
+    require(room->players[0]->playerId == 10001,
+            "remaining player should stay in game state");
+    require(room->step == cabogame::GameStep::GameOver,
+            "single remaining player should end the active game");
+
+    bool remainingSawGameOver = false;
+    for (const auto& serverMsg : messagesForConn(sentFrames, p2Conn)) {
+        if (serverMsg.has_game_over_notify()) {
+            remainingSawGameOver = true;
+        }
+    }
+    require(remainingSawGameOver,
+            "remaining player should receive GameOver after opponent disconnects");
+}
+
 } // namespace
 
 int main() {
     rejectsForgedConnectionForDraw();
     hidesDrawnIncomingValueFromOtherPlayers();
     rejectsSkillTypeMismatch();
+    removesDisconnectedPlayerFromActiveGame();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

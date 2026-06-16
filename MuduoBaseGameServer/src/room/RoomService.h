@@ -61,7 +61,7 @@ public:
                           const ::game::messages::ClientMessage& msg);
     void handleJoinRoom(const TcpConnectionPtr& conn,
                         const ::game::messages::ClientMessage& msg);
-    void handleLeaveRoom(const TcpConnectionPtr& conn,
+    bool handleLeaveRoom(const TcpConnectionPtr& conn,
                          const ::game::messages::ClientMessage& msg);
     void handleReady(const TcpConnectionPtr& conn,
                      const ::game::messages::ClientMessage& msg);
