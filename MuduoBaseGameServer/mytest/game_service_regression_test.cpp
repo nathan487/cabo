@@ -298,6 +298,38 @@ void rejectsRestartRoundWhileRoundIsActive() {
             "active round restart should not broadcast a new game start");
 }
 
+void deckEmptyDrawReturnsAnError() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(11);
+    auto p2Conn = fakeConn(12);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::Playing;
+    room->currentPlayerSeat = 0;
+    room->drawPile.clear();
+    service.games_[room->roomId] = room;
+
+    ::game::messages::ClientMessage msg;
+    auto* req = msg.mutable_draw_card_req();
+    req->set_request_id(40);
+    req->set_room_id(room->roomId);
+    req->set_player_id(10000);
+
+    service.handleDrawCard(p1Conn, msg);
+
+    bool sawDrawError = false;
+    for (const auto& serverMsg : messagesForConn(sentFrames, p1Conn)) {
+        if (!serverMsg.has_draw_card_rsp()) continue;
+        sawDrawError = serverMsg.draw_card_rsp().error().code() != 0;
+    }
+    require(sawDrawError,
+            "empty deck draw should return a non-zero DrawCardRsp error");
+}
+
 } // namespace
 
 int main() {
@@ -306,6 +338,7 @@ int main() {
     rejectsSkillTypeMismatch();
     removesDisconnectedPlayerFromActiveGame();
     rejectsRestartRoundWhileRoundIsActive();
+    deckEmptyDrawReturnsAnError();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

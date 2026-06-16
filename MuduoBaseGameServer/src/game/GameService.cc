@@ -758,7 +758,7 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
         ::game::messages::ServerMessage errMsg;
         auto* rsp2 = errMsg.mutable_draw_card_rsp();
         rsp2->set_request_id(req.request_id());
-        rsp2->mutable_error()->set_code(0);
+        rsp2->mutable_error()->set_code(4014);
         rsp2->mutable_error()->set_message("Deck empty, round ending");
         sendToPlayer(conn, errMsg);
         revealAndScore(*room);
