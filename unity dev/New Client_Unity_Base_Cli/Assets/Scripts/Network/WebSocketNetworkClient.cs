@@ -15,6 +15,7 @@ namespace Cabo.Client.Network
     {
         private ClientWebSocket ws;
         private CancellationTokenSource receiveCts;
+        private readonly SemaphoreSlim sendLock = new(1, 1);
         private readonly Uri url;
         private const int ReceiveBufferSize = 8192;
 
@@ -91,24 +92,30 @@ namespace Cabo.Client.Network
 
         public async Task SendAsync(byte[] data)
         {
-            if (State != NetworkClientState.Connected || ws == null || ws.State != WebSocketState.Open)
-            {
-                Debug.LogWarning("[WebSocketNetworkClient] Cannot send - not connected");
-                return;
-            }
-
+            await sendLock.WaitAsync();
             try
             {
-                await ws.SendAsync(new ArraySegment<byte>(data),
-                                   WebSocketMessageType.Binary,
-                                   true,
-                                   CancellationToken.None);
+                var socket = ws;
+                if (State != NetworkClientState.Connected || socket == null || socket.State != WebSocketState.Open)
+                {
+                    Debug.LogWarning("[WebSocketNetworkClient] Cannot send - not connected");
+                    return;
+                }
+
+                await socket.SendAsync(new ArraySegment<byte>(data),
+                                       WebSocketMessageType.Binary,
+                                       true,
+                                       CancellationToken.None);
             }
             catch (Exception ex)
             {
                 ErrorOccurred?.Invoke($"Send failed: {ex.Message}");
                 Debug.LogError($"[WebSocketNetworkClient] Send error: {ex}");
                 Disconnect();
+            }
+            finally
+            {
+                sendLock.Release();
             }
         }
 
@@ -168,6 +175,7 @@ namespace Cabo.Client.Network
         {
             Disconnect();
             try { receiveCts?.Dispose(); } catch { }
+            try { sendLock.Dispose(); } catch { }
         }
     }
 }
