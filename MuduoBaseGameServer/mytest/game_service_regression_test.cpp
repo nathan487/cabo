@@ -194,11 +194,53 @@ void hidesDrawnIncomingValueFromOtherPlayers() {
             "other players should receive a hidden incoming card value marker");
 }
 
+void rejectsSkillTypeMismatch() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(5);
+    auto p2Conn = fakeConn(6);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::WaitingDrawDecision;
+    room->pendingDrewFromDiscard = false;
+    room->pendingDrawnCard = card(300, 8);
+    service.games_[room->roomId] = room;
+
+    const int p1Slot0 = room->players[0]->cards[0].value();
+    const int p2Slot0 = room->players[1]->cards[0].value();
+
+    ::game::messages::ClientMessage msg;
+    auto* req = msg.mutable_use_skill_req();
+    req->set_request_id(30);
+    req->set_room_id(room->roomId);
+    req->set_player_id(10000);
+    req->set_card_id(room->pendingDrawnCard.card_id());
+    auto* swap = req->mutable_swap();
+    swap->set_own_slot_index(0);
+    swap->set_target_player_id(10001);
+    swap->set_target_slot_index(0);
+
+    service.handleUseSkill(p1Conn, msg);
+
+    require(room->players[0]->cards[0].value() == p1Slot0,
+            "mismatched skill must not swap the source card");
+    require(room->players[1]->cards[0].value() == p2Slot0,
+            "mismatched skill must not swap the target card");
+    require(room->step == cabogame::GameStep::WaitingDrawDecision,
+            "mismatched skill must not end the turn");
+    require(!sentFrames.empty(),
+            "mismatched skill should receive an error response");
+}
+
 } // namespace
 
 int main() {
     rejectsForgedConnectionForDraw();
     hidesDrawnIncomingValueFromOtherPlayers();
+    rejectsSkillTypeMismatch();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

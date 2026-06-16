@@ -96,7 +96,7 @@ namespace Cabo.Client
 
         // Draw state
         public bool HasDrawnCard;
-        public int DrawnCardValue, DrawnCardSkill;
+        public int DrawnCardId, DrawnCardValue, DrawnCardSkill;
         public long DrawResponseSequence;
 
         // Request waiting flags
@@ -448,7 +448,7 @@ namespace Cabo.Client
             RoundNumber = notify.RoundNumber;
             CurrentPlayerId = notify.FirstPlayerId;
             IsFinalRound = false; FinalRoundRemaining = 0; SteadyCallerId = 0;
-            HasDrawnCard = false; DrawnCardValue = 0; DrawnCardSkill = 0;
+            HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0;
             DrawResponseSequence = 0;
             WaitingForDrawResponse = false; WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
@@ -527,7 +527,7 @@ namespace Cabo.Client
 
             if (notify.CurrentPlayerId == MyPlayerId)
             {
-                HasDrawnCard = false; DrawnCardValue = 0; DrawnCardSkill = 0;
+                HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0;
                 WaitingForDrawResponse = false; WaitingForTakeResponse = false;
                 WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
             }
@@ -544,7 +544,7 @@ namespace Cabo.Client
             WaitingForDrawResponse = false;
             if (rsp.Error?.Code == 0)
             {
-                HasDrawnCard = true; DrawnCardValue = rsp.Value;
+                HasDrawnCard = true; DrawnCardId = rsp.CardId; DrawnCardValue = rsp.Value;
                 DrawnCardSkill = (int)(rsp.Skill);
                 DrawResponseSequence++;
             }
@@ -552,7 +552,7 @@ namespace Cabo.Client
 
         void HandleDiscardDrawn(DiscardDrawnRsp rsp)
         {
-            if (rsp.Error?.Code == 0) { HasDrawnCard = false; }
+            if (rsp.Error?.Code == 0) { HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0; }
         }
 
         void HandleReplaceWithDrawn(ReplaceWithDrawnRsp rsp)
@@ -586,6 +586,9 @@ namespace Cabo.Client
                 AddFailedExchangeCards(ex);
             }
             HasDrawnCard = false;
+            DrawnCardId = 0;
+            DrawnCardValue = 0;
+            DrawnCardSkill = 0;
             SyncMyCardCount();
         }
 
@@ -740,7 +743,7 @@ namespace Cabo.Client
                 }
             }
 
-            if (ar.TurnEnded) { HasDrawnCard = false; }
+            if (ar.TurnEnded) { HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0; }
             SyncMyCardCount();
 
             LastActionMessage = BuildActionMessage(ar);
@@ -1016,6 +1019,7 @@ namespace Cabo.Client
             RoundNumber = 0;
             TurnNumber = 0;
             HasDrawnCard = false;
+            DrawnCardId = 0;
             DrawnCardValue = 0;
             DrawnCardSkill = 0;
             WaitingForDrawResponse = false;
@@ -1081,6 +1085,7 @@ namespace Cabo.Client
             RoundNumber = 0;
             TurnNumber = 0;
             HasDrawnCard = false;
+            DrawnCardId = 0;
             DrawnCardValue = 0;
             DrawnCardSkill = 0;
             WaitingForDrawResponse = false;

@@ -1133,6 +1133,40 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
         return;
     }
 
+    auto sendUseSkillError = [&](int32_t code, const std::string& message) {
+        ::game::messages::ServerMessage errMsg;
+        auto* rsp = errMsg.mutable_use_skill_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendToPlayer(conn, errMsg);
+    };
+
+    const auto expectedSkill = room->pendingDrawnCard.skill();
+    ::game::common::SkillType requestedSkill = ::game::common::SKILL_TYPE_NONE;
+    if (req.has_peek_self()) requestedSkill = ::game::common::SKILL_TYPE_PEEK_SELF;
+    else if (req.has_spy()) requestedSkill = ::game::common::SKILL_TYPE_SPY;
+    else if (req.has_swap()) requestedSkill = ::game::common::SKILL_TYPE_SWAP;
+
+    if (req.card_id() != room->pendingDrawnCard.card_id()) {
+        LOG_INFO("[Game] UseSkill: card mismatch req=%d pending=%d",
+                 req.card_id(), room->pendingDrawnCard.card_id());
+        sendUseSkillError(4011, "Skill card mismatch");
+        return;
+    }
+    if (expectedSkill == ::game::common::SKILL_TYPE_NONE) {
+        LOG_INFO("[Game] UseSkill: no skill pending for card value=%d",
+                 room->pendingDrawnCard.value());
+        sendUseSkillError(4012, "No skill pending");
+        return;
+    }
+    if (requestedSkill != ::game::common::SKILL_TYPE_NONE && requestedSkill != expectedSkill) {
+        LOG_INFO("[Game] UseSkill: skill type mismatch req=%d expected=%d",
+                 static_cast<int>(requestedSkill), static_cast<int>(expectedSkill));
+        sendUseSkillError(4013, "Skill type mismatch");
+        return;
+    }
+
     int64_t targetPlayer = 0;
     int32_t srcSlot = -1, dstSlot = -1;
     int32_t peekedValue = -1;

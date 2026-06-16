@@ -238,37 +238,37 @@ namespace Cabo.Client
             Send(req);
         }
 
-        public void SendUseSkillPeekSelf(long playerId, long roomId, int slot)
+        public void SendUseSkillPeekSelf(long playerId, long roomId, int cardId, int slot)
         {
             Send(new ClientMessage
             {
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
-                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
+                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId, CardId = cardId,
                     PeekSelf = new Game.Common.PeekSelfParams { SlotIndex = slot }
                 }
             });
         }
 
-        public void SendUseSkillSpy(long playerId, long roomId, long targetId, int slot)
+        public void SendUseSkillSpy(long playerId, long roomId, int cardId, long targetId, int slot)
         {
             Send(new ClientMessage
             {
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
-                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
+                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId, CardId = cardId,
                     Spy = new Game.Common.SpyParams { TargetPlayerId = targetId, TargetSlotIndex = slot }
                 }
             });
         }
 
-        public void SendUseSkillSwap(long playerId, long roomId, long targetId, int mySlot, int targetSlot)
+        public void SendUseSkillSwap(long playerId, long roomId, int cardId, long targetId, int mySlot, int targetSlot)
         {
             Send(new ClientMessage
             {
                 UseSkillReq = new Game.Game.UseSkillReq
                 {
-                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId,
+                    RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId, CardId = cardId,
                     Swap = new Game.Common.SwapParams { OwnSlotIndex = mySlot, TargetPlayerId = targetId, TargetSlotIndex = targetSlot }
                 }
             });
@@ -304,11 +304,11 @@ namespace Cabo.Client
             });
         }
 
-        public void SendSkipSkill(long playerId, long roomId)
+        public void SendSkipSkill(long playerId, long roomId, int cardId)
         {
             Send(new ClientMessage
             {
-                UseSkillReq = new Game.Game.UseSkillReq { RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId }
+                UseSkillReq = new Game.Game.UseSkillReq { RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId, CardId = cardId }
             });
         }
 

@@ -522,9 +522,9 @@ namespace Cabo.Client
         {
             switch (SkillTypePending)
             {
-                case 2: Gateway.SendUseSkillPeekSelf(State.MyPlayerId, State.RoomId, SkillMySlot); break;
-                case 3: Gateway.SendUseSkillSpy(State.MyPlayerId, State.RoomId, SkillTargetPlayerId, SkillTargetSlot); break;
-                case 4: Gateway.SendUseSkillSwap(State.MyPlayerId, State.RoomId, SkillTargetPlayerId, SkillMySlot, SkillTargetSlot); break;
+                case 2: Gateway.SendUseSkillPeekSelf(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillMySlot); break;
+                case 3: Gateway.SendUseSkillSpy(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillTargetPlayerId, SkillTargetSlot); break;
+                case 4: Gateway.SendUseSkillSwap(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillTargetPlayerId, SkillMySlot, SkillTargetSlot); break;
             }
             SkillTypeJustCompleted = SkillTypePending;
             SkillTypePending = 0;
@@ -535,7 +535,7 @@ namespace Cabo.Client
 
         public void DoSkipSkill()
         {
-            Gateway.SendSkipSkill(State.MyPlayerId, State.RoomId);
+            Gateway.SendSkipSkill(State.MyPlayerId, State.RoomId, State.DrawnCardId);
             State.WaitingForSkillResponse = true;
             SubState = GameSubState.WaitingSkillRsp;
             StateChanged?.Invoke();
