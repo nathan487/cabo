@@ -294,6 +294,7 @@ void GameService::startNewRound(GameRoom& room) {
     for (auto& p : room.players) {
         p->cards.clear();
         p->knownSlots.clear();
+        p->lastRoundScore = 0;
         for (int i = 0; i < 4; i++) {
             p->cards.push_back(drawCard(room));
             p->knownSlots.push_back(false);
@@ -578,10 +579,8 @@ void GameService::revealAndScore(GameRoom& room) {
 
     if (hadKamikaze) {
         for (auto& p : room.players) {
-            if (p->playerId == kamikazePlayerId)
-                p->totalScore += 0;
-            else
-                p->totalScore += 50;
+            p->lastRoundScore = p->playerId == kamikazePlayerId ? 0 : 50;
+            p->totalScore += p->lastRoundScore;
 
             auto* rh = rn->add_revealed_hands();
             rh->set_player_id(p->playerId);
@@ -593,7 +592,7 @@ void GameService::revealAndScore(GameRoom& room) {
             sc->set_character_id(p->characterId);
             sc->set_hand_total(p->roundScore());
             sc->set_penalty(p->playerId != kamikazePlayerId ? 50 : 0);
-            sc->set_round_score(p->playerId == kamikazePlayerId ? 0 : 50);
+            sc->set_round_score(p->lastRoundScore);
             sc->set_cumulative_score(p->totalScore);
             sc->set_is_steady_caller(p->seatId == room.steadyCallerSeat);
             sc->set_is_lowest(p->playerId == kamikazePlayerId);
@@ -626,6 +625,7 @@ void GameService::revealAndScore(GameRoom& room) {
                 penalty = 0;
                 roundSc = p->roundScore();
             }
+            p->lastRoundScore = roundSc;
             p->totalScore += roundSc;
 
             auto* rh = rn->add_revealed_hands();
@@ -666,7 +666,7 @@ void GameService::revealAndScore(GameRoom& room) {
         auto* si = su->add_scores();
         si->set_player_id(p->playerId);
         si->set_total_score(p->totalScore);
-        si->set_current_round_score(p->roundScore());
+        si->set_current_round_score(p->lastRoundScore);
     }
     broadcastToRoom(room, scoreMsg);
 
@@ -693,8 +693,8 @@ void GameService::revealAndScore(GameRoom& room) {
         } else {
             int32_t bestLastRound = INT32_MAX;
             for (auto& p : tied) {
-                if (p->roundScore() < bestLastRound) {
-                    bestLastRound = p->roundScore();
+                if (p->lastRoundScore < bestLastRound) {
+                    bestLastRound = p->lastRoundScore;
                     winner = p;
                 }
             }

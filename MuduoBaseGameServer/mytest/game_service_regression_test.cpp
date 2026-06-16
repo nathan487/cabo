@@ -118,6 +118,16 @@ std::shared_ptr<cabogame::GameRoom> makeRoom(const cabogame::TcpConnectionPtr& p
     return room;
 }
 
+void setHandValues(const std::shared_ptr<cabogame::PlayerGameState>& p,
+                   const std::vector<int>& values) {
+    p->cards.clear();
+    p->knownSlots.clear();
+    for (size_t i = 0; i < values.size(); ++i) {
+        p->cards.push_back(card(500 + static_cast<int>(i), values[i]));
+        p->knownSlots.push_back(true);
+    }
+}
+
 void rejectsForgedConnectionForDraw() {
     cabogame::GameService service;
     std::vector<SentFrame> sentFrames;
@@ -330,6 +340,54 @@ void deckEmptyDrawReturnsAnError() {
             "empty deck draw should return a non-zero DrawCardRsp error");
 }
 
+void gameOverTieBreakUsesActualRoundScore() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(13);
+    auto p2Conn = fakeConn(14);
+    auto room = std::make_shared<cabogame::GameRoom>();
+    room->roomId = 2;
+    room->roomCode = "TEST02";
+    room->maxPlayers = 2;
+    room->hostPlayerId = 10001;
+    room->step = cabogame::GameStep::Playing;
+    room->roundNumber = 1;
+    room->currentPlayerSeat = 0;
+
+    auto firstInOrder = player(10001, 0, p2Conn);
+    auto steadyCaller = player(10000, 1, p1Conn);
+    firstInOrder->totalScore = 95;
+    steadyCaller->totalScore = 100;
+    firstInOrder->hasUsedReset = true;
+    steadyCaller->hasUsedReset = true;
+    setHandValues(firstInOrder, {1, 1, 1, 2});
+    setHandValues(steadyCaller, {1, 1, 1, 2});
+    room->players.push_back(firstInOrder);
+    room->players.push_back(steadyCaller);
+    room->steadyCallerSeat = 1;
+    service.games_[room->roomId] = room;
+
+    service.revealAndScore(*room);
+
+    int64_t winnerId = 0;
+    for (const auto& serverMsg : messagesForConn(sentFrames, p1Conn)) {
+        if (!serverMsg.has_game_over_notify()) continue;
+        for (const auto& ranking : serverMsg.game_over_notify().rankings()) {
+            if (ranking.is_winner()) {
+                winnerId = ranking.player_id();
+                break;
+            }
+        }
+    }
+
+    require(winnerId == 10000,
+            "game over tie-break should use actual last round score");
+}
+
 } // namespace
 
 int main() {
@@ -339,6 +397,7 @@ int main() {
     removesDisconnectedPlayerFromActiveGame();
     rejectsRestartRoundWhileRoundIsActive();
     deckEmptyDrawReturnsAnError();
+    gameOverTieBreakUsesActualRoundScore();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

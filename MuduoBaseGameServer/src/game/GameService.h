@@ -31,6 +31,7 @@ struct PlayerGameState {
 
     // Cumulative score across rounds
     int32_t totalScore = 0;
+    int32_t lastRoundScore = 0;
     // Has used 100→50 reset this game?
     bool hasUsedReset = false;
 
