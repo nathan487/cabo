@@ -193,11 +193,18 @@ bool GameService::isGameOver(int64_t roomId) const {
     return it != games_.end() && it->second->step == GameStep::GameOver;
 }
 
+bool GameService::canRestartRound(int64_t roomId) const {
+    auto it = games_.find(roomId);
+    if (it == games_.end()) return true;
+    const auto step = it->second->step;
+    return step == GameStep::WaitingToStart || step == GameStep::GameOver;
+}
+
 void GameService::restartRound(int64_t roomId) {
     auto it = games_.find(roomId);
     if (it == games_.end()) return;
     auto& room = *it->second;
-    if (room.step == GameStep::GameOver) return;
+    if (room.step != GameStep::WaitingToStart) return;
     room.step = GameStep::Playing;
     startNewRound(room);
 }

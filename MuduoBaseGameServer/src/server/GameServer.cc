@@ -126,18 +126,37 @@ public:
     void start() { server_.start(); }
 
 private:
+    void sendStartGameError(const cabogame::TcpConnectionPtr& conn,
+                            int64_t requestId,
+                            int32_t code,
+                            const std::string& message) {
+        ::game::messages::ServerMessage rspMsg;
+        auto* rsp = rspMsg.mutable_start_game_rsp();
+        rsp->set_request_id(requestId);
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+
+        std::string payload;
+        rspMsg.SerializeToString(&payload);
+        conn->send(game::WebSocketCodec::encode(payload));
+    }
+
     // Triggered when host clicks Start Game.
     // Validates room state, then delegates to GameService to begin.
     void onStartGame(const cabogame::TcpConnectionPtr& conn,
                      const ::game::messages::ClientMessage& msg) {
+        const auto& req = msg.start_game_req();
+        int64_t roomId = req.room_id();
+        if (!gameService_.canRestartRound(roomId)) {
+            sendStartGameError(conn, req.request_id(), 2005, "Game is still in progress");
+            return;
+        }
+
         // RoomService validates host/ready/etc and sends RoomStartNotify
         if (!roomService_.handleStartGame(conn, msg))
             return;
 
         // Kick off game logic
-        const auto& req = msg.start_game_req();
-        int64_t roomId = req.room_id();
-
         bool startNewGame = !gameService_.hasGame(roomId) || gameService_.isGameOver(roomId);
 
         // Inter-round restart: existing active game, just start new round

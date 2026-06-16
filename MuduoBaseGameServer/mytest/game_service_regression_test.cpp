@@ -268,6 +268,36 @@ void removesDisconnectedPlayerFromActiveGame() {
             "remaining player should receive GameOver after opponent disconnects");
 }
 
+void rejectsRestartRoundWhileRoundIsActive() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(9);
+    auto p2Conn = fakeConn(10);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::Playing;
+    room->roundNumber = 3;
+    room->turnNumber = 7;
+    const auto originalDrawPileSize = room->drawPile.size();
+    service.games_[room->roomId] = room;
+
+    service.restartRound(room->roomId);
+
+    require(room->step == cabogame::GameStep::Playing,
+            "active round restart should keep the current step");
+    require(room->roundNumber == 3,
+            "active round restart should not advance the round number");
+    require(room->turnNumber == 7,
+            "active round restart should not reset turn number");
+    require(room->drawPile.size() == originalDrawPileSize,
+            "active round restart should not reinitialize the deck");
+    require(sentFrames.empty(),
+            "active round restart should not broadcast a new game start");
+}
+
 } // namespace
 
 int main() {
@@ -275,6 +305,7 @@ int main() {
     hidesDrawnIncomingValueFromOtherPlayers();
     rejectsSkillTypeMismatch();
     removesDisconnectedPlayerFromActiveGame();
+    rejectsRestartRoundWhileRoundIsActive();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

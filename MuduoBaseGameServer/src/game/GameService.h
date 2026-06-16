@@ -98,6 +98,7 @@ public:
     // Inter-round restart: resume existing game with startNewRound
     bool hasGame(int64_t roomId) const;
     bool isGameOver(int64_t roomId) const;
+    bool canRestartRound(int64_t roomId) const;
     void restartRound(int64_t roomId);
     void onConnectionClosed(const TcpConnectionPtr& conn);
 
