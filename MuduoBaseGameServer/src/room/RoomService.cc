@@ -95,6 +95,18 @@ int64_t RoomService::nextChatMessageId() {
     return nextChatMessageId_++;
 }
 
+std::shared_ptr<PlayerSession> RoomService::findPlayer(Room& room, int64_t playerId) {
+    for (auto& player : room.players) {
+        if (player->playerId == playerId) return player;
+    }
+    return nullptr;
+}
+
+bool RoomService::isPlayerConnection(const PlayerSession& player,
+                                     const TcpConnectionPtr& conn) const {
+    return player.isConnected && player.conn && conn && player.conn.get() == conn.get();
+}
+
 void RoomService::sendTo(const TcpConnectionPtr& conn,
                           const ::game::messages::ServerMessage& msg) {
     if (!sendFunc_ || !conn) return;
@@ -364,6 +376,16 @@ void RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto& players = room->players;
+        auto leavingPlayer = findPlayer(*room, playerId);
+        if (!leavingPlayer || !isPlayerConnection(*leavingPlayer, conn)) {
+            ::game::messages::ServerMessage rspMsg;
+            auto* rsp = rspMsg.mutable_leave_room_rsp();
+            rsp->set_request_id(req.request_id());
+            rsp->mutable_error()->set_code(2004);
+            rsp->mutable_error()->set_message("Player connection mismatch");
+            sendTo(conn, rspMsg);
+            return;
+        }
         players.erase(
             std::remove_if(players.begin(), players.end(),
                            [playerId](const std::shared_ptr<PlayerSession>& p) { return p->playerId == playerId; }),
@@ -416,14 +438,19 @@ void RoomService::handleReady(const TcpConnectionPtr& conn,
         room = it->second;
 
         // Update player ready state while holding lock
-        for (auto& p : room->players) {
-            if (p->playerId == playerId) {
-                p->isReady = ready;
-                LOG_INFO("[Room] Player %s set ready=%d in room %s",
-                         p->nickname.c_str(), ready, room->roomCode.c_str());
-                break;
-            }
+        auto player = findPlayer(*room, playerId);
+        if (!player || !isPlayerConnection(*player, conn)) {
+            ::game::messages::ServerMessage rspMsg;
+            auto* rsp = rspMsg.mutable_ready_rsp();
+            rsp->set_request_id(req.request_id());
+            rsp->mutable_error()->set_code(2004);
+            rsp->mutable_error()->set_message("Player connection mismatch");
+            sendTo(conn, rspMsg);
+            return;
         }
+        player->isReady = ready;
+        LOG_INFO("[Room] Player %s set ready=%d in room %s",
+                 player->nickname.c_str(), ready, room->roomCode.c_str());
     }
 
     // Send ReadyRsp to the requesting player
@@ -463,6 +490,16 @@ bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
             return false;
         }
         room = it->second;
+        auto player = findPlayer(*room, playerId);
+        if (!player || !isPlayerConnection(*player, conn)) {
+            ::game::messages::ServerMessage rspMsg;
+            auto* rsp = rspMsg.mutable_start_game_rsp();
+            rsp->set_request_id(req.request_id());
+            rsp->mutable_error()->set_code(2004);
+            rsp->mutable_error()->set_message("Player connection mismatch");
+            sendTo(conn, rspMsg);
+            return false;
+        }
     }
 
     ::game::messages::ServerMessage rspMsg;

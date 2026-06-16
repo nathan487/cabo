@@ -88,6 +88,9 @@ private:
     int64_t nextPlayerId();
     int64_t nextRoomId();
     int64_t nextChatMessageId();
+    std::shared_ptr<PlayerSession> findPlayer(Room& room, int64_t playerId);
+    bool isPlayerConnection(const PlayerSession& player,
+                            const TcpConnectionPtr& conn) const;
 
     std::unordered_map<int64_t, std::shared_ptr<Room>> rooms_;
     // Maps playerId -> room (for quick room lookup)
