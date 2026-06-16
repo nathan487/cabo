@@ -648,6 +648,13 @@ namespace Cabo.Client.UI
             || _cardTableView.HasActiveTransientAnimation
             || _inspectionActive;
 
+        public void ForceCompletePendingActionAnimationForReveal()
+        {
+            if (_flow != null)
+                _lastAnimatedActionSequence = Math.Max(_lastAnimatedActionSequence, _flow.State.LastActionSequence);
+            ClearTransientAnimationState();
+        }
+
         void ResetPresentationForRoomExit()
         {
             HideRulesOverlay();

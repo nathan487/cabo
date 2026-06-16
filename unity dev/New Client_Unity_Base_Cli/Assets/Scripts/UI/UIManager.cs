@@ -10,6 +10,8 @@ namespace Cabo.Client.UI
     /// </summary>
     public class UIManager : MonoBehaviour
     {
+        const float RevealAnimationDrainTimeout = 3.5f;
+
         [SerializeField] public UIDocument uiDocument;
 
         public VisualElement Root { get; private set; }
@@ -20,6 +22,7 @@ namespace Cabo.Client.UI
         VisualElement _backgroundLayer;
         System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
         bool _waitingForRevealAnimationDrain;
+        float _revealAnimationDrainStartedAt;
 
         void Awake()
         {
@@ -98,7 +101,24 @@ namespace Cabo.Client.UI
             }
 
             if (!GameTablePanel.HasPendingActionAnimation)
+            {
+                _waitingForRevealAnimationDrain = false;
+                _revealAnimationDrainStartedAt = 0f;
                 OnStateChanged();
+                return;
+            }
+
+            if (_revealAnimationDrainStartedAt <= 0f)
+                _revealAnimationDrainStartedAt = Time.realtimeSinceStartup;
+
+            if (Time.realtimeSinceStartup - _revealAnimationDrainStartedAt >= RevealAnimationDrainTimeout)
+            {
+                Debug.LogWarning("[UIManager] Reveal animation drain timed out; forcing settlement render.");
+                GameTablePanel.ForceCompletePendingActionAnimationForReveal();
+                _waitingForRevealAnimationDrain = false;
+                _revealAnimationDrainStartedAt = 0f;
+                OnStateChanged();
+            }
         }
 
         void OnStateChanged()
@@ -110,6 +130,10 @@ namespace Cabo.Client.UI
             bool showOver = state.Phase == GamePhase.GameOver;
             bool revealPending = !showOver && (state.Phase == GamePhase.RoundReveal || state.RoundJustRevealed || _flow.Flow == FlowState.RoundReveal);
             bool waitForActionAnimation = revealPending && GameTablePanel.HasPendingActionAnimation;
+            if (waitForActionAnimation && !_waitingForRevealAnimationDrain)
+                _revealAnimationDrainStartedAt = Time.realtimeSinceStartup;
+            if (!waitForActionAnimation)
+                _revealAnimationDrainStartedAt = 0f;
             _waitingForRevealAnimationDrain = waitForActionAnimation;
             bool showReveal = revealPending && !waitForActionAnimation;
             bool showGame = !showReveal && !showOver && (_flow.Flow == FlowState.Playing || state.Phase == GamePhase.Playing);
