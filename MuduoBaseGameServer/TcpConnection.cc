@@ -5,6 +5,7 @@
 #include "EventLoop.h"
 #include <errno.h>
 #include <functional>
+#include <sys/socket.h>
 #include <unistd.h>
 
 static EventLoop* CheckLoopNotNull(EventLoop* loop){
@@ -155,7 +156,7 @@ void TcpConnection::sendInLoop(const void* data,std::size_t len){
 
     //表示channel_第一次开始写数据，而且缓冲区没有待发送数据
     if(!channel_->isWritng() && outputBuffer_.readableBytes() == 0){
-        nwrote = ::write(channel_->getFd(),data,len);
+        nwrote = ::send(channel_->getFd(), data, len, MSG_NOSIGNAL);
 
         if(nwrote >= 0){
             remaining = len - nwrote;
@@ -208,9 +209,10 @@ void TcpConnection::send(const std::string& buf){
             sendInLoop(buf.c_str(),buf.size());
         }
         else {
+            TcpConnectionPtr self = shared_from_this();
             loop_->runInLoop(
-                [this,buf](){
-                    sendInLoop(buf.c_str(),buf.size());
+                [self,buf](){
+                    self->sendInLoop(buf.c_str(),buf.size());
                 }
             );
         }
@@ -246,9 +248,10 @@ void TcpConnection::connectionDestroyed(){
 void TcpConnection::shutdown(){
     if(state_ == KConnected){
         setState(kDisconnecting);
+        TcpConnectionPtr self = shared_from_this();
         loop_->runInLoop(
-            [this](){
-                shutdownInLoop();
+            [self](){
+                self->shutdownInLoop();
             }
         );
     }

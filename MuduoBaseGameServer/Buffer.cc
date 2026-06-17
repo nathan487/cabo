@@ -1,5 +1,6 @@
 #include "Buffer.h"
 #include <errno.h>
+#include <sys/socket.h>
 #include <sys/uio.h>
 #include <unistd.h>
 //从fd 上面读取数据 Poller工作在LT模式
@@ -33,7 +34,7 @@ ssize_t Buffer::readFd(int fd,int* saveErrno){
 }
 
 ssize_t Buffer::writeFd(int fd,int* saveErrno){
-    ssize_t n = ::write(fd,peek(),readableBytes());
+    ssize_t n = ::send(fd, peek(), readableBytes(), MSG_NOSIGNAL);
     if(n < 0){
         *saveErrno = errno;
     }
