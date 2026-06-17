@@ -140,13 +140,26 @@ bool RoomService::isPlayerConnection(const PlayerSession& player,
     return player.isConnected && player.conn && conn && player.conn.get() == conn.get();
 }
 
+std::string RoomService::encodeServerMessage(const ::game::messages::ServerMessage& msg) {
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    ++sendPathStats_.encodedFrames;
+#endif
+    std::string payload;
+    msg.SerializeToString(&payload);
+    return WebSocketCodec::encode(payload);
+}
+
+void RoomService::sendFrame(const TcpConnectionPtr& conn,
+                            const std::string& frame) {
+    if (!sendFunc_ || !conn) return;
+    sendFunc_(conn, frame);
+}
+
 void RoomService::sendTo(const TcpConnectionPtr& conn,
                           const ::game::messages::ServerMessage& msg) {
     if (!sendFunc_ || !conn) return;
-    std::string payload;
-    msg.SerializeToString(&payload);
-    auto frame = WebSocketCodec::encode(payload);
-    sendFunc_(conn, frame);
+    auto frame = encodeServerMessage(msg);
+    sendFrame(conn, frame);
 }
 
 void RoomService::broadcastToRoom(int64_t roomId,
@@ -156,11 +169,14 @@ void RoomService::broadcastToRoom(int64_t roomId,
     auto it = rooms_.find(roomId);
     if (it == rooms_.end()) return;
 
+    std::string frame;
     for (auto& player : it->second->players) {
         if (player->playerId == excludePlayerId) continue;
-        if (player->conn && player->isConnected) {
-            sendTo(player->conn, msg);
+        if (!player->conn || !player->isConnected) continue;
+        if (frame.empty()) {
+            frame = encodeServerMessage(msg);
         }
+        sendFrame(player->conn, frame);
     }
 }
 

@@ -486,6 +486,37 @@ void discardDrawnDoesNotBlockForAnimationDelay() {
             "non-skill discard should advance the room back to Playing");
 }
 
+void publicGameBroadcastEncodesFrameOnceForAllRecipients() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(21);
+    auto p2Conn = fakeConn(22);
+    auto p3Conn = fakeConn(23);
+    auto p4Conn = fakeConn(24);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->players.push_back(player(10002, 2, p3Conn));
+    room->players.push_back(player(10003, 3, p4Conn));
+
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_turn_start_notify();
+    notify->set_room_id(room->roomId);
+    notify->set_current_player_id(10000);
+    notify->set_turn_number(1);
+    notify->set_round_number(1);
+
+    service.resetSendPathStatsForTests();
+    service.broadcastToRoom(*room, msg);
+
+    require(sentFrames.size() == 4,
+            "public game broadcast should still send one frame to each connected player");
+    require(service.sendPathStatsForTests().encodedFrames == 1,
+            "public game broadcast should encode and frame the shared payload once");
+}
+
 } // namespace
 
 int main() {
@@ -499,6 +530,7 @@ int main() {
     gameOverTieBreakUsesActualRoundScore();
     callSteadyUsesPlayerVectorIndex();
     discardDrawnDoesNotBlockForAnimationDelay();
+    publicGameBroadcastEncodesFrameOnceForAllRecipients();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

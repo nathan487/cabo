@@ -137,7 +137,10 @@ add_executable(game_service_regression_test
     ${PROTO_SRCS}
 )
 add_dependencies(game_service_regression_test generate_game_protos)
-target_compile_definitions(game_service_regression_test PRIVATE NDEBUG)
+target_compile_definitions(game_service_regression_test PRIVATE
+    NDEBUG
+    CABO_ENABLE_SEND_PATH_STATS
+)
 target_include_directories(game_service_regression_test PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
@@ -158,7 +161,10 @@ add_executable(room_service_regression_test
     ${PROTO_SRCS}
 )
 add_dependencies(room_service_regression_test generate_game_protos)
-target_compile_definitions(room_service_regression_test PRIVATE NDEBUG)
+target_compile_definitions(room_service_regression_test PRIVATE
+    NDEBUG
+    CABO_ENABLE_SEND_PATH_STATS
+)
 target_include_directories(room_service_regression_test PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src

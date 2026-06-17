@@ -4,6 +4,7 @@
 #include "proto/messages.pb.h"
 #include <functional>
 #include "common/MessageDispatcher.h" // for TcpConnectionPtr
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -89,9 +90,20 @@ public:
     using SendFunc = std::function<void(const TcpConnectionPtr&, const std::string&)>;
     using GameFinishedFunc = std::function<void(int64_t)>;
 
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    struct SendPathStats {
+        std::size_t encodedFrames = 0;
+    };
+#endif
+
     GameService();
     void setSendFunc(SendFunc f) { sendFunc_ = std::move(f); }
     void setGameFinishedFunc(GameFinishedFunc f) { gameFinishedFunc_ = std::move(f); }
+
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    const SendPathStats& sendPathStatsForTests() const { return sendPathStats_; }
+    void resetSendPathStatsForTests() { sendPathStats_ = {}; }
+#endif
 
     // Start a game for a room (called from RoomService when host starts)
     void startGame(int64_t roomId,
@@ -138,6 +150,9 @@ private:
     int nextCardId;
 
     // Notifications
+    std::string encodeServerMessage(const ::game::messages::ServerMessage& msg);
+    void sendFrameToPlayer(const TcpConnectionPtr& conn,
+                           const std::string& frame);
     void sendToPlayer(const TcpConnectionPtr& conn,
                       const ::game::messages::ServerMessage& msg);
     void broadcastToRoom(GameRoom& room,
@@ -187,6 +202,9 @@ private:
 
     SendFunc sendFunc_;
     GameFinishedFunc gameFinishedFunc_;
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    SendPathStats sendPathStats_;
+#endif
     mutable std::mutex mutex_;
     std::mt19937 rng_;
     std::unordered_map<int64_t, std::shared_ptr<GameRoom>> games_;

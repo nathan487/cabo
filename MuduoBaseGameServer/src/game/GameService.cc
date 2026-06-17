@@ -10,6 +10,40 @@
 
 namespace cabogame {
 
+namespace {
+
+const char* serverMessageTypeForLog(const ::game::messages::ServerMessage& msg) {
+    if (msg.has_create_room_rsp()) return "CreateRoomRsp";
+    if (msg.has_join_room_rsp()) return "JoinRoomRsp";
+    if (msg.has_room_state_notify()) return "RoomStateNotify";
+    if (msg.has_player_join_notify()) return "PlayerJoinNotify";
+    if (msg.has_player_leave_notify()) return "PlayerLeaveNotify";
+    if (msg.has_player_ready_notify()) return "PlayerReadyNotify";
+    if (msg.has_ready_rsp()) return "ReadyRsp";
+    if (msg.has_start_game_rsp()) return "StartGameRsp";
+    if (msg.has_room_start_notify()) return "RoomStartNotify";
+    if (msg.has_game_start_notify()) return "GameStartNotify";
+    if (msg.has_turn_start_notify()) return "TurnStartNotify";
+    if (msg.has_draw_card_rsp()) return "DrawCardRsp";
+    if (msg.has_discard_drawn_rsp()) return "DiscardDrawnRsp";
+    if (msg.has_replace_with_drawn_rsp()) return "ReplaceWithDrawnRsp";
+    if (msg.has_take_from_discard_rsp()) return "TakeFromDiscardRsp";
+    if (msg.has_use_skill_rsp()) return "UseSkillRsp";
+    if (msg.has_call_steady_rsp()) return "CallSteadyRsp";
+    if (msg.has_end_game_early_rsp()) return "EndGameEarlyRsp";
+    if (msg.has_end_game_early_request_notify()) return "EndGameEarlyRequestNotify";
+    if (msg.has_end_game_early_decision_rsp()) return "EndGameEarlyDecisionRsp";
+    if (msg.has_action_result_notify()) return "ActionResultNotify";
+    if (msg.has_round_reveal_notify()) return "RoundRevealNotify";
+    if (msg.has_score_update_notify()) return "ScoreUpdateNotify";
+    if (msg.has_game_over_notify()) return "GameOverNotify";
+    if (msg.has_end_game_early_rejected_notify()) return "EndGameEarlyRejectedNotify";
+    if (msg.has_state_sync_notify()) return "StateSyncNotify";
+    return "Unknown";
+}
+
+} // namespace
+
 // ── Player helpers ──
 
 int32_t PlayerGameState::roundScore() const {
@@ -110,54 +144,51 @@ void GameService::discardCard(GameRoom& room, const ::game::common::CardInfo& ca
 
 // ── Messaging ──
 
+std::string GameService::encodeServerMessage(const ::game::messages::ServerMessage& msg) {
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    ++sendPathStats_.encodedFrames;
+#endif
+    std::string payload;
+    msg.SerializeToString(&payload);
+    return game::WebSocketCodec::encode(payload);
+}
+
+void GameService::sendFrameToPlayer(const TcpConnectionPtr& conn,
+                                     const std::string& frame) {
+    if (!sendFunc_ || !conn) return;
+    sendFunc_(conn, frame);
+}
+
 void GameService::sendToPlayer(const TcpConnectionPtr& conn,
                                 const ::game::messages::ServerMessage& msg) {
     if (!sendFunc_) { LOG_INFO("[Game] sendToPlayer: no sendFunc!"); return; }
     if (!conn) { LOG_INFO("[Game] sendToPlayer: null conn!"); return; }
 
-    // 获取消息类型用于日志
-    std::string msgType = "Unknown";
-    if (msg.has_create_room_rsp()) msgType = "CreateRoomRsp";
-    else if (msg.has_join_room_rsp()) msgType = "JoinRoomRsp";
-    else if (msg.has_room_state_notify()) msgType = "RoomStateNotify";
-    else if (msg.has_player_join_notify()) msgType = "PlayerJoinNotify";
-    else if (msg.has_player_leave_notify()) msgType = "PlayerLeaveNotify";
-    else if (msg.has_player_ready_notify()) msgType = "PlayerReadyNotify";
-    else if (msg.has_ready_rsp()) msgType = "ReadyRsp";
-    else if (msg.has_start_game_rsp()) msgType = "StartGameRsp";
-    else if (msg.has_room_start_notify()) msgType = "RoomStartNotify";
-    else if (msg.has_game_start_notify()) msgType = "GameStartNotify";
-    else if (msg.has_turn_start_notify()) msgType = "TurnStartNotify";
-    else if (msg.has_draw_card_rsp()) msgType = "DrawCardRsp";
-    else if (msg.has_discard_drawn_rsp()) msgType = "DiscardDrawnRsp";
-    else if (msg.has_replace_with_drawn_rsp()) msgType = "ReplaceWithDrawnRsp";
-    else if (msg.has_take_from_discard_rsp()) msgType = "TakeFromDiscardRsp";
-    else if (msg.has_use_skill_rsp()) msgType = "UseSkillRsp";
-    else if (msg.has_call_steady_rsp()) msgType = "CallSteadyRsp";
-    else if (msg.has_end_game_early_rsp()) msgType = "EndGameEarlyRsp";
-    else if (msg.has_end_game_early_request_notify()) msgType = "EndGameEarlyRequestNotify";
-    else if (msg.has_end_game_early_decision_rsp()) msgType = "EndGameEarlyDecisionRsp";
-    else if (msg.has_action_result_notify()) msgType = "ActionResultNotify";
-    else if (msg.has_round_reveal_notify()) msgType = "RoundRevealNotify";
-    else if (msg.has_score_update_notify()) msgType = "ScoreUpdateNotify";
-    else if (msg.has_game_over_notify()) msgType = "GameOverNotify";
-    else if (msg.has_end_game_early_rejected_notify()) msgType = "EndGameEarlyRejectedNotify";
-    else if (msg.has_state_sync_notify()) msgType = "StateSyncNotify";
-
-    std::string payload;
-    msg.SerializeToString(&payload);
-    auto frame = game::WebSocketCodec::encode(payload);
-    LOG_INFO("[Game] sendToPlayer: %s (%zu bytes)", msgType.c_str(), frame.size());
-    sendFunc_(conn, frame);
+    auto frame = encodeServerMessage(msg);
+    LOG_INFO("[Game] sendToPlayer: %s (%zu bytes)",
+             serverMessageTypeForLog(msg), frame.size());
+    sendFrameToPlayer(conn, frame);
 }
 
 void GameService::broadcastToRoom(GameRoom& room,
                                    const ::game::messages::ServerMessage& msg,
                                    int64_t excludePlayerId) {
+    if (!sendFunc_) { LOG_INFO("[Game] broadcastToRoom: no sendFunc!"); return; }
+
+    std::string frame;
+    int recipients = 0;
     for (auto& p : room.players) {
         if (p->playerId == excludePlayerId) continue;
-        if (p->conn && p->isConnected)
-            sendToPlayer(p->conn, msg);
+        if (!p->conn || !p->isConnected) continue;
+        if (frame.empty()) {
+            frame = encodeServerMessage(msg);
+        }
+        sendFrameToPlayer(p->conn, frame);
+        ++recipients;
+    }
+    if (!frame.empty()) {
+        LOG_INFO("[Game] broadcastToRoom: %s (%zu bytes, recipients=%d)",
+                 serverMessageTypeForLog(msg), frame.size(), recipients);
     }
 }
 

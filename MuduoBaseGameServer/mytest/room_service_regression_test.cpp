@@ -170,6 +170,31 @@ void gameStartSnapshotSurvivesLaterRoomMutation() {
             "game start snapshot should preserve the disconnected player's identity");
 }
 
+void publicRoomBroadcastEncodesFrameOnceForAllRecipients() {
+    game::RoomService service;
+    std::vector<std::string> sentFrames;
+    service.setSendFunc([&](const game::TcpConnectionPtr&, const std::string& frame) {
+        sentFrames.push_back(frame);
+    });
+
+    auto hostConn = fakeConn(9);
+    auto guestConn = fakeConn(10);
+    auto room = makeRoom(hostConn, guestConn);
+    installRoom(service, room);
+
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_room_start_notify();
+    notify->set_room_id(room->roomId);
+
+    service.resetSendPathStatsForTests();
+    service.broadcastToRoom(room->roomId, msg);
+
+    require(sentFrames.size() == 2,
+            "public room broadcast should still send one frame to each connected player");
+    require(service.sendPathStatsForTests().encodedFrames == 1,
+            "public room broadcast should encode and frame the shared payload once");
+}
+
 } // namespace
 
 int main() {
@@ -177,6 +202,7 @@ int main() {
     rejectsForgedStartGame();
     rejectsForgedLeaveRoom();
     gameStartSnapshotSurvivesLaterRoomMutation();
+    publicRoomBroadcastEncodesFrameOnceForAllRecipients();
     std::cout << "room_service_regression_test passed\n";
     return 0;
 }

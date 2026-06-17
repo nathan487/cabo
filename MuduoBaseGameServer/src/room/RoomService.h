@@ -2,6 +2,7 @@
 #include "proto/room.pb.h"
 #include "proto/common.pb.h"
 #include "proto/messages.pb.h"
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -64,9 +65,20 @@ public:
     using SendFunc = std::function<void(const TcpConnectionPtr& conn,
                                          const std::string& framedData)>;
 
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    struct SendPathStats {
+        std::size_t encodedFrames = 0;
+    };
+#endif
+
     RoomService();
 
     void setSendFunc(SendFunc func) { sendFunc_ = std::move(func); }
+
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    const SendPathStats& sendPathStatsForTests() const { return sendPathStats_; }
+    void resetSendPathStatsForTests() { sendPathStats_ = {}; }
+#endif
 
     // Access room data (used by GameService to bridge room ↔ game state)
     const std::shared_ptr<Room> getRoom(int64_t roomId) const;
@@ -95,6 +107,9 @@ public:
     void onConnectionClosed(const TcpConnectionPtr& conn);
 
 private:
+    std::string encodeServerMessage(const ::game::messages::ServerMessage& msg);
+    void sendFrame(const TcpConnectionPtr& conn,
+                   const std::string& frame);
     void sendTo(const TcpConnectionPtr& conn,
                 const ::game::messages::ServerMessage& msg);
     void broadcastToRoom(int64_t roomId,
@@ -115,6 +130,9 @@ private:
     std::unordered_map<int64_t, std::shared_ptr<Room>> playerRooms_;
 
     SendFunc sendFunc_;
+#ifdef CABO_ENABLE_SEND_PATH_STATS
+    SendPathStats sendPathStats_;
+#endif
     mutable std::recursive_mutex mutex_;
     std::mt19937 rng_;
     int64_t nextPlayerId_ = 10000;
