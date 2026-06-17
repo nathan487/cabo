@@ -10,6 +10,8 @@
 #include "room/RoomService.h"
 #include "game/GameService.h"
 
+#include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -189,11 +191,15 @@ private:
         if (conn->connected()) {
             LOG_INFO("GameServer - connection UP : %s",
                      conn->peerAddress().toIpPort().c_str());
-            codecs_[conn.get()] = game::WebSocketCodec();
+            std::lock_guard<std::mutex> lock(codecsMutex_);
+            codecs_[conn.get()] = std::make_shared<game::WebSocketCodec>();
         } else {
             LOG_INFO("GameServer - connection DOWN : %s",
                      conn->peerAddress().toIpPort().c_str());
-            codecs_.erase(conn.get());
+            {
+                std::lock_guard<std::mutex> lock(codecsMutex_);
+                codecs_.erase(conn.get());
+            }
             gameService_.onConnectionClosed(conn);
             roomService_.onConnectionClosed(conn);
         }
@@ -202,10 +208,15 @@ private:
     void onMessage(const TcpConnectionPtr& conn,
                    Buffer* buf, Timestamp /*time*/) {
         std::string raw = buf->retrieveAllAsString();
-        auto it = codecs_.find(conn.get());
-        if (it == codecs_.end()) return;
+        std::shared_ptr<game::WebSocketCodec> codec;
+        {
+            std::lock_guard<std::mutex> lock(codecsMutex_);
+            auto it = codecs_.find(conn.get());
+            if (it == codecs_.end()) return;
+            codec = it->second;
+        }
 
-        it->second.feedBytes(raw.data(), raw.size(),
+        codec->feedBytes(raw.data(), raw.size(),
             [this, conn](const std::vector<uint8_t>& payload) {
                 dispatcher_.dispatch(conn, payload);
             },
@@ -222,7 +233,8 @@ private:
     game::MessageDispatcher dispatcher_;
     game::RoomService roomService_;
     cabogame::GameService gameService_;
-    std::unordered_map<const TcpConnection*, game::WebSocketCodec> codecs_;
+    std::mutex codecsMutex_;
+    std::unordered_map<const TcpConnection*, std::shared_ptr<game::WebSocketCodec>> codecs_;
 };
 
 int main(int argc, char* argv[]) {
