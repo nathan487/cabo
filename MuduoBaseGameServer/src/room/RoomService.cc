@@ -68,6 +68,33 @@ std::shared_ptr<Room> RoomService::getRoomMutable(int64_t roomId) {
     return getRoom(roomId);
 }
 
+RoomGameStartSnapshot RoomService::getGameStartSnapshot(int64_t roomId) const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    RoomGameStartSnapshot snapshot;
+    auto it = rooms_.find(roomId);
+    if (it == rooms_.end()) {
+        return snapshot;
+    }
+
+    const auto& room = it->second;
+    snapshot.valid = true;
+    snapshot.roomId = room->roomId;
+    snapshot.hostPlayerId = room->hostPlayerId;
+    snapshot.players.reserve(room->players.size());
+    for (const auto& p : room->players) {
+        PlayerSessionSnapshot player;
+        player.playerId = p->playerId;
+        player.nickname = p->nickname;
+        player.characterId = p->characterId;
+        player.seatId = p->seatId;
+        player.isConnected = p->isConnected;
+        player.totalScore = p->totalScore;
+        player.conn = p->conn;
+        snapshot.players.push_back(std::move(player));
+    }
+    return snapshot;
+}
+
 // ── Helpers ──
 
 std::string RoomService::generateRoomCode() {

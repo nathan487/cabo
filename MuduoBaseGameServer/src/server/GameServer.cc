@@ -168,23 +168,23 @@ private:
         }
 
         // First game start, or a new full game after GameOver.
-        auto roomPtr = roomService_.getRoom(roomId);
-        if (!roomPtr) return;
+        auto snapshot = roomService_.getGameStartSnapshot(roomId);
+        if (!snapshot.valid) return;
 
         std::vector<std::shared_ptr<cabogame::PlayerGameState>> gamePlayers;
-        for (auto& rp : roomPtr->players) {
+        for (const auto& rp : snapshot.players) {
             auto gp = std::make_shared<cabogame::PlayerGameState>();
-            gp->playerId = rp->playerId;
-            gp->nickname = rp->nickname;
-            gp->characterId = rp->characterId;
-            gp->seatId = rp->seatId;
-            gp->conn = rp->conn;
-            gp->isConnected = rp->isConnected;
-            gp->totalScore = rp->totalScore;
+            gp->playerId = rp.playerId;
+            gp->nickname = rp.nickname;
+            gp->characterId = rp.characterId;
+            gp->seatId = rp.seatId;
+            gp->conn = rp.conn;
+            gp->isConnected = rp.isConnected;
+            gp->totalScore = rp.totalScore;
             gamePlayers.push_back(gp);
         }
 
-        gameService_.startGame(roomId, gamePlayers, roomPtr->hostPlayerId);
+        gameService_.startGame(roomId, gamePlayers, snapshot.hostPlayerId);
     }
 
     void onConnection(const TcpConnectionPtr& conn) {

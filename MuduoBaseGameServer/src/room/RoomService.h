@@ -38,6 +38,23 @@ struct Room {
     std::vector<std::shared_ptr<PlayerSession>> players;
 };
 
+struct PlayerSessionSnapshot {
+    int64_t playerId = 0;
+    std::string nickname;
+    std::string characterId;
+    int32_t seatId = 0;
+    bool isConnected = false;
+    int32_t totalScore = 0;
+    TcpConnectionPtr conn;
+};
+
+struct RoomGameStartSnapshot {
+    bool valid = false;
+    int64_t roomId = 0;
+    int64_t hostPlayerId = 0;
+    std::vector<PlayerSessionSnapshot> players;
+};
+
 // Manages rooms and player sessions in memory.
 // All room operations are thread-safe.
 class RoomService {
@@ -55,6 +72,7 @@ public:
     const std::shared_ptr<Room> getRoom(int64_t roomId) const;
     std::shared_ptr<Room> getRoom(int64_t roomId);
     std::shared_ptr<Room> getRoomMutable(int64_t roomId);
+    RoomGameStartSnapshot getGameStartSnapshot(int64_t roomId) const;
 
     // Request handlers
     void handleCreateRoom(const TcpConnectionPtr& conn,

@@ -148,12 +148,35 @@ void rejectsForgedLeaveRoom() {
             "forged leave should receive an error response");
 }
 
+void gameStartSnapshotSurvivesLaterRoomMutation() {
+    game::RoomService service;
+    service.setSendFunc([](const game::TcpConnectionPtr&, const std::string&) {});
+
+    auto hostConn = fakeConn(7);
+    auto guestConn = fakeConn(8);
+    auto room = makeRoom(hostConn, guestConn);
+    installRoom(service, room);
+
+    auto snapshot = service.getGameStartSnapshot(room->roomId);
+
+    service.onConnectionClosed(guestConn);
+
+    require(snapshot.valid, "game start snapshot should exist for a valid room");
+    require(snapshot.players.size() == 2,
+            "game start snapshot should keep the validated player list stable");
+    require(room->players.size() == 1,
+            "test setup should remove the disconnected player from live room state");
+    require(snapshot.players[1].playerId == 10001,
+            "game start snapshot should preserve the disconnected player's identity");
+}
+
 } // namespace
 
 int main() {
     rejectsForgedReady();
     rejectsForgedStartGame();
     rejectsForgedLeaveRoom();
+    gameStartSnapshotSurvivesLaterRoomMutation();
     std::cout << "room_service_regression_test passed\n";
     return 0;
 }
