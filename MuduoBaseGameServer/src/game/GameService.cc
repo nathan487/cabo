@@ -144,13 +144,16 @@ void GameService::discardCard(GameRoom& room, const ::game::common::CardInfo& ca
 
 // ── Messaging ──
 
-std::string GameService::encodeServerMessage(const ::game::messages::ServerMessage& msg) {
+game::SendBufferPool::Lease GameService::encodeServerMessage(
+    const ::game::messages::ServerMessage& msg) {
 #ifdef CABO_ENABLE_SEND_PATH_STATS
     ++sendPathStats_.encodedFrames;
 #endif
-    std::string payload;
-    msg.SerializeToString(&payload);
-    return game::WebSocketCodec::encode(payload);
+    auto payload = game::SendBufferPool::threadLocal().acquire();
+    auto frame = game::SendBufferPool::threadLocal().acquire();
+    msg.SerializeToString(&payload.get());
+    game::WebSocketCodec::encode(payload.get(), &frame.get());
+    return frame;
 }
 
 void GameService::sendFrameToPlayer(const TcpConnectionPtr& conn,
@@ -166,8 +169,8 @@ void GameService::sendToPlayer(const TcpConnectionPtr& conn,
 
     auto frame = encodeServerMessage(msg);
     LOG_INFO("[Game] sendToPlayer: %s (%zu bytes)",
-             serverMessageTypeForLog(msg), frame.size());
-    sendFrameToPlayer(conn, frame);
+             serverMessageTypeForLog(msg), frame.get().size());
+    sendFrameToPlayer(conn, frame.get());
 }
 
 void GameService::broadcastToRoom(GameRoom& room,
@@ -175,20 +178,22 @@ void GameService::broadcastToRoom(GameRoom& room,
                                    int64_t excludePlayerId) {
     if (!sendFunc_) { LOG_INFO("[Game] broadcastToRoom: no sendFunc!"); return; }
 
-    std::string frame;
+    game::SendBufferPool::Lease frame;
+    bool hasFrame = false;
     int recipients = 0;
     for (auto& p : room.players) {
         if (p->playerId == excludePlayerId) continue;
         if (!p->conn || !p->isConnected) continue;
-        if (frame.empty()) {
+        if (!hasFrame) {
             frame = encodeServerMessage(msg);
+            hasFrame = true;
         }
-        sendFrameToPlayer(p->conn, frame);
+        sendFrameToPlayer(p->conn, frame.get());
         ++recipients;
     }
-    if (!frame.empty()) {
+    if (hasFrame) {
         LOG_INFO("[Game] broadcastToRoom: %s (%zu bytes, recipients=%d)",
-                 serverMessageTypeForLog(msg), frame.size(), recipients);
+                 serverMessageTypeForLog(msg), frame.get().size(), recipients);
     }
 }
 

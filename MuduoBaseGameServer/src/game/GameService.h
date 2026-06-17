@@ -2,6 +2,7 @@
 #include "proto/game.pb.h"
 #include "proto/common.pb.h"
 #include "proto/messages.pb.h"
+#include "common/SendBufferPool.h"
 #include <functional>
 #include "common/MessageDispatcher.h" // for TcpConnectionPtr
 #include <cstddef>
@@ -150,7 +151,7 @@ private:
     int nextCardId;
 
     // Notifications
-    std::string encodeServerMessage(const ::game::messages::ServerMessage& msg);
+    game::SendBufferPool::Lease encodeServerMessage(const ::game::messages::ServerMessage& msg);
     void sendFrameToPlayer(const TcpConnectionPtr& conn,
                            const std::string& frame);
     void sendToPlayer(const TcpConnectionPtr& conn,

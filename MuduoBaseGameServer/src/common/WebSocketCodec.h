@@ -27,6 +27,7 @@ public:
                    const CloseCallback& onClose);
 
     static std::string encode(const std::string& payload);
+    static void encode(const std::string& payload, std::string* frame);
     static std::string buildCloseFrame(uint16_t code = 1000,
                                        const std::string& reason = "");
 

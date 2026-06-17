@@ -315,11 +315,17 @@ void WebSocketCodec::decodeFrames(const MessageCallback& onMessage,
 
 std::string WebSocketCodec::encode(const std::string& payload) {
     std::string frame;
-    frame.reserve(10 + payload.size());
-    frame.push_back(static_cast<char>(0x82));
-    appendPayloadLength(frame, payload.size());
-    frame.append(payload);
+    encode(payload, &frame);
     return frame;
+}
+
+void WebSocketCodec::encode(const std::string& payload, std::string* frame) {
+    if (!frame) return;
+    frame->clear();
+    frame->reserve(10 + payload.size());
+    frame->push_back(static_cast<char>(0x82));
+    appendPayloadLength(*frame, payload.size());
+    frame->append(payload);
 }
 
 std::string WebSocketCodec::buildCloseFrame(uint16_t code, const std::string& reason) {

@@ -130,6 +130,14 @@ target_link_libraries(websocket_codec_test
     OpenSSL::Crypto
 )
 
+add_executable(send_buffer_pool_test
+    mytest/send_buffer_pool_test.cpp
+)
+target_include_directories(send_buffer_pool_test PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
+)
+
 add_executable(game_service_regression_test
     mytest/game_service_regression_test.cpp
     src/common/WebSocketCodec.cc

@@ -2,6 +2,7 @@
 #include "proto/room.pb.h"
 #include "proto/common.pb.h"
 #include "proto/messages.pb.h"
+#include "common/SendBufferPool.h"
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -107,7 +108,7 @@ public:
     void onConnectionClosed(const TcpConnectionPtr& conn);
 
 private:
-    std::string encodeServerMessage(const ::game::messages::ServerMessage& msg);
+    SendBufferPool::Lease encodeServerMessage(const ::game::messages::ServerMessage& msg);
     void sendFrame(const TcpConnectionPtr& conn,
                    const std::string& frame);
     void sendTo(const TcpConnectionPtr& conn,
