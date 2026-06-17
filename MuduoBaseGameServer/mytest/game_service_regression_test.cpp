@@ -3,6 +3,7 @@
 #undef private
 
 #include <cstdint>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -415,6 +416,39 @@ void callSteadyUsesPlayerVectorIndex() {
             "steady caller should be stored as player vector index");
 }
 
+void discardDrawnDoesNotBlockForAnimationDelay() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(17);
+    auto p2Conn = fakeConn(18);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::WaitingDrawDecision;
+    room->currentPlayerSeat = 0;
+    room->pendingDrewFromDiscard = false;
+    room->pendingDrawnCard = card(400, 5);
+    service.games_[room->roomId] = room;
+
+    ::game::messages::ClientMessage msg;
+    auto* req = msg.mutable_discard_drawn_req();
+    req->set_request_id(60);
+    req->set_room_id(room->roomId);
+    req->set_player_id(10000);
+
+    auto start = std::chrono::steady_clock::now();
+    service.handleDiscardDrawn(p1Conn, msg);
+    auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count();
+
+    require(elapsedMs < 250,
+            "discarding a drawn card must not block the server IO path for animation delay");
+    require(room->step == cabogame::GameStep::Playing,
+            "non-skill discard should advance the room back to Playing");
+}
+
 } // namespace
 
 int main() {
@@ -426,6 +460,7 @@ int main() {
     deckEmptyDrawReturnsAnError();
     gameOverTieBreakUsesActualRoundScore();
     callSteadyUsesPlayerVectorIndex();
+    discardDrawnDoesNotBlockForAnimationDelay();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

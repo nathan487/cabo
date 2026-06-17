@@ -6,7 +6,6 @@
 #include <climits>
 #include <set>
 #include <sstream>
-#include <thread>
 #include <utility>
 
 namespace cabogame {
@@ -36,6 +35,7 @@ GameService::GameService() : rng_(std::random_device{}()) {
 }
 
 std::shared_ptr<GameRoom> GameService::getRoom(int64_t roomId) {
+    std::lock_guard<std::mutex> lock(mutex_);
     auto it = games_.find(roomId);
     return (it != games_.end()) ? it->second : nullptr;
 }
@@ -70,6 +70,7 @@ bool GameService::isPlayerConnection(const PlayerGameState& player,
 // ── Deck ──
 
 void GameService::initDeck(GameRoom& room) {
+    std::lock_guard<std::mutex> lock(mutex_);
     room.drawPile.clear();
     room.discardPile.clear();
 
@@ -173,37 +174,56 @@ void GameService::startGame(int64_t roomId,
                              const std::vector<std::shared_ptr<PlayerGameState>>& players,
                              int64_t hostPlayerId) {
     auto room = std::make_shared<GameRoom>();
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     room->roomId = roomId;
     room->hostPlayerId = hostPlayerId;
     room->maxPlayers = static_cast<int32_t>(players.size());
     room->players = players;
     room->step = GameStep::Playing;
 
-    games_[roomId] = room;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        games_[roomId] = room;
+    }
 
     startNewRound(*room);
 }
 
 bool GameService::hasGame(int64_t roomId) const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return games_.count(roomId) > 0;
 }
 
 bool GameService::isGameOver(int64_t roomId) const {
-    auto it = games_.find(roomId);
-    return it != games_.end() && it->second->step == GameStep::GameOver;
+    std::shared_ptr<GameRoom> room;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = games_.find(roomId);
+        if (it == games_.end()) return false;
+        room = it->second;
+    }
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    return room->step == GameStep::GameOver;
 }
 
 bool GameService::canRestartRound(int64_t roomId) const {
-    auto it = games_.find(roomId);
-    if (it == games_.end()) return true;
-    const auto step = it->second->step;
+    std::shared_ptr<GameRoom> room;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = games_.find(roomId);
+        if (it == games_.end()) return true;
+        room = it->second;
+    }
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    const auto step = room->step;
     return step == GameStep::WaitingToStart || step == GameStep::GameOver;
 }
 
 void GameService::restartRound(int64_t roomId) {
-    auto it = games_.find(roomId);
-    if (it == games_.end()) return;
-    auto& room = *it->second;
+    auto roomPtr = getRoom(roomId);
+    if (!roomPtr) return;
+    std::lock_guard<std::mutex> roomLock(roomPtr->stateMutex);
+    auto& room = *roomPtr;
     if (room.step != GameStep::WaitingToStart) return;
     room.step = GameStep::Playing;
     startNewRound(room);
@@ -212,8 +232,17 @@ void GameService::restartRound(int64_t roomId) {
 void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
     if (!conn) return;
 
-    for (auto& kv : games_) {
-        auto& room = *kv.second;
+    std::vector<std::shared_ptr<GameRoom>> rooms;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& kv : games_) {
+            rooms.push_back(kv.second);
+        }
+    }
+
+    for (auto& roomPtr : rooms) {
+        std::lock_guard<std::mutex> roomLock(roomPtr->stateMutex);
+        auto& room = *roomPtr;
         if (room.step == GameStep::GameOver) continue;
 
         int32_t removedIndex = -1;
@@ -456,8 +485,7 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
 // ── Turn Management ──
 
 void GameService::endTurn(GameRoom& room) {
-    // 延迟 1.5 秒再切换回合，给客户端渲染操作动画的时间窗口
-    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // Never block an IO loop for animation pacing; clients animate from ActionResultNotify.
 
     if (room.step == GameStep::GameOver)
         return;
@@ -727,6 +755,7 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
     LOG_INFO("[Game] DrawCard req: player=%lld, room=%lld", (long long)req.player_id(), (long long)req.room_id());
     auto room = getRoom(req.room_id());
     if (!room) { LOG_INFO("[Game] DrawCard: room not found"); return; }
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
@@ -795,6 +824,7 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.discard_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
     if (room->pendingDrewFromDiscard) return;
@@ -864,6 +894,7 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.replace_with_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
 
@@ -1032,6 +1063,7 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
     const auto& req = msg.take_from_discard_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::Playing) return;
     if (room->discardPile.empty()) return;
@@ -1191,6 +1223,7 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
     const auto& req = msg.use_skill_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
@@ -1319,6 +1352,7 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     const auto& req = msg.call_steady_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->steadyCallerSeat >= 0) return; // Already called
     auto player = getPlayer(*room, req.player_id());
@@ -1380,6 +1414,7 @@ void GameService::handleEndGameEarly(const TcpConnectionPtr& conn,
         sendToPlayer(conn, rspMsg);
         return;
     }
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) {
@@ -1455,6 +1490,7 @@ void GameService::handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
         sendToPlayer(conn, rspMsg);
         return;
     }
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) {

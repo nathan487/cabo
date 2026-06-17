@@ -51,6 +51,8 @@ enum class GameStep {
 };
 
 struct GameRoom {
+    mutable std::mutex stateMutex;
+
     int64_t roomId;
     std::string roomCode;
     int32_t maxPlayers;
@@ -184,7 +186,7 @@ private:
 
     SendFunc sendFunc_;
     GameFinishedFunc gameFinishedFunc_;
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     std::mt19937 rng_;
     std::unordered_map<int64_t, std::shared_ptr<GameRoom>> games_;
 };
