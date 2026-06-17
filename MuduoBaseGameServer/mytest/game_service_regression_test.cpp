@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <chrono>
 #include <cstdlib>
+#include <future>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -279,6 +280,42 @@ void removesDisconnectedPlayerFromActiveGame() {
             "remaining player should receive GameOver after opponent disconnects");
 }
 
+void gameFinishedCallbackRunsAfterRoomLockReleased() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto p1Conn = fakeConn(19);
+    auto p2Conn = fakeConn(20);
+    auto room = makeRoom(p1Conn, p2Conn);
+    room->step = cabogame::GameStep::Playing;
+    service.games_[room->roomId] = room;
+
+    bool callbackRan = false;
+    bool restartableFromCallback = false;
+    service.setGameFinishedFunc([&](int64_t roomId) {
+        callbackRan = true;
+        restartableFromCallback = service.canRestartRound(roomId);
+    });
+
+    auto closeTask = std::async(std::launch::async, [&]() {
+        service.onConnectionClosed(p1Conn);
+    });
+
+    if (closeTask.wait_for(std::chrono::milliseconds(500)) != std::future_status::ready) {
+        std::cerr << "FAILED: game finished callback should not run while holding room state lock\n";
+        std::exit(1);
+    }
+    closeTask.get();
+
+    require(callbackRan,
+            "game finished callback should run after active game disconnect end");
+    require(restartableFromCallback,
+            "game finished callback should be able to query game state without deadlock");
+}
+
 void rejectsRestartRoundWhileRoundIsActive() {
     cabogame::GameService service;
     std::vector<SentFrame> sentFrames;
@@ -456,6 +493,7 @@ int main() {
     hidesDrawnIncomingValueFromOtherPlayers();
     rejectsSkillTypeMismatch();
     removesDisconnectedPlayerFromActiveGame();
+    gameFinishedCallbackRunsAfterRoomLockReleased();
     rejectsRestartRoundWhileRoundIsActive();
     deckEmptyDrawReturnsAnError();
     gameOverTieBreakUsesActualRoundScore();

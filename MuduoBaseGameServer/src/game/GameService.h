@@ -158,8 +158,8 @@ private:
                           bool hideIncomingValueFromOthers = false);
 
     // Turn management
-    void endTurn(GameRoom& room);
-    void revealAndScore(GameRoom& room);
+    bool endTurn(GameRoom& room);
+    bool revealAndScore(GameRoom& room);
     void startNewRound(GameRoom& room);
     void nextPlayer(GameRoom& room);
     bool canEndGameEarly(const GameRoom& room) const;
@@ -167,7 +167,8 @@ private:
     void broadcastGameOver(GameRoom& room,
                            const std::vector<std::shared_ptr<PlayerGameState>>& rankedPlayers,
                            const std::vector<int64_t>& winnerPlayerIds);
-    void finalizeEarlyGameOver(GameRoom& room);
+    bool finalizeEarlyGameOver(GameRoom& room);
+    void notifyGameFinished(int64_t roomId);
 
     // Skill execution
     void executePeekSelf(GameRoom& room, int64_t playerId, int32_t slotIndex);

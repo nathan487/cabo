@@ -241,7 +241,7 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
     }
 
     for (auto& roomPtr : rooms) {
-        std::lock_guard<std::mutex> roomLock(roomPtr->stateMutex);
+        std::unique_lock<std::mutex> roomLock(roomPtr->stateMutex);
         auto& room = *roomPtr;
         if (room.step == GameStep::GameOver) continue;
 
@@ -292,7 +292,9 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
 
         if (room.players.empty()) {
             room.step = GameStep::GameOver;
-            if (gameFinishedFunc_) gameFinishedFunc_(room.roomId);
+            const int64_t finishedRoomId = room.roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
             continue;
         }
 
@@ -300,7 +302,9 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
             room.step = GameStep::GameOver;
             std::vector<std::shared_ptr<PlayerGameState>> ranked = room.players;
             broadcastGameOver(room, ranked, { ranked[0]->playerId });
-            if (gameFinishedFunc_) gameFinishedFunc_(room.roomId);
+            const int64_t finishedRoomId = room.roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
             continue;
         }
 
@@ -484,22 +488,22 @@ void GameService::sendActionResult(GameRoom& room, int64_t sourcePlayerId,
 
 // ── Turn Management ──
 
-void GameService::endTurn(GameRoom& room) {
+bool GameService::endTurn(GameRoom& room) {
     // Never block an IO loop for animation pacing; clients animate from ActionResultNotify.
 
     if (room.step == GameStep::GameOver)
-        return;
+        return false;
 
     if (room.steadyCallerSeat >= 0) {
         room.finalRoundRemaining--;
         if (room.finalRoundRemaining <= 0) {
-            revealAndScore(room);
-            return;
+            return revealAndScore(room);
         }
     }
 
     nextPlayer(room);
     sendTurnStart(room);
+    return false;
 }
 
 void GameService::nextPlayer(GameRoom& room) {
@@ -524,6 +528,12 @@ bool GameService::canEndGameEarly(const GameRoom& room) const {
 void GameService::clearPendingEndGameRequest(GameRoom& room) {
     room.pendingEndGameRequesterPlayerId = 0;
     room.pendingEndGameRequesterConn.reset();
+}
+
+void GameService::notifyGameFinished(int64_t roomId) {
+    auto callback = gameFinishedFunc_;
+    if (callback)
+        callback(roomId);
 }
 
 void GameService::broadcastGameOver(
@@ -551,11 +561,9 @@ void GameService::broadcastGameOver(
     LOG_INFO("[Game] Broadcasting GameOverNotify room=%lld rankings=%zu winners=%zu",
              static_cast<long long>(room.roomId), rankedPlayers.size(), winnerPlayerIds.size());
     broadcastToRoom(room, goMsg);
-    if (gameFinishedFunc_)
-        gameFinishedFunc_(room.roomId);
 }
 
-void GameService::finalizeEarlyGameOver(GameRoom& room) {
+bool GameService::finalizeEarlyGameOver(GameRoom& room) {
     LOG_INFO("[Game] Early end requested; finalizing current scores in room %lld",
              static_cast<long long>(room.roomId));
 
@@ -578,13 +586,14 @@ void GameService::finalizeEarlyGameOver(GameRoom& room) {
         });
 
     broadcastGameOver(room, ranked, winners);
+    return true;
 }
 
 // ── Reveal & Score ──
 
-void GameService::revealAndScore(GameRoom& room) {
+bool GameService::revealAndScore(GameRoom& room) {
     if (room.step == GameStep::GameOver)
-        return;
+        return false;
 
     LOG_INFO("[Game] Round %d reveal — scoring...", room.roundNumber);
 
@@ -741,9 +750,11 @@ void GameService::revealAndScore(GameRoom& room) {
             return a->playerId < b->playerId;
         });
         broadcastGameOver(room, ranked, { winner->playerId });
+        return true;
     } else {
         // Wait for all players to ready up and host to start before next round
         room.step = GameStep::WaitingToStart;
+        return false;
     }
 }
 
@@ -755,7 +766,7 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
     LOG_INFO("[Game] DrawCard req: player=%lld, room=%lld", (long long)req.player_id(), (long long)req.room_id());
     auto room = getRoom(req.room_id());
     if (!room) { LOG_INFO("[Game] DrawCard: room not found"); return; }
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
@@ -793,7 +804,11 @@ void GameService::handleDrawCard(const TcpConnectionPtr& conn,
         rsp2->mutable_error()->set_code(4014);
         rsp2->mutable_error()->set_message("Deck empty, round ending");
         sendToPlayer(conn, errMsg);
-        revealAndScore(*room);
+        if (revealAndScore(*room)) {
+            const int64_t finishedRoomId = room->roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
+        }
         return;
     }
 
@@ -824,7 +839,7 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.discard_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
     if (room->pendingDrewFromDiscard) return;
@@ -885,7 +900,11 @@ void GameService::handleDiscardDrawn(const TcpConnectionPtr& conn,
         // The client should send UseSkillReq or a "skip skill" message
     } else {
         room->step = GameStep::Playing;
-        endTurn(*room);
+        if (endTurn(*room)) {
+            const int64_t finishedRoomId = room->roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
+        }
     }
 }
 
@@ -894,7 +913,7 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
     const auto& req = msg.replace_with_drawn_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::WaitingDrawDecision) return;
 
@@ -1055,7 +1074,11 @@ void GameService::handleReplaceWithDrawn(const TcpConnectionPtr& conn,
         ::game::common::SKILL_TYPE_NONE, false, &exResult, -1, -1, true);
 
     room->step = GameStep::Playing;
-    endTurn(*room);
+    if (endTurn(*room)) {
+        const int64_t finishedRoomId = room->roomId;
+        roomLock.unlock();
+        notifyGameFinished(finishedRoomId);
+    }
 }
 
 void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
@@ -1063,7 +1086,7 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
     const auto& req = msg.take_from_discard_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->step != GameStep::Playing) return;
     if (room->discardPile.empty()) return;
@@ -1215,7 +1238,11 @@ void GameService::handleTakeFromDiscard(const TcpConnectionPtr& conn,
         ::game::common::SKILL_TYPE_NONE, false, &exResult, -1, -1);
 
     room->step = GameStep::Playing;
-    endTurn(*room);
+    if (endTurn(*room)) {
+        const int64_t finishedRoomId = room->roomId;
+        roomLock.unlock();
+        notifyGameFinished(finishedRoomId);
+    }
 }
 
 void GameService::handleUseSkill(const TcpConnectionPtr& conn,
@@ -1223,7 +1250,7 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
     const auto& req = msg.use_skill_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
 
     auto player = getPlayer(*room, req.player_id());
@@ -1344,7 +1371,11 @@ void GameService::handleUseSkill(const TcpConnectionPtr& conn,
 
     // Skill ends the turn (skill card goes to discard, turn passes)
     room->step = GameStep::Playing;
-    endTurn(*room);
+    if (endTurn(*room)) {
+        const int64_t finishedRoomId = room->roomId;
+        roomLock.unlock();
+        notifyGameFinished(finishedRoomId);
+    }
 }
 
 void GameService::handleCallSteady(const TcpConnectionPtr& conn,
@@ -1352,7 +1383,7 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     const auto& req = msg.call_steady_req();
     auto room = getRoom(req.room_id());
     if (!room) return;
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
     if (room->step == GameStep::GameOver) return;
     if (room->steadyCallerSeat >= 0) return; // Already called
     auto player = getPlayer(*room, req.player_id());
@@ -1389,7 +1420,11 @@ void GameService::handleCallSteady(const TcpConnectionPtr& conn,
     sendActionResult(*room, player->playerId, ::game::common::ACTION_TYPE_CALL_STEADY, 0, ::game::common::SKILL_TYPE_NONE, false, nullptr, -1, -1);
 
     if (room->finalRoundRemaining <= 0) {
-        revealAndScore(*room);
+        if (revealAndScore(*room)) {
+            const int64_t finishedRoomId = room->roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
+        }
         return;
     }
 
@@ -1414,7 +1449,7 @@ void GameService::handleEndGameEarly(const TcpConnectionPtr& conn,
         sendToPlayer(conn, rspMsg);
         return;
     }
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) {
@@ -1444,7 +1479,11 @@ void GameService::handleEndGameEarly(const TcpConnectionPtr& conn,
         rsp->mutable_error()->set_code(0);
         sendToPlayer(conn, rspMsg);
         clearPendingEndGameRequest(*room);
-        finalizeEarlyGameOver(*room);
+        if (finalizeEarlyGameOver(*room)) {
+            const int64_t finishedRoomId = room->roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
+        }
         return;
     }
 
@@ -1490,7 +1529,7 @@ void GameService::handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
         sendToPlayer(conn, rspMsg);
         return;
     }
-    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    std::unique_lock<std::mutex> roomLock(room->stateMutex);
 
     auto player = getPlayer(*room, req.player_id());
     if (!player) {
@@ -1536,7 +1575,11 @@ void GameService::handleEndGameEarlyDecision(const TcpConnectionPtr& conn,
     clearPendingEndGameRequest(*room);
 
     if (req.approve()) {
-        finalizeEarlyGameOver(*room);
+        if (finalizeEarlyGameOver(*room)) {
+            const int64_t finishedRoomId = room->roomId;
+            roomLock.unlock();
+            notifyGameFinished(finishedRoomId);
+        }
         return;
     }
 
