@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Game.Messages;
 using Game.Room;
@@ -21,7 +22,8 @@ namespace Cabo.Client
 
         private readonly MessageDispatcher dispatcher = new();
 
-        public bool IsConnected { get; private set; }
+        private int isConnected;
+        public bool IsConnected => Volatile.Read(ref isConnected) != 0;
         public long NextSeq => _nextSeq;
         private long _nextSeq = 1;
 
@@ -70,19 +72,19 @@ namespace Cabo.Client
                 {
                     try { wsClient.Dispose(); } catch { }
                     wsClient = null;
-                    IsConnected = false;
+                    SetConnected(false);
                 }
 
                 wsClient = new WebSocketNetworkClient(url);
                 wsClient.Connected += () =>
                 {
-                    IsConnected = true;
+                    SetConnected(true);
                     Connected?.Invoke();
                 };
                 wsClient.Disconnected += () =>
                 {
                     bool wasConnected = IsConnected;
-                    IsConnected = false;
+                    SetConnected(false);
                     if (wasConnected)
                         Disconnected?.Invoke();
                 };
@@ -109,12 +111,12 @@ namespace Cabo.Client
 
             if (wasConnected && IsConnected)
             {
-                IsConnected = false;
+                SetConnected(false);
                 Disconnected?.Invoke();
             }
             else if (!wasConnected)
             {
-                IsConnected = false;
+                SetConnected(false);
             }
         }
 
@@ -330,6 +332,11 @@ namespace Cabo.Client
             {
                 Debug.LogError($"[NetworkGateway] Decode error: {ex}");
             }
+        }
+
+        private void SetConnected(bool connected)
+        {
+            Volatile.Write(ref isConnected, connected ? 1 : 0);
         }
     }
 }

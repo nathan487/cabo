@@ -13,13 +13,22 @@ namespace Cabo.Client.Network
     /// </summary>
     public sealed class WebSocketNetworkClient : IDisposable
     {
+        private readonly object stateLock = new object();
         private ClientWebSocket ws;
         private CancellationTokenSource receiveCts;
         private readonly SemaphoreSlim sendLock = new(1, 1);
         private readonly Uri url;
         private const int ReceiveBufferSize = 8192;
 
-        public NetworkClientState State { get; private set; } = NetworkClientState.Disconnected;
+        private NetworkClientState state = NetworkClientState.Disconnected;
+        public NetworkClientState State
+        {
+            get
+            {
+                lock (stateLock)
+                    return state;
+            }
+        }
 
         public event Action Connected;
         public event Action Disconnected;
@@ -33,40 +42,67 @@ namespace Cabo.Client.Network
 
         public async Task ConnectAsync()
         {
-            if (State == NetworkClientState.Connected || State == NetworkClientState.Connecting)
-                return;
+            ClientWebSocket socket;
+            CancellationTokenSource cts;
+            lock (stateLock)
+            {
+                if (state == NetworkClientState.Connected || state == NetworkClientState.Connecting)
+                    return;
 
-            State = NetworkClientState.Connecting;
+                state = NetworkClientState.Connecting;
+                socket = new ClientWebSocket();
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                ws = socket;
+            }
+
             try
             {
-                ws = new ClientWebSocket();
-                ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                await socket.ConnectAsync(url, CancellationToken.None);
+                lock (stateLock)
+                {
+                    if (ws != socket)
+                        return;
 
-                await ws.ConnectAsync(url, CancellationToken.None);
-                State = NetworkClientState.Connected;
-                receiveCts = new CancellationTokenSource();
-                _ = Task.Run(() => ReceiveLoop(receiveCts.Token));
+                    state = NetworkClientState.Connected;
+                    cts = new CancellationTokenSource();
+                    receiveCts = cts;
+                }
+
+                _ = Task.Run(() => ReceiveLoop(socket, cts.Token));
                 Connected?.Invoke();
                 Debug.Log($"[WebSocketNetworkClient] Connected to {url}");
             }
             catch (Exception ex)
             {
-                State = NetworkClientState.Disconnected;
+                lock (stateLock)
+                {
+                    if (ws == socket)
+                        ws = null;
+                    state = NetworkClientState.Disconnected;
+                }
                 ErrorOccurred?.Invoke($"Connect failed: {ex.Message}");
                 Debug.LogError($"[WebSocketNetworkClient] Connect error: {ex}");
-                try { ws?.Dispose(); } catch { }
-                ws = null;
+                try { socket.Dispose(); } catch { }
             }
         }
 
         public void Disconnect()
         {
-            var cts = receiveCts;
-            receiveCts = null;
+            ClientWebSocket socket;
+            CancellationTokenSource cts;
+            bool notifyDisconnected;
+            lock (stateLock)
+            {
+                cts = receiveCts;
+                receiveCts = null;
+                socket = ws;
+                ws = null;
+                notifyDisconnected = state != NetworkClientState.Disconnected;
+                state = NetworkClientState.Disconnected;
+            }
+
             try { cts?.Cancel(); } catch (ObjectDisposedException) { }
 
-            var socket = ws;
-            ws = null;
             if (socket != null)
             {
                 try
@@ -82,11 +118,8 @@ namespace Cabo.Client.Network
                 try { socket.Dispose(); } catch { }
             }
 
-            if (State != NetworkClientState.Disconnected)
-            {
-                State = NetworkClientState.Disconnected;
+            if (notifyDisconnected)
                 Disconnected?.Invoke();
-            }
             Debug.Log("[WebSocketNetworkClient] Disconnected");
         }
 
@@ -95,8 +128,15 @@ namespace Cabo.Client.Network
             await sendLock.WaitAsync();
             try
             {
-                var socket = ws;
-                if (State != NetworkClientState.Connected || socket == null || socket.State != WebSocketState.Open)
+                ClientWebSocket socket;
+                NetworkClientState currentState;
+                lock (stateLock)
+                {
+                    socket = ws;
+                    currentState = state;
+                }
+
+                if (currentState != NetworkClientState.Connected || socket == null || socket.State != WebSocketState.Open)
                 {
                     Debug.LogWarning("[WebSocketNetworkClient] Cannot send - not connected");
                     return;
@@ -124,13 +164,13 @@ namespace Cabo.Client.Network
             _ = SendAsync(data);
         }
 
-        private async Task ReceiveLoop(CancellationToken ct)
+        private async Task ReceiveLoop(ClientWebSocket socket, CancellationToken ct)
         {
             var buffer = new byte[ReceiveBufferSize];
             var messageBuffer = new List<byte>(ReceiveBufferSize);
             try
             {
-                while (!ct.IsCancellationRequested && ws != null && ws.State == WebSocketState.Open)
+                while (!ct.IsCancellationRequested && socket.State == WebSocketState.Open)
                 {
                     messageBuffer.Clear();
                     WebSocketReceiveResult result;
@@ -163,11 +203,24 @@ namespace Cabo.Client.Network
             }
             finally
             {
-                if (State == NetworkClientState.Connected)
+                bool notifyDisconnected = false;
+                lock (stateLock)
                 {
-                    State = NetworkClientState.Disconnected;
-                    Disconnected?.Invoke();
+                    if (ws == socket)
+                    {
+                        ws = null;
+                        receiveCts = null;
+                    }
+
+                    if (state == NetworkClientState.Connected)
+                    {
+                        state = NetworkClientState.Disconnected;
+                        notifyDisconnected = true;
+                    }
                 }
+
+                if (notifyDisconnected)
+                    Disconnected?.Invoke();
             }
         }
 
