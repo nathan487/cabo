@@ -53,11 +53,13 @@ RoomService::RoomService() : rng_(std::random_device{}()) {}
 // ── Public access ──
 
 const std::shared_ptr<Room> RoomService::getRoom(int64_t roomId) const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     auto it = rooms_.find(roomId);
     return (it != rooms_.end()) ? it->second : nullptr;
 }
 
 std::shared_ptr<Room> RoomService::getRoom(int64_t roomId) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     auto it = rooms_.find(roomId);
     return (it != rooms_.end()) ? it->second : nullptr;
 }
@@ -69,6 +71,7 @@ std::shared_ptr<Room> RoomService::getRoomMutable(int64_t roomId) {
 // ── Helpers ──
 
 std::string RoomService::generateRoomCode() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     static const char chars[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     std::uniform_int_distribution<int> dist(0, static_cast<int>(sizeof(chars)) - 2);
     std::string code(6, '\0');
@@ -84,14 +87,17 @@ std::string RoomService::generateSessionToken() {
 }
 
 int64_t RoomService::nextPlayerId() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     return nextPlayerId_++;
 }
 
 int64_t RoomService::nextRoomId() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     return nextRoomId_++;
 }
 
 int64_t RoomService::nextChatMessageId() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     return nextChatMessageId_++;
 }
 
@@ -119,7 +125,7 @@ void RoomService::sendTo(const TcpConnectionPtr& conn,
 void RoomService::broadcastToRoom(int64_t roomId,
                                    const ::game::messages::ServerMessage& msg,
                                    int64_t excludePlayerId) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     auto it = rooms_.find(roomId);
     if (it == rooms_.end()) return;
 
@@ -132,7 +138,7 @@ void RoomService::broadcastToRoom(int64_t roomId,
 }
 
 void RoomService::sendRoomState(int64_t roomId, const TcpConnectionPtr& conn) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     auto it = rooms_.find(roomId);
     if (it == rooms_.end()) return;
     auto& room = it->second;
@@ -166,11 +172,12 @@ void RoomService::sendRoomState(int64_t roomId, const TcpConnectionPtr& conn) {
 
 void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
                                     const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.create_room_req();
 
     // Check if this connection is already in a room
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         for (auto& kv : playerRooms_) {
             auto& room = kv.second;
             for (auto& p : room->players) {
@@ -208,7 +215,7 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
     room->players.push_back(player);
 
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         rooms_[room->roomId] = room;
         playerRooms_[player->playerId] = room;
     }
@@ -237,11 +244,12 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
 
 void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
                                   const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.join_room_req();
 
     // Check if this connection is already in a room
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         for (auto& kv : playerRooms_) {
             auto& room = kv.second;
             for (auto& p : room->players) {
@@ -261,7 +269,7 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
     // Find room by code
     std::shared_ptr<Room> room;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         for (auto& kv : rooms_) {
             if (kv.second->roomCode == req.room_code()) {
                 room = kv.second;
@@ -308,7 +316,7 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
     player->sessionToken = generateSessionToken();
 
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         room->players.push_back(player);
         playerRooms_[player->playerId] = room;
     }
@@ -351,13 +359,14 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
 
 bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
                                    const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.leave_room_req();
     int64_t playerId = req.player_id();
     int64_t roomId = req.room_id();
 
     std::shared_ptr<Room> room;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto it = rooms_.find(roomId);
         if (it == rooms_.end()) {
             // Try playerRooms_ lookup
@@ -374,7 +383,7 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
 
     int64_t newHostId = 0;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto& players = room->players;
         auto leavingPlayer = findPlayer(*room, playerId);
         if (!leavingPlayer || !isPlayerConnection(*leavingPlayer, conn)) {
@@ -420,13 +429,14 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
 
 void RoomService::handleReady(const TcpConnectionPtr& conn,
                                const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.ready_req();
     int64_t playerId = req.player_id();
     bool ready = req.is_ready();
 
     std::shared_ptr<Room> room;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto it = playerRooms_.find(playerId);
         if (it == playerRooms_.end()) {
             ::game::messages::ServerMessage rspMsg;
@@ -475,12 +485,13 @@ void RoomService::handleReady(const TcpConnectionPtr& conn,
 
 bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
                                    const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.start_game_req();
     int64_t playerId = req.player_id();
 
     std::shared_ptr<Room> room;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto it = playerRooms_.find(playerId);
         if (it == playerRooms_.end()) {
             ::game::messages::ServerMessage rspMsg;
@@ -557,6 +568,7 @@ bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
 
 void RoomService::handleRoomChat(const TcpConnectionPtr& conn,
                                   const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     const auto& req = msg.room_chat_req();
     const int64_t playerId = req.player_id();
     const int64_t roomId = req.room_id();
@@ -602,7 +614,7 @@ void RoomService::handleRoomChat(const TcpConnectionPtr& conn,
     std::string nickname;
     int64_t messageId = 0;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto roomIt = rooms_.find(roomId);
         auto playerRoomIt = playerRooms_.find(playerId);
         if (roomIt == rooms_.end() || playerRoomIt == playerRooms_.end()
@@ -651,9 +663,10 @@ void RoomService::handleRoomChat(const TcpConnectionPtr& conn,
 }
 
 void RoomService::markGameFinished(int64_t roomId) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     std::shared_ptr<Room> room;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto it = rooms_.find(roomId);
         if (it == rooms_.end()) return;
 
@@ -703,10 +716,11 @@ void RoomService::markGameFinished(int64_t roomId) {
 
 void RoomService::onConnectionClosed(const TcpConnectionPtr& conn) {
     if (!conn) return;
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
 
     std::vector<int64_t> roomsToUpdate;
     {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
         for (auto& kv : rooms_) {
             auto& room = kv.second;
             for (auto it = room->players.begin(); it != room->players.end(); ) {

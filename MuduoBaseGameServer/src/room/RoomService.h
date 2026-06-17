@@ -97,7 +97,7 @@ private:
     std::unordered_map<int64_t, std::shared_ptr<Room>> playerRooms_;
 
     SendFunc sendFunc_;
-    std::mutex mutex_;
+    mutable std::recursive_mutex mutex_;
     std::mt19937 rng_;
     int64_t nextPlayerId_ = 10000;
     int64_t nextRoomId_ = 1;
