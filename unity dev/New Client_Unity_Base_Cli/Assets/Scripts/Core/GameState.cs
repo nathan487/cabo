@@ -971,6 +971,13 @@ namespace Cabo.Client
             {
                 var pl = Players.Find(p => p.PlayerId == si.PlayerId);
                 if (pl != null) pl.TotalScore = si.TotalScore;
+
+                var rr = LastRoundResults.Find(r => r.PlayerId == si.PlayerId);
+                if (rr != null)
+                {
+                    rr.RoundScore = si.CurrentRoundScore;
+                    rr.CumulativeScore = si.TotalScore;
+                }
             }
         }
 

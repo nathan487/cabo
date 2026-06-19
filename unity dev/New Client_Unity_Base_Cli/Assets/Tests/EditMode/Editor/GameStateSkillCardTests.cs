@@ -134,5 +134,52 @@ namespace Cabo.Client.Tests
             Assert.AreEqual(0, state.PendingSkillCardId);
             Assert.AreEqual(0, state.PendingSkillCardSkill);
         }
+
+        [Test]
+        public void ScoreUpdateKeepsRoundRevealCumulativeScoreInSync()
+        {
+            var state = new GameState();
+            state.Players.Add(new PlayerInfo { PlayerId = 10000, Nickname = "P10000" });
+
+            state.UpdateFromMessage(new ServerMessage
+            {
+                RoundRevealNotify = new RoundRevealNotify
+                {
+                    RoomId = 1,
+                    RoundNumber = 1,
+                    Scores =
+                    {
+                        new RoundScoreDetail
+                        {
+                            PlayerId = 10000,
+                            RoundScore = 15,
+                            CumulativeScore = 100
+                        }
+                    }
+                }
+            });
+
+            state.UpdateFromMessage(new ServerMessage
+            {
+                ScoreUpdateNotify = new ScoreUpdateNotify
+                {
+                    RoomId = 1,
+                    RoundNumber = 1,
+                    Scores =
+                    {
+                        new PlayerScoreInfo
+                        {
+                            PlayerId = 10000,
+                            CurrentRoundScore = 15,
+                            TotalScore = 50
+                        }
+                    }
+                }
+            });
+
+            Assert.AreEqual(50, state.Players[0].TotalScore);
+            Assert.AreEqual(50, state.LastRoundResults[0].CumulativeScore);
+            Assert.AreEqual(15, state.LastRoundResults[0].RoundScore);
+        }
     }
 }

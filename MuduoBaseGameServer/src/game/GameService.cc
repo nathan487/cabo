@@ -293,6 +293,29 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
 
         auto removedPlayer = room.players[removedIndex];
         const bool removedCurrent = removedIndex == room.currentPlayerSeat;
+        const int32_t playerCountBeforeRemoval = static_cast<int32_t>(room.players.size());
+        bool removedHadPendingFinalTurn = false;
+        if (room.steadyCallerSeat >= 0
+            && room.finalRoundRemaining > 0
+            && removedIndex != room.steadyCallerSeat
+            && playerCountBeforeRemoval > 1) {
+            int32_t pendingTurnsToScan = std::min(
+                room.finalRoundRemaining,
+                playerCountBeforeRemoval - 1);
+            int32_t seat = room.currentPlayerSeat;
+            for (int32_t scannedSeats = 0;
+                 scannedSeats < playerCountBeforeRemoval && pendingTurnsToScan > 0;
+                 ++scannedSeats) {
+                if (seat != room.steadyCallerSeat) {
+                    if (seat == removedIndex) {
+                        removedHadPendingFinalTurn = true;
+                        break;
+                    }
+                    --pendingTurnsToScan;
+                }
+                seat = (seat + 1) % playerCountBeforeRemoval;
+            }
+        }
         LOG_INFO("[Game] Player %lld disconnected from active game room=%lld",
                  (long long)removedPlayer->playerId, (long long)room.roomId);
 
@@ -317,12 +340,22 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
         if (room.steadyCallerSeat == removedIndex) {
             room.steadyCallerSeat = -1;
             room.finalRoundRemaining = 0;
-        } else if (room.steadyCallerSeat > removedIndex) {
-            room.steadyCallerSeat--;
-        } else if (room.finalRoundRemaining > 0) {
-            room.finalRoundRemaining = std::min(
-                room.finalRoundRemaining,
-                static_cast<int32_t>(room.players.size()) - 1);
+        } else {
+            if (room.steadyCallerSeat > removedIndex) {
+                room.steadyCallerSeat--;
+            }
+            if (room.finalRoundRemaining > 0) {
+                if (removedHadPendingFinalTurn) {
+                    room.finalRoundRemaining = std::max<int32_t>(
+                        0,
+                        room.finalRoundRemaining - 1);
+                }
+                room.finalRoundRemaining = std::min(
+                    room.finalRoundRemaining,
+                    std::max<int32_t>(
+                        0,
+                        static_cast<int32_t>(room.players.size()) - 1));
+            }
         }
         clearPendingEndGameRequest(room);
 

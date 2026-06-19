@@ -517,6 +517,49 @@ void publicGameBroadcastEncodesFrameOnceForAllRecipients() {
             "public game broadcast should encode and frame the shared payload once");
 }
 
+void finalRoundDisconnectConsumesPendingTurn() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto callerConn = fakeConn(25);
+    auto finishedConn = fakeConn(26);
+    auto disconnectingConn = fakeConn(27);
+    auto waitingConn = fakeConn(28);
+
+    auto room = std::make_shared<cabogame::GameRoom>();
+    room->roomId = 3;
+    room->roomCode = "TEST03";
+    room->maxPlayers = 4;
+    room->hostPlayerId = 10000;
+    room->step = cabogame::GameStep::Playing;
+    room->roundNumber = 1;
+    room->currentPlayerSeat = 2;
+    room->steadyCallerSeat = 0;
+    room->finalRoundRemaining = 2;
+    room->players.push_back(player(10000, 0, callerConn));
+    room->players.push_back(player(10001, 1, finishedConn));
+    room->players.push_back(player(10002, 2, disconnectingConn));
+    room->players.push_back(player(10003, 3, waitingConn));
+    room->drawPile.push_back(card(700, 2));
+    service.games_[room->roomId] = room;
+
+    service.onConnectionClosed(disconnectingConn);
+
+    require(room->players.size() == 3,
+            "only the disconnected final-round player should be removed");
+    require(room->currentPlayerSeat == 2,
+            "turn should advance to the next remaining final-round player");
+    require(room->players[room->currentPlayerSeat]->playerId == 10003,
+            "next remaining player should become current after disconnect");
+    require(room->finalRoundRemaining == 1,
+            "disconnecting a pending final-round player should consume that pending turn");
+    require(room->steadyCallerSeat == 0,
+            "steady caller index should remain valid after later player disconnects");
+}
+
 } // namespace
 
 int main() {
@@ -531,6 +574,7 @@ int main() {
     callSteadyUsesPlayerVectorIndex();
     discardDrawnDoesNotBlockForAnimationDelay();
     publicGameBroadcastEncodesFrameOnceForAllRecipients();
+    finalRoundDisconnectConsumesPendingTurn();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }
