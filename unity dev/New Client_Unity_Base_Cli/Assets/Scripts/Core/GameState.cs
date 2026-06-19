@@ -97,6 +97,7 @@ namespace Cabo.Client
         // Draw state
         public bool HasDrawnCard;
         public int DrawnCardId, DrawnCardValue, DrawnCardSkill;
+        public int PendingSkillCardId, PendingSkillCardSkill;
         public long DrawResponseSequence;
 
         // Request waiting flags
@@ -442,6 +443,7 @@ namespace Cabo.Client
             Phase = GamePhase.Playing;
             ClearLocalCardKnowledge();
             ResetEarlyEndState();
+            ClearPendingSkillCard();
             RoundJustRevealed = false;
             GameOverPending = false;
             GameStartConfirmed = false;
@@ -528,6 +530,7 @@ namespace Cabo.Client
             if (notify.CurrentPlayerId == MyPlayerId)
             {
                 HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0;
+                ClearPendingSkillCard();
                 WaitingForDrawResponse = false; WaitingForTakeResponse = false;
                 WaitingForCallSteadyResponse = false; WaitingForSkillResponse = false;
             }
@@ -544,6 +547,7 @@ namespace Cabo.Client
             WaitingForDrawResponse = false;
             if (rsp.Error?.Code == 0)
             {
+                ClearPendingSkillCard();
                 HasDrawnCard = true; DrawnCardId = rsp.CardId; DrawnCardValue = rsp.Value;
                 DrawnCardSkill = (int)(rsp.Skill);
                 DrawResponseSequence++;
@@ -552,7 +556,20 @@ namespace Cabo.Client
 
         void HandleDiscardDrawn(DiscardDrawnRsp rsp)
         {
-            if (rsp.Error?.Code == 0) { HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0; }
+            if (rsp.Error?.Code == 0)
+            {
+                if (IsPlayableSkill(DrawnCardSkill) && DrawnCardId != 0)
+                {
+                    PendingSkillCardId = DrawnCardId;
+                    PendingSkillCardSkill = DrawnCardSkill;
+                }
+                else
+                {
+                    ClearPendingSkillCard();
+                }
+
+                HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0;
+            }
         }
 
         void HandleReplaceWithDrawn(ReplaceWithDrawnRsp rsp)
@@ -589,6 +606,7 @@ namespace Cabo.Client
             DrawnCardId = 0;
             DrawnCardValue = 0;
             DrawnCardSkill = 0;
+            ClearPendingSkillCard();
             SyncMyCardCount();
         }
 
@@ -648,11 +666,16 @@ namespace Cabo.Client
         void HandleUseSkill(UseSkillRsp rsp)
         {
             WaitingForSkillResponse = false;
-            if (rsp.Error?.Code == 0)
-            {
-                LastPeekedValue = rsp.PeekedValue;
-                LastSwapOccurred = rsp.SwapOccurred;
-            }
+            if (rsp.Error?.Code != 0)
+                return;
+
+            LastPeekedValue = rsp.PeekedValue;
+            LastSwapOccurred = rsp.SwapOccurred;
+            ClearPendingSkillCard();
+            HasDrawnCard = false;
+            DrawnCardId = 0;
+            DrawnCardValue = 0;
+            DrawnCardSkill = 0;
         }
 
         void HandleCallSteady(CallSteadyRsp rsp)
@@ -744,6 +767,7 @@ namespace Cabo.Client
             }
 
             if (ar.TurnEnded) { HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0; }
+            if (ar.TurnEnded) ClearPendingSkillCard();
             SyncMyCardCount();
 
             LastActionMessage = BuildActionMessage(ar);
@@ -907,6 +931,8 @@ namespace Cabo.Client
         void HandleRoundReveal(RoundRevealNotify rrn)
         {
             Phase = GamePhase.RoundReveal; RoundJustRevealed = true;
+            ClearPendingSkillCard();
+            HasDrawnCard = false; DrawnCardId = 0; DrawnCardValue = 0; DrawnCardSkill = 0;
             GameOverPending = false;
             GameStartConfirmed = false;
             SteadyCallerId = rrn.SteadyCallerId;
@@ -1003,6 +1029,19 @@ namespace Cabo.Client
             ShowEndGameRejectedPrompt = false;
         }
 
+        public void ClearPendingSkillCard()
+        {
+            PendingSkillCardId = 0;
+            PendingSkillCardSkill = 0;
+        }
+
+        public static bool IsPlayableSkill(int skill)
+        {
+            return skill == (int)SkillType.PeekSelf
+                || skill == (int)SkillType.Spy
+                || skill == (int)SkillType.Swap;
+        }
+
         public void ReturnToRoomAfterGameOver()
         {
             if (Phase != GamePhase.GameOver)
@@ -1022,6 +1061,7 @@ namespace Cabo.Client
             DrawnCardId = 0;
             DrawnCardValue = 0;
             DrawnCardSkill = 0;
+            ClearPendingSkillCard();
             WaitingForDrawResponse = false;
             WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false;
@@ -1088,6 +1128,7 @@ namespace Cabo.Client
             DrawnCardId = 0;
             DrawnCardValue = 0;
             DrawnCardSkill = 0;
+            ClearPendingSkillCard();
             WaitingForDrawResponse = false;
             WaitingForTakeResponse = false;
             WaitingForCallSteadyResponse = false;

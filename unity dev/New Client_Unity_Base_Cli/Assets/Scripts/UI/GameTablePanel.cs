@@ -1588,7 +1588,7 @@ namespace Cabo.Client.UI
                     _actionBody.text = "可以弃掉、替换手牌，或弃掉后发动技能。";
                     AddActionButton("弃牌", () => _flow.DoDiscardDrawn(false), true);
                     AddActionButton("替换", () => _flow.BeginReplaceWithDrawn(), true);
-                    AddActionButton(BuildSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), state.DrawnCardSkill > 0);
+                    AddActionButton(BuildSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), GameState.IsPlayableSkill(state.DrawnCardSkill));
                     break;
 
                 case GameSubState.AwaitingReplaceSlots:
@@ -1598,7 +1598,7 @@ namespace Cabo.Client.UI
                     AddActionButton("确认替换", () => ConfirmReplace(), _selectedOwnSlots.Count > 0);
                     AddActionButton("返回选择", () => ReturnToDrawnDecision(), true);
                     AddActionButton("改为弃牌", () => _flow.DoDiscardDrawn(false), true);
-                    AddActionButton(BuildChangeToSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), state.DrawnCardSkill > 0);
+                    AddActionButton(BuildChangeToSkillButtonText(state.DrawnCardSkill), () => _flow.DoDiscardDrawn(true), GameState.IsPlayableSkill(state.DrawnCardSkill));
                     break;
 
                 case GameSubState.AwaitingTakeSlots:
@@ -5011,13 +5011,13 @@ namespace Cabo.Client.UI
                 case GameSubState.AwaitingDrawnDecision:
                     SetActionButtonEnabled(0, true);
                     SetActionButtonEnabled(1, true);
-                    SetActionButtonEnabled(2, state.DrawnCardSkill > 0);
+                    SetActionButtonEnabled(2, GameState.IsPlayableSkill(state.DrawnCardSkill));
                     break;
                 case GameSubState.AwaitingReplaceSlots:
                     SetActionButtonEnabled(0, _selectedOwnSlots.Count > 0);
                     SetActionButtonEnabled(1, true);
                     SetActionButtonEnabled(2, true);
-                    SetActionButtonEnabled(3, state.DrawnCardSkill > 0);
+                    SetActionButtonEnabled(3, GameState.IsPlayableSkill(state.DrawnCardSkill));
                     break;
                 case GameSubState.AwaitingTakeSlots:
                     SetActionButtonEnabled(0, _selectedOwnSlots.Count > 0);

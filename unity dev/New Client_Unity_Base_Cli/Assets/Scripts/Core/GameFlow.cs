@@ -418,7 +418,8 @@ namespace Cabo.Client
         public void DoDiscardDrawn(bool useSkill)
         {
             Gateway.SendDiscardDrawn(State.MyPlayerId, State.RoomId);
-            SkillTypePending = useSkill ? State.DrawnCardSkill : (State.DrawnCardSkill > 0 ? -1 : 0);
+            bool hasPlayableSkill = GameState.IsPlayableSkill(State.DrawnCardSkill);
+            SkillTypePending = useSkill && hasPlayableSkill ? State.DrawnCardSkill : hasPlayableSkill ? -1 : 0;
             SubState = GameSubState.WaitingDiscardRsp;
             StateChanged?.Invoke();
         }
@@ -520,11 +521,12 @@ namespace Cabo.Client
 
         void SendSkillRequest()
         {
+            int skillCardId = State.PendingSkillCardId != 0 ? State.PendingSkillCardId : State.DrawnCardId;
             switch (SkillTypePending)
             {
-                case 2: Gateway.SendUseSkillPeekSelf(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillMySlot); break;
-                case 3: Gateway.SendUseSkillSpy(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillTargetPlayerId, SkillTargetSlot); break;
-                case 4: Gateway.SendUseSkillSwap(State.MyPlayerId, State.RoomId, State.DrawnCardId, SkillTargetPlayerId, SkillMySlot, SkillTargetSlot); break;
+                case 2: Gateway.SendUseSkillPeekSelf(State.MyPlayerId, State.RoomId, skillCardId, SkillMySlot); break;
+                case 3: Gateway.SendUseSkillSpy(State.MyPlayerId, State.RoomId, skillCardId, SkillTargetPlayerId, SkillTargetSlot); break;
+                case 4: Gateway.SendUseSkillSwap(State.MyPlayerId, State.RoomId, skillCardId, SkillTargetPlayerId, SkillMySlot, SkillTargetSlot); break;
             }
             SkillTypeJustCompleted = SkillTypePending;
             SkillTypePending = 0;
@@ -535,7 +537,10 @@ namespace Cabo.Client
 
         public void DoSkipSkill()
         {
-            Gateway.SendSkipSkill(State.MyPlayerId, State.RoomId, State.DrawnCardId);
+            int skillCardId = State.PendingSkillCardId != 0 ? State.PendingSkillCardId : State.DrawnCardId;
+            Gateway.SendSkipSkill(State.MyPlayerId, State.RoomId, skillCardId);
+            SkillTypeJustCompleted = -1;
+            SkillTypePending = 0;
             State.WaitingForSkillResponse = true;
             SubState = GameSubState.WaitingSkillRsp;
             StateChanged?.Invoke();
@@ -630,7 +635,24 @@ namespace Cabo.Client
             // UseSkillRsp arrived
             if (SubState == GameSubState.WaitingSkillRsp && !State.WaitingForSkillResponse)
             {
-                if (SkillTypeJustCompleted == 2) // PeekSelf
+                bool skillStillPending = State.PendingSkillCardId != 0
+                    && GameState.IsPlayableSkill(State.PendingSkillCardSkill);
+                if (skillStillPending)
+                {
+                    SkillTypePending = State.PendingSkillCardSkill;
+                    SkillTypeJustCompleted = 0;
+                    SkillMySlot = -1;
+                    SkillTargetSlot = -1;
+                    SkillTargetPlayerId = 0;
+                    SubState = SkillTypePending switch
+                    {
+                        2 => GameSubState.SkillPeekSlot,
+                        3 => GameSubState.SkillSpyTarget,
+                        4 => GameSubState.SkillSwapMySlot,
+                        _ => GameSubState.Idle
+                    };
+                }
+                else if (SkillTypeJustCompleted == 2) // PeekSelf
                 {
                     if (SkillMySlot >= 0 && SkillMySlot < State.MyCards.Count)
                     {
@@ -642,8 +664,11 @@ namespace Cabo.Client
                 {
                     State.ApplyOwnSwapVisibility(SkillMySlot);
                 }
-                SkillTypeJustCompleted = 0;
-                SubState = GameSubState.Idle;
+                if (!skillStillPending)
+                {
+                    SkillTypeJustCompleted = 0;
+                    SubState = GameSubState.Idle;
+                }
             }
 
             // My turn + Idle → show main menu
