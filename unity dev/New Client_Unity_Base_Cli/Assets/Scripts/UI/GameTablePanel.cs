@@ -31,6 +31,7 @@ namespace Cabo.Client.UI
         const float SkillHoldDuration = 1.60f;
         const float FlipRevealDuration = 1.80f;
         const float CaboCallDuration = 1.20f;
+        const float SpecialEffectDuration = 1.20f;
         const float AnimationSettleDuration = 0.25f;
         const float EmptyOriginHoldDuration = 0.20f;
         const float SurvivorMoveDuration = 0.48f;
@@ -2575,6 +2576,7 @@ namespace Cabo.Client.UI
         void PlayActionAnimation(ActionAnimationSnapshot action)
         {
             PlayActionSfx(action);
+            PlaySpecialEffectOverlay(action);
 
             // For exchange actions, capture FinalSourceHandBounds now after layout settle delay
             // This ensures UI Toolkit has completed layout calculations for the new hand size
@@ -2618,6 +2620,165 @@ namespace Cabo.Client.UI
         {
             foreach (var cue in GetActionSfxCues(action.ActionType, action.Skill, action.Sequence == _lastLocalDrawSequence))
                 CaboAudio.Play(cue, GetActionSfxVolume(cue));
+        }
+
+        void PlaySpecialEffectOverlay(ActionAnimationSnapshot action)
+        {
+            var cue = GetActionSpecialEffect(action.ActionType, action.Skill);
+            if (cue == CaboSpecialEffect.None)
+                return;
+
+            var sprite = CaboArt.GetSpecialEffect(cue);
+            if (sprite == null)
+                return;
+
+            var rootBounds = _root.worldBound;
+            if (rootBounds.width <= 20f || rootBounds.height <= 20f)
+                return;
+
+            var generation = _animationGeneration;
+            var host = new VisualElement();
+            host.pickingMode = PickingMode.Ignore;
+            host.style.position = Position.Absolute;
+            host.style.flexDirection = FlexDirection.Column;
+            host.style.alignItems = Align.Center;
+            host.style.justifyContent = Justify.Center;
+            host.style.opacity = 0f;
+
+            var art = new VisualElement();
+            art.pickingMode = PickingMode.Ignore;
+            art.style.backgroundImage = new StyleBackground(sprite);
+            art.style.backgroundColor = Color.clear;
+            art.style.flexShrink = 0;
+            host.Add(art);
+
+            var label = new Label(GetSpecialEffectLabel(cue));
+            label.pickingMode = PickingMode.Ignore;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.fontSize = 24;
+            label.style.color = GetSpecialEffectLabelColor(cue);
+            label.style.marginTop = -18;
+            label.style.height = 34;
+            label.style.minWidth = 0;
+            label.style.paddingLeft = 12;
+            label.style.paddingRight = 12;
+            label.style.backgroundColor = new Color(1f, 0.98f, 0.92f, 0.82f);
+            label.style.borderTopLeftRadius = 17;
+            label.style.borderTopRightRadius = 17;
+            label.style.borderBottomLeftRadius = 17;
+            label.style.borderBottomRightRadius = 17;
+            SetBorderColor(label, new Color(1f, 0.86f, 0.58f, 0.78f));
+            SetBorderWidth(label, 1f);
+            host.Add(label);
+
+            _animationLayer.BringToFront();
+            _animationLayer.Add(host);
+
+            float startedAt = Time.realtimeSinceStartup;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                if (generation != _animationGeneration || host.panel == null)
+                {
+                    item?.Pause();
+                    host.RemoveFromHierarchy();
+                    return;
+                }
+
+                var bounds = _root.worldBound;
+                float maxSize = Mathf.Min(bounds.width * 0.54f, bounds.height * 0.50f);
+                if (maxSize <= 20f)
+                    return;
+
+                float targetSize = Mathf.Min(Mathf.Clamp(maxSize, 118f, 310f), maxSize);
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / SpecialEffectDuration);
+                float fadeIn = Mathf.Clamp01(t / 0.16f);
+                float fadeOut = 1f - Mathf.Clamp01((t - 0.76f) / 0.24f);
+                float opacity = Mathf.Min(fadeIn, fadeOut);
+                float pulse = 0.90f + Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI) * 0.14f;
+                float size = targetSize * pulse;
+                float labelWidth = Mathf.Min(Mathf.Max(148f, targetSize * 0.68f), bounds.width * 0.82f);
+                float hostWidth = Mathf.Max(size, labelWidth);
+                float hostHeight = size + 42f;
+                var rootOrigin = new Vector2(bounds.x, bounds.y);
+                var center = CenterOf(bounds);
+                if (center == Vector2.zero)
+                    center = rootOrigin + new Vector2(bounds.width * 0.5f, bounds.height * 0.5f);
+                var local = center - rootOrigin;
+
+                host.style.width = hostWidth;
+                host.style.height = hostHeight;
+                host.style.left = local.x - hostWidth * 0.5f;
+                host.style.top = local.y - hostHeight * 0.5f;
+                host.style.opacity = opacity;
+                art.style.width = size;
+                art.style.height = size;
+                label.style.width = labelWidth;
+
+                if (t >= 1f)
+                {
+                    item?.Pause();
+                    host.RemoveFromHierarchy();
+                }
+            }).Every(16);
+        }
+
+        public static CaboSpecialEffect GetActionSpecialEffect(ActionType actionType, SkillType skill)
+        {
+            switch (actionType)
+            {
+                case ActionType.UseSkill:
+                    switch (skill)
+                    {
+                        case SkillType.PeekSelf:
+                            return CaboSpecialEffect.PeekSelf;
+                        case SkillType.Spy:
+                            return CaboSpecialEffect.Spy;
+                        case SkillType.Swap:
+                            return CaboSpecialEffect.Swap;
+                        default:
+                            return CaboSpecialEffect.None;
+                    }
+                case ActionType.CallSteady:
+                    return CaboSpecialEffect.Cabo;
+                default:
+                    return CaboSpecialEffect.None;
+            }
+        }
+
+        static string GetSpecialEffectLabel(CaboSpecialEffect cue)
+        {
+            switch (cue)
+            {
+                case CaboSpecialEffect.PeekSelf:
+                    return "\u81EA\u68C0\u9910\u76D8";
+                case CaboSpecialEffect.Spy:
+                    return "\u8425\u517B\u4FA6\u67E5";
+                case CaboSpecialEffect.Swap:
+                    return "\u9910\u76D8\u4EA4\u6362";
+                case CaboSpecialEffect.Cabo:
+                    return "\u5065\u5EB7\u5BA3\u8A00";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        static Color GetSpecialEffectLabelColor(CaboSpecialEffect cue)
+        {
+            switch (cue)
+            {
+                case CaboSpecialEffect.PeekSelf:
+                    return new Color(0.12f, 0.48f, 0.40f, 1f);
+                case CaboSpecialEffect.Spy:
+                    return new Color(0.23f, 0.30f, 0.72f, 1f);
+                case CaboSpecialEffect.Swap:
+                    return new Color(0.76f, 0.28f, 0.18f, 1f);
+                case CaboSpecialEffect.Cabo:
+                    return new Color(0.70f, 0.28f, 0.18f, 1f);
+                default:
+                    return UITheme.TextPrimary;
+            }
         }
 
         public static IReadOnlyList<CaboSfx> GetActionSfxCues(ActionType actionType, SkillType skill, bool skipDrawSfx)

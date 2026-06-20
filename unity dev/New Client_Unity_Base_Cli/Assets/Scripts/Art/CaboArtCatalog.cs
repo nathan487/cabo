@@ -16,6 +16,15 @@ namespace Cabo.Client.Art
         Victory
     }
 
+    public enum CaboSpecialEffect
+    {
+        None,
+        PeekSelf,
+        Spy,
+        Swap,
+        Cabo
+    }
+
     public enum ConsumePose
     {
         None,
@@ -81,6 +90,10 @@ namespace Cabo.Client.Art
         public Sprite settlementBackground;
         public TableStationConfig[] tableStations = Array.Empty<TableStationConfig>();
         public Sprite tableCenterBackground;
+        public Sprite skillPeekSelfEffect;
+        public Sprite skillSpyEffect;
+        public Sprite skillSwapEffect;
+        public Sprite caboCallEffect;
         public AudioClip bgmClip;
         public AudioClip drawSfx;
         public AudioClip flipSfx;
@@ -120,6 +133,18 @@ namespace Cabo.Client.Art
             }
 
             return null;
+        }
+
+        public Sprite GetSpecialEffect(CaboSpecialEffect cue)
+        {
+            switch (cue)
+            {
+                case CaboSpecialEffect.PeekSelf: return skillPeekSelfEffect;
+                case CaboSpecialEffect.Spy: return skillSpyEffect;
+                case CaboSpecialEffect.Swap: return skillSwapEffect;
+                case CaboSpecialEffect.Cabo: return caboCallEffect;
+                default: return null;
+            }
         }
 
         public AudioClip GetSfx(CaboSfx cue)

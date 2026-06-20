@@ -196,6 +196,10 @@ MonoBehaviour:
     leftView: {fileID: 21300000, guid: 38924920ee089f2419b5ed3c3ebabe6d, type: 3}
     rightView: {fileID: 21300000, guid: 64625aed9f552b040bbfd2504882ca64, type: 3}
   tableCenterBackground: {fileID: 21300000, guid: 3271a72733f8c2d4b97feb3b0b125603, type: 3}
+  skillPeekSelfEffect: {fileID: 21300000, guid: bed3af02ab3d9ae4d8ee56b160d137ed, type: 3}
+  skillSpyEffect: {fileID: 21300000, guid: 499d080027e6a014a90f93a42f335188, type: 3}
+  skillSwapEffect: {fileID: 21300000, guid: 64efcd5b60f1be84b8a2eadddf7bded3, type: 3}
+  caboCallEffect: {fileID: 21300000, guid: a7463093ae84d6b47bde0dfb612783a4, type: 3}
   bgmClip: {fileID: 8300000, guid: a165182d2278f524a97b075a1f500727, type: 3}
   drawSfx: {fileID: 8300000, guid: 3e7799b770c343f43916f3e78a1ba15b, type: 3}
   flipSfx: {fileID: 8300000, guid: 526e0716539165645a050239158216f7, type: 3}

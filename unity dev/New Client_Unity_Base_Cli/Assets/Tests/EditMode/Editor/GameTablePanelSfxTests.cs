@@ -30,5 +30,40 @@ namespace Cabo.Client.Tests
 
             CollectionAssert.AreEqual(new[] { CaboSfx.Skill }, cues);
         }
+
+        [Test]
+        public void SkippedSkillActionDoesNotPlaySpecialEffect()
+        {
+            var effect = GameTablePanel.GetActionSpecialEffect(ActionType.UseSkill, SkillType.Unknown);
+
+            Assert.AreEqual(CaboSpecialEffect.None, effect);
+        }
+
+        [Test]
+        public void RealSkillActionsMapToSpecialEffects()
+        {
+            Assert.AreEqual(CaboSpecialEffect.PeekSelf, GameTablePanel.GetActionSpecialEffect(ActionType.UseSkill, SkillType.PeekSelf));
+            Assert.AreEqual(CaboSpecialEffect.Spy, GameTablePanel.GetActionSpecialEffect(ActionType.UseSkill, SkillType.Spy));
+            Assert.AreEqual(CaboSpecialEffect.Swap, GameTablePanel.GetActionSpecialEffect(ActionType.UseSkill, SkillType.Swap));
+        }
+
+        [Test]
+        public void CallSteadyActionMapsToCaboSpecialEffect()
+        {
+            var effect = GameTablePanel.GetActionSpecialEffect(ActionType.CallSteady, SkillType.Unknown);
+
+            Assert.AreEqual(CaboSpecialEffect.Cabo, effect);
+        }
+
+        [Test]
+        public void SpecialEffectSpritesAreConfiguredInArtCatalog()
+        {
+            CaboArt.ResetCache();
+
+            Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.PeekSelf));
+            Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.Spy));
+            Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.Swap));
+            Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.Cabo));
+        }
     }
 }
