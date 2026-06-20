@@ -135,6 +135,8 @@ namespace Cabo.Client.UI.CardTable
         int _lastScreenHeight;
         bool _layoutRefreshQueued;
         bool _lastFreezePiles;
+        long _lastFrozenPlayerId;
+        long _lastSecondFrozenPlayerId;
 
         public bool HasRenderableLayout { get; private set; }
         public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0;
@@ -333,6 +335,8 @@ namespace Cabo.Client.UI.CardTable
             _lastScreenHeight = Screen.height;
             HasRenderableLayout = layout.Slots.Count > 0;
             _lastFreezePiles = freezePiles;
+            _lastFrozenPlayerId = frozenPlayerId;
+            _lastSecondFrozenPlayerId = secondFrozenPlayerId;
 
             if (!freezePiles)
                 RenderPiles(state, layout);
@@ -407,7 +411,7 @@ namespace Cabo.Client.UI.CardTable
             _lastRootBounds = _root.rect;
             _lastScreenWidth = Screen.width;
             _lastScreenHeight = Screen.height;
-            Render(_lastState, _lastLayout, 0, 0, HasActiveTransientAnimation || _lastFreezePiles);
+            Render(_lastState, _lastLayout, _lastFrozenPlayerId, _lastSecondFrozenPlayerId, HasActiveTransientAnimation || _lastFreezePiles);
         }
 
         public bool PlayAction(CardTableActionSnapshot action)
