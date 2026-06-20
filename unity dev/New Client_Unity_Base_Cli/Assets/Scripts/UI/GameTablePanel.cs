@@ -40,6 +40,13 @@ namespace Cabo.Client.UI
         const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
+        static readonly CaboSfx[] NoActionSfx = Array.Empty<CaboSfx>();
+        static readonly CaboSfx[] DrawActionSfx = { CaboSfx.Draw };
+        static readonly CaboSfx[] DiscardActionSfx = { CaboSfx.Discard };
+        static readonly CaboSfx[] SwapActionSfx = { CaboSfx.Swap };
+        static readonly CaboSfx[] SkillActionSfx = { CaboSfx.Skill };
+        static readonly CaboSfx[] SkillFlipActionSfx = { CaboSfx.Skill, CaboSfx.Flip };
+        static readonly CaboSfx[] CaboActionSfx = { CaboSfx.Cabo };
         const string RulesText =
             "\u3010\u76ee\u6807\u3011\n"
             + "\u5c3d\u91cf\u8ba9\u81ea\u5df1\u7684\u624b\u724c\u7cd6\u5206\u603b\u503c\u66f4\u4f4e\u3002\u6bcf\u8f6e\u7ed3\u675f\u540e\u7d2f\u52a0\u5f97\u5206\uff0c\u6709\u4eba\u7d2f\u8ba1\u8fbe\u5230100\u5206\u65f6\u6e38\u620f\u7ed3\u675f\uff0c\u603b\u5206\u6700\u4f4e\u8005\u80dc\u5229\u3002\n\n"
@@ -2609,27 +2616,49 @@ namespace Cabo.Client.UI
 
         void PlayActionSfx(ActionAnimationSnapshot action)
         {
-            switch (action.ActionType)
+            foreach (var cue in GetActionSfxCues(action.ActionType, action.Skill, action.Sequence == _lastLocalDrawSequence))
+                CaboAudio.Play(cue, GetActionSfxVolume(cue));
+        }
+
+        public static IReadOnlyList<CaboSfx> GetActionSfxCues(ActionType actionType, SkillType skill, bool skipDrawSfx)
+        {
+            switch (actionType)
             {
                 case ActionType.Draw:
-                    if (action.Sequence != _lastLocalDrawSequence)
-                        CaboAudio.Play(CaboSfx.Draw, 0.72f);
-                    break;
+                    return skipDrawSfx ? NoActionSfx : DrawActionSfx;
                 case ActionType.DiscardDrawn:
-                    CaboAudio.Play(CaboSfx.Discard, 0.78f);
-                    break;
+                    return DiscardActionSfx;
                 case ActionType.ReplaceWithDrawn:
                 case ActionType.TakeFromDiscard:
-                    CaboAudio.Play(CaboSfx.Swap, 0.72f);
-                    break;
+                    return SwapActionSfx;
                 case ActionType.UseSkill:
-                    CaboAudio.Play(CaboSfx.Skill, 0.72f);
-                    if (action.Skill == SkillType.PeekSelf || action.Skill == SkillType.Spy)
-                        CaboAudio.Play(CaboSfx.Flip, 0.62f);
-                    break;
+                    if (!IsPlayableSkill(skill))
+                        return NoActionSfx;
+                    return skill == SkillType.PeekSelf || skill == SkillType.Spy ? SkillFlipActionSfx : SkillActionSfx;
                 case ActionType.CallSteady:
-                    CaboAudio.Play(CaboSfx.Cabo, 0.92f);
-                    break;
+                    return CaboActionSfx;
+                default:
+                    return NoActionSfx;
+            }
+        }
+
+        static bool IsPlayableSkill(SkillType skill)
+        {
+            return skill == SkillType.PeekSelf || skill == SkillType.Spy || skill == SkillType.Swap;
+        }
+
+        static float GetActionSfxVolume(CaboSfx cue)
+        {
+            switch (cue)
+            {
+                case CaboSfx.Discard:
+                    return 0.78f;
+                case CaboSfx.Flip:
+                    return 0.62f;
+                case CaboSfx.Cabo:
+                    return 0.92f;
+                default:
+                    return 0.72f;
             }
         }
 
