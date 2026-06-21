@@ -22,7 +22,9 @@ namespace Cabo.Client.Art
         PeekSelf,
         Spy,
         Swap,
-        Cabo
+        Cabo,
+        LowSugarSpring,
+        SugarBomb
     }
 
     public enum ConsumePose
@@ -94,6 +96,8 @@ namespace Cabo.Client.Art
         public Sprite skillSpyEffect;
         public Sprite skillSwapEffect;
         public Sprite caboCallEffect;
+        public Sprite drawLowSugarSpringEffect;
+        public Sprite drawSugarBombEffect;
         public AudioClip bgmClip;
         public AudioClip drawSfx;
         public AudioClip flipSfx;
@@ -143,6 +147,8 @@ namespace Cabo.Client.Art
                 case CaboSpecialEffect.Spy: return skillSpyEffect;
                 case CaboSpecialEffect.Swap: return skillSwapEffect;
                 case CaboSpecialEffect.Cabo: return caboCallEffect;
+                case CaboSpecialEffect.LowSugarSpring: return drawLowSugarSpringEffect;
+                case CaboSpecialEffect.SugarBomb: return drawSugarBombEffect;
                 default: return null;
             }
         }

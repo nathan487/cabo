@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using Cabo.Client;
 using Cabo.Client.UI.CardTable;
+using Game.Common;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -57,6 +58,61 @@ namespace Cabo.Client.Tests
 
                 Assert.IsTrue(view.TryGetCardFace(PlayerId, 0, out _, out int valueAfterEmptyLayout));
                 Assert.AreEqual(1, valueAfterEmptyLayout);
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void PlayActionReturnsFalseWhenSwapPlanIsMissing()
+        {
+            var host = new GameObject("CardTableViewMissingSwapHost", typeof(RectTransform));
+            var view = CardTableView.Create(host.transform);
+
+            try
+            {
+                view.Render(CreateState(1, 2, 3, 4), CreateLayout(1, 2, 3, 4));
+
+                var action = new CardTableActionSnapshot
+                {
+                    ActionType = ActionType.UseSkill,
+                    Skill = SkillType.Swap,
+                    SwapOccurred = true,
+                    SourcePlayerId = PlayerId,
+                    TargetPlayerId = 2002,
+                    SourceSlot = 0,
+                    TargetSlot = 0
+                };
+
+                Assert.IsFalse(view.PlayAction(action));
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
+        [Test]
+        public void PlayActionReturnsFalseWhenPeekSlotIsMissing()
+        {
+            var host = new GameObject("CardTableViewMissingPeekHost", typeof(RectTransform));
+            var view = CardTableView.Create(host.transform);
+
+            try
+            {
+                view.Render(CreateState(1, 2, 3, 4), CreateLayout(1, 2, 3, 4));
+
+                var action = new CardTableActionSnapshot
+                {
+                    ActionType = ActionType.UseSkill,
+                    Skill = SkillType.PeekSelf,
+                    SourcePlayerId = PlayerId,
+                    SourceSlot = 99
+                };
+
+                Assert.IsFalse(view.PlayAction(action));
             }
             finally
             {

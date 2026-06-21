@@ -200,6 +200,8 @@ MonoBehaviour:
   skillSpyEffect: {fileID: 21300000, guid: 499d080027e6a014a90f93a42f335188, type: 3}
   skillSwapEffect: {fileID: 21300000, guid: 64efcd5b60f1be84b8a2eadddf7bded3, type: 3}
   caboCallEffect: {fileID: 21300000, guid: a7463093ae84d6b47bde0dfb612783a4, type: 3}
+  drawLowSugarSpringEffect: {fileID: 21300000, guid: 5c2340005c383c040acf204e3dd06005, type: 3}
+  drawSugarBombEffect: {fileID: 21300000, guid: d139638bbac4f2b43a0744706bfe1aa0, type: 3}
   bgmClip: {fileID: 8300000, guid: a165182d2278f524a97b075a1f500727, type: 3}
   drawSfx: {fileID: 8300000, guid: 3e7799b770c343f43916f3e78a1ba15b, type: 3}
   flipSfx: {fileID: 8300000, guid: 526e0716539165645a050239158216f7, type: 3}

@@ -30,6 +30,9 @@ namespace Cabo.Client.UI
         const float EmptySlotHoldDuration = 0.45f;
         const float SkillHoldDuration = 1.60f;
         const float FlipRevealDuration = 1.80f;
+        const float CardTableMoveDuration = 0.70f;
+        const float CardTableInspectHoldDuration = 1.15f;
+        const float CardTableFlipDuration = 0.18f;
         const float CaboCallDuration = 1.20f;
         const float SpecialEffectDuration = 1.20f;
         const float AnimationSettleDuration = 0.25f;
@@ -38,6 +41,7 @@ namespace Cabo.Client.UI
         const float IncomingLandingPause = 0.12f;
         const float SwapEmptyHoldDuration = 0.22f;
         const float SwapSettleDuration = 0.16f;
+        const float TableCharacterReactionLead = 0.75f;
         const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
@@ -178,6 +182,7 @@ namespace Cabo.Client.UI
         int _tableCharacterCardCount = -1;
         int _tableCharacterKnownTotal;
         long _tableCharacterActionSequence;
+        long _lastTableCharacterReactionSequence;
         Rect _lastRootBounds;
         int _lastScreenWidth;
         int _lastScreenHeight;
@@ -2476,6 +2481,7 @@ namespace Cabo.Client.UI
             _animationQueueUntil = now + delay + settleDelay + duration;
             HideAuthoritativeCardsForAnimation(action, delay + settleDelay + duration);
             HoldTurnDisplay(action, _animationQueueUntil);
+            ScheduleTableCharacterReaction(action, delay + settleDelay, duration);
             ScheduleAnimationAfter(delay + settleDelay, () =>
             {
                 if (holdDiscard)
@@ -2552,6 +2558,7 @@ namespace Cabo.Client.UI
             _heldActionUntil = 0f;
             _hideActionPanelDuringTransient = false;
             _lastLocalDrawSequence = 0;
+            _lastTableCharacterReactionSequence = 0;
         }
 
         void PlayDrawAnimation(int value)
@@ -2573,6 +2580,7 @@ namespace Cabo.Client.UI
             if (_cardTableView.PlayLocalDraw(value, target.position, target.size))
             {
                 CaboAudio.Play(CaboSfx.Draw, 0.72f);
+                PlayDrawnCardSpecialEffect(value, target.position, target.size);
                 _lastLocalDrawSequence = sequence;
             }
         }
@@ -2629,7 +2637,22 @@ namespace Cabo.Client.UI
         void PlaySpecialEffectOverlay(ActionAnimationSnapshot action)
         {
             var cue = GetActionSpecialEffect(action.ActionType, action.Skill);
+            PlaySpecialEffectOverlay(cue, CenterOf(_root.worldBound), 310f);
+        }
+
+        void PlayDrawnCardSpecialEffect(int value, Vector2 drawTargetPosition, Vector2 drawTargetSize)
+        {
+            var cue = GetDrawnCardSpecialEffect(value);
             if (cue == CaboSpecialEffect.None)
+                return;
+
+            var effectPosition = drawTargetPosition + new Vector2(0f, Mathf.Max(48f, drawTargetSize.y * 0.82f));
+            PlaySpecialEffectOverlay(cue, OverlayPositionToWorld(effectPosition), 220f);
+        }
+
+        void PlaySpecialEffectOverlay(CaboSpecialEffect cue, Vector2 worldCenter, float maxPixelSize)
+        {
+            if (cue == CaboSpecialEffect.None || worldCenter == Vector2.zero)
                 return;
 
             var sprite = CaboArt.GetSpecialEffect(cue);
@@ -2695,7 +2718,7 @@ namespace Cabo.Client.UI
                 if (maxSize <= 20f)
                     return;
 
-                float targetSize = Mathf.Min(Mathf.Clamp(maxSize, 118f, 310f), maxSize);
+                float targetSize = Mathf.Min(Mathf.Clamp(maxSize, 118f, maxPixelSize), maxSize);
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / SpecialEffectDuration);
                 float fadeIn = Mathf.Clamp01(t / 0.16f);
                 float fadeOut = 1f - Mathf.Clamp01((t - 0.76f) / 0.24f);
@@ -2706,15 +2729,17 @@ namespace Cabo.Client.UI
                 float hostWidth = Mathf.Max(size, labelWidth);
                 float hostHeight = size + 42f;
                 var rootOrigin = new Vector2(bounds.x, bounds.y);
-                var center = CenterOf(bounds);
-                if (center == Vector2.zero)
-                    center = rootOrigin + new Vector2(bounds.width * 0.5f, bounds.height * 0.5f);
-                var local = center - rootOrigin;
+                var local = worldCenter - rootOrigin;
+                if (!IsFinite(local.x) || !IsFinite(local.y))
+                    local = new Vector2(bounds.width * 0.5f, bounds.height * 0.5f);
 
                 host.style.width = hostWidth;
                 host.style.height = hostHeight;
-                host.style.left = local.x - hostWidth * 0.5f;
-                host.style.top = local.y - hostHeight * 0.5f;
+                float margin = 8f;
+                float maxLeft = Mathf.Max(margin, bounds.width - hostWidth - margin);
+                float maxTop = Mathf.Max(margin, bounds.height - hostHeight - margin);
+                host.style.left = Mathf.Clamp(local.x - hostWidth * 0.5f, margin, maxLeft);
+                host.style.top = Mathf.Clamp(local.y - hostHeight * 0.5f, margin, maxTop);
                 host.style.opacity = opacity;
                 art.style.width = size;
                 art.style.height = size;
@@ -2726,6 +2751,22 @@ namespace Cabo.Client.UI
                     host.RemoveFromHierarchy();
                 }
             }).Every(16);
+        }
+
+        Vector2 OverlayPositionToWorld(Vector2 overlayPosition)
+        {
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(rootBounds))
+                return Vector2.zero;
+
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            if (overlayWidth <= 1f || overlayHeight <= 1f)
+                return Vector2.zero;
+
+            float localX = overlayPosition.x * rootBounds.width / overlayWidth + rootBounds.width * 0.5f;
+            float localY = rootBounds.height * 0.5f - overlayPosition.y * rootBounds.height / overlayHeight;
+            return new Vector2(rootBounds.x + localX, rootBounds.y + localY);
         }
 
         public static CaboSpecialEffect GetActionSpecialEffect(ActionType actionType, SkillType skill)
@@ -2751,6 +2792,15 @@ namespace Cabo.Client.UI
             }
         }
 
+        public static CaboSpecialEffect GetDrawnCardSpecialEffect(int value)
+        {
+            if (value == 0)
+                return CaboSpecialEffect.LowSugarSpring;
+            if (value == 13)
+                return CaboSpecialEffect.SugarBomb;
+            return CaboSpecialEffect.None;
+        }
+
         static string GetSpecialEffectLabel(CaboSpecialEffect cue)
         {
             switch (cue)
@@ -2763,6 +2813,10 @@ namespace Cabo.Client.UI
                     return "\u9910\u76D8\u4EA4\u6362";
                 case CaboSpecialEffect.Cabo:
                     return "\u5065\u5EB7\u5BA3\u8A00";
+                case CaboSpecialEffect.LowSugarSpring:
+                    return "\u4F4E\u7CD6\u6E05\u6CC9";
+                case CaboSpecialEffect.SugarBomb:
+                    return "\u7CD6\u5206\u70B8\u5F39";
                 default:
                     return string.Empty;
             }
@@ -2780,6 +2834,10 @@ namespace Cabo.Client.UI
                     return new Color(0.76f, 0.28f, 0.18f, 1f);
                 case CaboSpecialEffect.Cabo:
                     return new Color(0.70f, 0.28f, 0.18f, 1f);
+                case CaboSpecialEffect.LowSugarSpring:
+                    return new Color(0.10f, 0.48f, 0.55f, 1f);
+                case CaboSpecialEffect.SugarBomb:
+                    return new Color(0.78f, 0.24f, 0.16f, 1f);
                 default:
                     return UITheme.TextPrimary;
             }
@@ -2810,6 +2868,21 @@ namespace Cabo.Client.UI
         static bool IsPlayableSkill(SkillType skill)
         {
             return skill == SkillType.PeekSelf || skill == SkillType.Spy || skill == SkillType.Swap;
+        }
+
+        public static bool TryGetKnownValueReactionDelta(int discardedValueSum, int incomingValueSum, out int delta)
+        {
+            return TryGetKnownValueReactionDelta(discardedValueSum, incomingValueSum, true, out delta);
+        }
+
+        public static bool TryGetKnownValueReactionDelta(int discardedValueSum, int incomingValueSum, bool incomingValuesKnown, out int delta)
+        {
+            delta = 0;
+            if (!incomingValuesKnown)
+                return false;
+
+            delta = incomingValueSum - discardedValueSum;
+            return delta != 0;
         }
 
         static float GetActionSfxVolume(CaboSfx cue)
@@ -3595,6 +3668,95 @@ namespace Cabo.Client.UI
             SetBorderColor(_inspectionZone, UITheme.PanelBorder);
         }
 
+        void ScheduleTableCharacterReaction(ActionAnimationSnapshot action, float actionStartDelay, float actionDuration)
+        {
+            if (!TryGetTableCharacterReactionDelta(action, out int delta))
+                return;
+
+            long sequence = action.Sequence;
+            float delay = actionStartDelay + Mathf.Max(0f, actionDuration - TableCharacterReactionLead);
+            ScheduleAnimationAfter(delay, () => PlayTableCharacterReaction(sequence, delta));
+        }
+
+        void PlayTableCharacterReaction(long sequence, int delta)
+        {
+            if (sequence <= _lastTableCharacterReactionSequence)
+                return;
+            if (_flow?.State == null || _flow.State.Phase != GamePhase.Playing)
+                return;
+            if (_tableCharacterStage == null || !_tableCharacterStage.isActiveAndEnabled)
+                return;
+
+            _lastTableCharacterReactionSequence = sequence;
+            _tableCharacterStage.ReactToHandChange(delta);
+        }
+
+        bool TryGetTableCharacterReactionDelta(ActionAnimationSnapshot action, out int delta)
+        {
+            delta = 0;
+            if (action == null || _flow?.State == null)
+                return false;
+            if (action.SourcePlayerId != _flow.State.MyPlayerId)
+                return false;
+            if (action.ActionType != ActionType.ReplaceWithDrawn && action.ActionType != ActionType.TakeFromDiscard)
+                return false;
+            if (!action.ExchangeSucceeded || action.DrewExtraPenaltyCard)
+                return false;
+
+            if (!TryGetKnownDiscardedValueSum(action, out int discardedSum))
+                return false;
+            bool incomingKnown = TryGetKnownIncomingValueSum(action, out int incomingSum);
+            return TryGetKnownValueReactionDelta(discardedSum, incomingSum, incomingKnown, out delta);
+        }
+
+        bool TryGetKnownDiscardedValueSum(ActionAnimationSnapshot action, out int sum)
+        {
+            sum = 0;
+            int expectedCount = action.SelectedSlots.Count > 0 ? action.SelectedSlots.Count : Mathf.Max(0, action.DiscardedCount);
+            if (expectedCount <= 0)
+                return false;
+
+            int knownCount = 0;
+            for (int i = 0; i < action.SelectedSlotBounds.Count; i++)
+            {
+                var slot = action.SelectedSlotBounds[i];
+                if (!slot.FaceUp)
+                    continue;
+
+                sum += slot.Value;
+                knownCount++;
+            }
+
+            if (knownCount == expectedCount)
+                return true;
+
+            if (expectedCount == 1 && action.DiscardTopValue >= 0)
+            {
+                sum = action.DiscardTopValue;
+                return true;
+            }
+
+            sum = 0;
+            return false;
+        }
+
+        static bool TryGetKnownIncomingValueSum(ActionAnimationSnapshot action, out int sum)
+        {
+            sum = 0;
+            if (action.AddedCardCount > 1)
+                return false;
+
+            int value = action.IncomingCardValue;
+            if (value < 0 && action.ActionType == ActionType.TakeFromDiscard)
+                value = action.DiscardTopValue;
+
+            if (value < 0)
+                return false;
+
+            sum = value;
+            return true;
+        }
+
         void SetTemporaryCardVisibility(VisualElement card, bool visible)
         {
             if (card == null) return;
@@ -3659,12 +3821,12 @@ namespace Cabo.Client.UI
         float EstimateActionAnimationDuration(ActionAnimationSnapshot action)
         {
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Spy)
-                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
+                return CardTableMoveDuration + CardTableFlipDuration + CardTableInspectHoldDuration + CardTableFlipDuration + CardTableMoveDuration;
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.PeekSelf)
             {
                 if (action.SourcePlayerId == _flow.State.MyPlayerId)
-                    return FlipRevealDuration;
-                return SkillMoveDuration + SkillHoldDuration + SkillMoveDuration + EmptySlotHoldDuration;
+                    return CardTableFlipDuration + CardTableInspectHoldDuration;
+                return CardTableMoveDuration + CardTableInspectHoldDuration + CardTableMoveDuration;
             }
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
                 return SwapEmptyHoldDuration + SwapMoveDuration + SwapSettleDuration;
@@ -4927,38 +5089,13 @@ namespace Cabo.Client.UI
                 _tableCharacterCardCount = state.MyCards.Count;
                 _tableCharacterKnownTotal = knownTotal;
                 _tableCharacterActionSequence = state.LastActionSequence;
+                _lastTableCharacterReactionSequence = state.LastActionSequence;
                 return;
-            }
-
-            if (state.LastActionSequence > _tableCharacterActionSequence)
-            {
-                if (DidLastActionChangeMyHand(state))
-                {
-                    int delta = state.MyCards.Count == _tableCharacterCardCount
-                        ? knownTotal - _tableCharacterKnownTotal
-                        : state.MyCards.Count > _tableCharacterCardCount ? 1 : -1;
-                    _tableCharacterStage.ReactToHandChange(delta);
-                }
-                _tableCharacterActionSequence = state.LastActionSequence;
             }
 
             _tableCharacterCardCount = state.MyCards.Count;
             _tableCharacterKnownTotal = knownTotal;
-        }
-
-        static bool DidLastActionChangeMyHand(GameState state)
-        {
-            if (state == null)
-                return false;
-
-            if ((state.LastActionType == ActionType.ReplaceWithDrawn || state.LastActionType == ActionType.TakeFromDiscard)
-                && state.LastActionSourcePlayerId == state.MyPlayerId)
-                return true;
-
-            return state.LastActionType == ActionType.UseSkill
-                && state.LastActionSkill == SkillType.Swap
-                && state.LastActionSwapOccurred
-                && (state.LastActionSourcePlayerId == state.MyPlayerId || state.LastActionTargetPlayerId == state.MyPlayerId);
+            _tableCharacterActionSequence = state.LastActionSequence;
         }
 
         void HideTableCharacterStage()
@@ -4969,6 +5106,7 @@ namespace Cabo.Client.UI
             _tableCharacterCardCount = -1;
             _tableCharacterKnownTotal = 0;
             _tableCharacterActionSequence = 0;
+            _lastTableCharacterReactionSequence = 0;
         }
 
         void AddGameOverFinaleGate(bool playbackComplete)

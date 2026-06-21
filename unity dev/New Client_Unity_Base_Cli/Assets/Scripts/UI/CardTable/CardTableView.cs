@@ -452,18 +452,27 @@ namespace Cabo.Client.UI.CardTable
 
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Swap && action.SwapOccurred)
             {
-                BeginSwap(action);
-                return true;
+                return BeginSwap(action);
             }
 
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.PeekSelf)
             {
+                if (!HasPeekSelfPlan(action))
+                {
+                    Reconcile();
+                    return false;
+                }
                 StartCoroutine(PlayPeekSelf(action));
                 return true;
             }
 
             if (action.ActionType == ActionType.UseSkill && action.Skill == SkillType.Spy)
             {
+                if (!HasSpyPlan(action))
+                {
+                    Reconcile();
+                    return false;
+                }
                 StartCoroutine(PlaySpy(action));
                 return true;
             }
@@ -1238,15 +1247,16 @@ namespace Cabo.Client.UI.CardTable
             return false;
         }
 
-        void BeginSwap(CardTableActionSnapshot action)
+        bool BeginSwap(CardTableActionSnapshot action)
         {
             if (!HasSwapPlan(action))
             {
                 Reconcile();
-                return;
+                return false;
             }
 
             StartCoroutine(PlaySwap(action));
+            return true;
         }
 
         bool HasSwapPlan(CardTableActionSnapshot action)
@@ -1263,6 +1273,53 @@ namespace Cabo.Client.UI.CardTable
                 && FindSnapshot(action.TargetSlots, action.TargetSlot).IsValid
                 && (sourceHand.GetCard(action.SourceSlot) != null || action.SourceSwapSlots.Count > 0)
                 && (targetHand.GetCard(action.TargetSlot) != null || action.TargetSlots.Count > 0);
+        }
+
+        bool HasPeekSelfPlan(CardTableActionSnapshot action)
+        {
+            int slotIndex = GetPeekSelfSlot(action);
+            if (slotIndex < 0)
+                return false;
+
+            var hand = GetHand(action.SourcePlayerId);
+            if (hand == null)
+                return false;
+
+            if (action.SourcePlayerId == _myPlayerId)
+                return hand.GetSlot(slotIndex) != null || FindSourceSnapshot(action, slotIndex).IsValid;
+
+            return hand.GetCard(slotIndex) != null || FindSourceSnapshot(action, slotIndex).IsValid;
+        }
+
+        bool HasSpyPlan(CardTableActionSnapshot action)
+        {
+            int slotIndex = GetSpySlot(action);
+            if (slotIndex < 0)
+                return false;
+
+            var targetHand = GetHand(action.TargetPlayerId);
+            return targetHand != null
+                && (targetHand.GetCard(slotIndex) != null || FindSnapshot(action.TargetSlots, slotIndex).IsValid);
+        }
+
+        static int GetPeekSelfSlot(CardTableActionSnapshot action)
+        {
+            if (action == null)
+                return -1;
+            return action.SourceSlot >= 0 ? action.SourceSlot : (action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : -1);
+        }
+
+        static int GetSpySlot(CardTableActionSnapshot action)
+        {
+            if (action == null)
+                return -1;
+            return action.TargetSlot >= 0 ? action.TargetSlot : (action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : -1);
+        }
+
+        CardTableSlotSnapshot FindSourceSnapshot(CardTableActionSnapshot action, int slotIndex)
+        {
+            var snapshot = FindSnapshot(action.SourceSlots, slotIndex);
+            return snapshot.IsValid ? snapshot : FindSnapshot(action.SourceHand, slotIndex);
         }
 
         IEnumerator PlaySwap(CardTableActionSnapshot action)
@@ -1331,7 +1388,7 @@ namespace Cabo.Client.UI.CardTable
         IEnumerator PlayPeekSelf(CardTableActionSnapshot action)
         {
             long playerId = action.SourcePlayerId;
-            int slotIndex = action.SourceSlot >= 0 ? action.SourceSlot : (action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : -1);
+            int slotIndex = GetPeekSelfSlot(action);
             if (slotIndex < 0)
             {
                 Reconcile();
@@ -1374,7 +1431,8 @@ namespace Cabo.Client.UI.CardTable
             _animatingPlayers.Add(playerId);
 
             var slot = hand.GetSlot(slotIndex);
-            var card = hand.DetachCard(slotIndex);
+            var snapshot = FindSourceSnapshot(action, slotIndex);
+            var card = hand.DetachCard(slotIndex) ?? (snapshot.IsValid ? CreateSnapshotCard(snapshot) : null);
             if (card == null)
             {
                 _animatingPlayers.Remove(playerId);
@@ -1411,7 +1469,7 @@ namespace Cabo.Client.UI.CardTable
         {
             long sourcePlayerId = action.SourcePlayerId;
             long targetPlayerId = action.TargetPlayerId;
-            int slotIndex = action.TargetSlot >= 0 ? action.TargetSlot : (action.SelectedSlots.Count > 0 ? action.SelectedSlots[0] : -1);
+            int slotIndex = GetSpySlot(action);
             if (slotIndex < 0)
             {
                 Reconcile();
@@ -1428,7 +1486,8 @@ namespace Cabo.Client.UI.CardTable
             _animatingPlayers.Add(targetPlayerId);
 
             var slot = targetHand.GetSlot(slotIndex);
-            var card = targetHand.DetachCard(slotIndex);
+            var targetSnapshot = FindSnapshot(action.TargetSlots, slotIndex);
+            var card = targetHand.DetachCard(slotIndex) ?? (targetSnapshot.IsValid ? CreateSnapshotCard(targetSnapshot) : null);
             if (card == null)
             {
                 _animatingPlayers.Remove(targetPlayerId);
