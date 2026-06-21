@@ -37,6 +37,33 @@ namespace Cabo.Client.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator RoundRevealWithTemporarilyEmptyLayoutKeepsPreviouslyRenderedCards()
+        {
+            var host = new GameObject("CardTableViewRoundRevealHost", typeof(RectTransform));
+            var view = CardTableView.Create(host.transform);
+
+            try
+            {
+                var state = CreateState(1, 2, 3, 4);
+                view.Render(state, CreateLayout(1, 2, 3, 4));
+                Assert.IsTrue(view.TryGetCardFace(PlayerId, 0, out _, out int initialValue));
+                Assert.AreEqual(1, initialValue);
+
+                state.Phase = GamePhase.RoundReveal;
+                view.Render(state, new CardTableLayout());
+
+                yield return null;
+
+                Assert.IsTrue(view.TryGetCardFace(PlayerId, 0, out _, out int valueAfterEmptyLayout));
+                Assert.AreEqual(1, valueAfterEmptyLayout);
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
         static IEnumerator RunLayoutRefreshRoutine(CardTableView view)
         {
             var method = typeof(CardTableView).GetMethod("LayoutRefreshRoutine", BindingFlags.NonPublic | BindingFlags.Instance);

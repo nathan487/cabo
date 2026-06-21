@@ -2107,7 +2107,11 @@ namespace Cabo.Client.UI
             _root.schedule.Execute(() =>
             {
                 _cardTableRefreshQueued = false;
-                if (generation != _animationGeneration || _flow.State.Phase != GamePhase.Playing)
+                bool canRefresh = _flow.State.Phase == GamePhase.Playing
+                    || _flow.State.Phase == GamePhase.RoundReveal
+                    || _flow.State.RoundJustRevealed
+                    || _flow.Flow == FlowState.RoundReveal;
+                if (generation != _animationGeneration || !canRefresh)
                     return;
                 if (_cardTableView.HasActiveTransientAnimation)
                 {

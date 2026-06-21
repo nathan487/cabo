@@ -327,6 +327,13 @@ namespace Cabo.Client.UI.CardTable
             if (state == null || layout == null)
                 return;
 
+            if (state.Phase == GamePhase.RoundReveal && layout.Slots.Count == 0 && HasRenderableLayout)
+            {
+                _lastState = state;
+                _myPlayerId = state.MyPlayerId;
+                return;
+            }
+
             _lastState = state;
             _lastLayout = layout;
             _myPlayerId = state.MyPlayerId;
