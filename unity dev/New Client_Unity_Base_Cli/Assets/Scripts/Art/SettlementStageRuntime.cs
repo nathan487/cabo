@@ -38,6 +38,7 @@ namespace Cabo.Client.Art
     {
         const int TextureWidth = 1024;
         const int TextureHeight = 560;
+        const int RenderLayer = 30;
 
         readonly List<SettlementCharacterActor> _actors = new();
         Camera _camera;
@@ -49,6 +50,7 @@ namespace Cabo.Client.Art
         int _completedRoundNumber = -1;
         Action<SettlementCue> _cueHandler;
         Action _completeHandler;
+        bool _initialized;
 
         public RenderTexture Output => _output;
 
@@ -66,14 +68,27 @@ namespace Cabo.Client.Art
             var go = new GameObject("SettlementCharacterStage");
             if (parent != null)
                 go.transform.SetParent(parent, false);
-            return go.AddComponent<SettlementStageRuntime>();
+            var runtime = go.AddComponent<SettlementStageRuntime>();
+            runtime.EnsureInitialized();
+            return runtime;
         }
 
         void Awake()
         {
+            EnsureInitialized();
+        }
+
+        void EnsureInitialized()
+        {
+            if (_initialized)
+                return;
+
+            _initialized = true;
+            gameObject.layer = RenderLayer;
             transform.position = new Vector3(0f, 1000f, 0f);
             _actorRoot = new GameObject("Actors").transform;
             _actorRoot.SetParent(transform, false);
+            _actorRoot.gameObject.layer = RenderLayer;
 
             _output = new RenderTexture(TextureWidth, TextureHeight, 16, RenderTextureFormat.ARGB32)
             {
@@ -87,11 +102,13 @@ namespace Cabo.Client.Art
             var cameraObject = new GameObject("SettlementCamera");
             cameraObject.transform.SetParent(transform, false);
             cameraObject.transform.localPosition = new Vector3(0f, 0.15f, -10f);
+            cameraObject.layer = RenderLayer;
             _camera = cameraObject.AddComponent<Camera>();
             _camera.orthographic = true;
             _camera.orthographicSize = 2.18f;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = Color.clear;
+            _camera.cullingMask = 1 << RenderLayer;
             _camera.allowHDR = false;
             _camera.allowMSAA = true;
             _camera.targetTexture = _output;
@@ -176,11 +193,23 @@ namespace Cabo.Client.Art
                 go.name = $"SettlementActor_{i + 1}";
                 go.transform.localPosition = new Vector3(start + spacing * i, -0.25f, 0f);
                 go.transform.localScale = Vector3.one * (scale * GetActorScale(characterId));
+                SetLayerRecursively(go, RenderLayer);
                 var actor = go.GetComponent<SettlementCharacterActor>();
                 if (actor != null)
                     actor.ConfigureGameOverDefeat(character.gameOverDefeatSprite);
                 _actors.Add(actor);
             }
+        }
+
+        static void SetLayerRecursively(GameObject target, int layer)
+        {
+            if (target == null)
+                return;
+
+            target.layer = layer;
+            var targetTransform = target.transform;
+            for (int i = 0; i < targetTransform.childCount; i++)
+                SetLayerRecursively(targetTransform.GetChild(i).gameObject, layer);
         }
 
         static float GetActorScale(string characterId)

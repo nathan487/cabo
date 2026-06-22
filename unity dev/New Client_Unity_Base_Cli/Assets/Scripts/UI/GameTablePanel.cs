@@ -349,7 +349,7 @@ namespace Cabo.Client.UI
             _turnLabel.style.marginBottom = 10;
             _centerTable.Add(_turnLabel);
 
-            _pileRow = new VisualElement();
+            _pileRow = new VisualElement { name = "PileRow" };
             _pileRow.style.flexDirection = FlexDirection.Row;
             _pileRow.style.justifyContent = Justify.Center;
             _pileRow.style.alignItems = Align.Center;
@@ -654,9 +654,9 @@ namespace Cabo.Client.UI
             if (_cardTableView != null)
                 CardTableView.DestroyView(_cardTableView);
             if (_settlementStage != null)
-                UnityEngine.Object.Destroy(_settlementStage.gameObject);
+                DestroyRuntimeGameObject(_settlementStage.gameObject);
             if (_tableCharacterStage != null)
-                UnityEngine.Object.Destroy(_tableCharacterStage.gameObject);
+                DestroyRuntimeGameObject(_tableCharacterStage.gameObject);
         }
 
         public bool HasPendingActionAnimation =>
@@ -889,9 +889,9 @@ namespace Cabo.Client.UI
 
         public void RenderReveal()
         {
-            ClearTransientAnimationState();
+            ForceCompletePendingActionAnimationForReveal();
             HideTableCharacterStage();
-            _cardTableView.SetVisible(false);
+            HideGameplaySurfaceForOverlay();
             var state = _flow.State;
             ConfigureActionPanelForOverlay();
             _roundLabel.style.display = DisplayStyle.Flex;
@@ -900,10 +900,9 @@ namespace Cabo.Client.UI
             _turnLabel.text = "角色吃下最终餐盘食物，糖能逐项累加";
             StyleOverlayHeading(_roundLabel, true);
             StyleOverlayHeading(_turnLabel, false);
-            HideSeatsForOverlay();
-            RenderPiles(state);
             RenderSocialPanel(state);
             RenderEndGameControls(state, true);
+            HideGameplaySurfaceForOverlay();
 
             _drawnCardSlot.Clear();
             _actionPanel.Clear();
@@ -973,6 +972,7 @@ namespace Cabo.Client.UI
                 AddInterRoundControls(state, _settlementPlaybackComplete);
             MountSettlementStage(state, revealContent);
             UpdateStatusLineForEarlyEnd(state, true);
+            HideGameplaySurfaceForOverlay();
         }
 
         public void RenderGameOver()
@@ -982,10 +982,10 @@ namespace Cabo.Client.UI
                 CaboAudio.Play(CaboSfx.Victory, 0.92f);
                 _victorySfxPlayed = true;
             }
-            ClearTransientAnimationState();
+            ForceCompletePendingActionAnimationForReveal();
             HideSettlementStage();
             HideTableCharacterStage();
-            _cardTableView.SetVisible(false);
+            HideGameplaySurfaceForOverlay();
             ConfigureActionPanelForOverlay();
             _actionPanel.style.width = Length.Percent(70);
             _actionPanel.style.maxWidth = 760;
@@ -999,13 +999,11 @@ namespace Cabo.Client.UI
             _turnLabel.text = "累计糖能最低的玩家赢得健康餐桌冠军";
             StyleOverlayHeading(_roundLabel, true);
             StyleOverlayHeading(_turnLabel, false);
-            HideSeatsForOverlay();
             _drawnCardSlot.Clear();
-            _drawPile.Clear();
-            _discardPile.Clear();
             RenderSocialPanel(_flow.State);
             _showLocalEndGameConfirm = false;
             RenderEndGameControls(_flow.State, false);
+            HideGameplaySurfaceForOverlay();
 
             _actionPanel.Clear();
             _actionPanel.style.display = DisplayStyle.Flex;
@@ -1352,6 +1350,13 @@ namespace Cabo.Client.UI
         void RenderPiles(GameState state, bool freezeDiscardPile = false)
         {
             EnsurePileContainersAttached();
+            if (!ShouldShowGameplayPiles(state.Phase))
+            {
+                HideGameplayPiles();
+                return;
+            }
+
+            _pileRow.style.display = DisplayStyle.Flex;
             bool compact = state.Phase == GamePhase.RoundReveal || state.Phase == GamePhase.GameOver;
             bool usePlaceholders = state.Phase == GamePhase.Playing;
             ConfigurePileRowLayout(usePlaceholders);
@@ -1539,6 +1544,25 @@ namespace Cabo.Client.UI
                 _pileRow.Add(_drawPile);
             if (_discardPile.parent != _pileRow)
                 _pileRow.Add(_discardPile);
+        }
+
+        void HideGameplayPiles()
+        {
+            if (_pileRow == null)
+                return;
+
+            _pileRow.style.display = DisplayStyle.None;
+            _drawPile.Clear();
+            _discardPile.Clear();
+        }
+
+        void HideGameplaySurfaceForOverlay()
+        {
+            HideSeatsForOverlay();
+            HideGameplayPiles();
+            _cardTableView.SetVisible(false);
+            _animationLayer.Clear();
+            HideInspectionZone();
         }
 
         void ConfigureActionPanelForGame()
@@ -2099,6 +2123,16 @@ namespace Cabo.Client.UI
 
         void RenderCardTableLayer(GameState state, ActionAnimationSnapshot pendingAction)
         {
+            if (!ShouldRefreshCardTableLayer(
+                    state.Phase,
+                    state.RoundJustRevealed,
+                    _flow.Flow,
+                    pendingAction != null || HasPendingActionAnimation))
+            {
+                _cardTableView.SetVisible(false);
+                return;
+            }
+
             var layout = BuildCardTableLayout(state);
             long frozenPlayerId = pendingAction != null ? pendingAction.SourcePlayerId : 0;
             long secondFrozenPlayerId = pendingAction != null && pendingAction.ActionType == ActionType.UseSkill && pendingAction.Skill == SkillType.Swap
@@ -2150,10 +2184,11 @@ namespace Cabo.Client.UI
             _root.schedule.Execute(() =>
             {
                 _cardTableRefreshQueued = false;
-                bool canRefresh = _flow.State.Phase == GamePhase.Playing
-                    || _flow.State.Phase == GamePhase.RoundReveal
-                    || _flow.State.RoundJustRevealed
-                    || _flow.Flow == FlowState.RoundReveal;
+                bool canRefresh = ShouldRefreshCardTableLayer(
+                    _flow.State.Phase,
+                    _flow.State.RoundJustRevealed,
+                    _flow.Flow,
+                    HasPendingActionAnimation);
                 if (generation != _animationGeneration || !canRefresh)
                     return;
                 if (_cardTableView.HasActiveTransientAnimation)
@@ -2885,6 +2920,25 @@ namespace Cabo.Client.UI
                 || roundJustRevealed
                 || flow == FlowState.RoundReveal;
             return revealPending && hasPendingActionAnimation;
+        }
+
+        public static bool ShouldRefreshCardTableLayer(
+            GamePhase phase,
+            bool roundJustRevealed,
+            FlowState flow,
+            bool hasPendingActionAnimation)
+        {
+            return phase == GamePhase.Playing
+                || ShouldRenderGameForRevealLayoutRefresh(
+                    phase,
+                    roundJustRevealed,
+                    flow,
+                    hasPendingActionAnimation);
+        }
+
+        public static bool ShouldShowGameplayPiles(GamePhase phase)
+        {
+            return phase == GamePhase.Playing;
         }
 
         public static bool ShouldShowCardTable(
@@ -5338,8 +5392,19 @@ namespace Cabo.Client.UI
                 return;
 
             _settlementStage.StopPlayback();
-            UnityEngine.Object.Destroy(_settlementStage.gameObject);
+            DestroyRuntimeGameObject(_settlementStage.gameObject);
             _settlementStage = null;
+        }
+
+        static void DestroyRuntimeGameObject(GameObject target)
+        {
+            if (target == null)
+                return;
+
+            if (Application.isPlaying)
+                UnityEngine.Object.Destroy(target);
+            else
+                UnityEngine.Object.DestroyImmediate(target);
         }
 
         void RenderTableCharacter(GameState state)

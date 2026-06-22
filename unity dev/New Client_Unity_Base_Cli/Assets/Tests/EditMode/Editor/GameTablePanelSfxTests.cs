@@ -1,8 +1,12 @@
 using Cabo.Client.Art;
+using System.Reflection;
 using Cabo.Client;
 using Cabo.Client.UI;
+using Cabo.Client.UI.CardTable;
 using Game.Common;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Cabo.Client.Tests
 {
@@ -103,6 +107,76 @@ namespace Cabo.Client.Tests
                 phase: GamePhase.RoundReveal,
                 hasPendingActionAnimation: false,
                 hasEndGameModal: false));
+        }
+
+        [Test]
+        public void CardTableLayerRefreshIsSuppressedForSettledReveal()
+        {
+            Assert.IsFalse(GameTablePanel.ShouldRefreshCardTableLayer(
+                GamePhase.RoundReveal,
+                true,
+                FlowState.RoundReveal,
+                false));
+        }
+
+        [Test]
+        public void CardTableLayerRefreshIsAllowedWhileRevealActionDrainPending()
+        {
+            Assert.IsTrue(GameTablePanel.ShouldRefreshCardTableLayer(
+                GamePhase.RoundReveal,
+                true,
+                FlowState.RoundReveal,
+                true));
+        }
+
+        [Test]
+        public void GameplayPilesAreHiddenForSettlementOverlays()
+        {
+            Assert.IsTrue(GameTablePanel.ShouldShowGameplayPiles(GamePhase.Playing));
+            Assert.IsFalse(GameTablePanel.ShouldShowGameplayPiles(GamePhase.RoundReveal));
+            Assert.IsFalse(GameTablePanel.ShouldShowGameplayPiles(GamePhase.GameOver));
+        }
+
+        [Test]
+        public void RenderRevealKeepsGameplaySurfaceHiddenWithStaleActionSequence()
+        {
+            var root = new VisualElement();
+            var flow = new GameFlow(new NetworkGateway());
+            flow.State.Phase = GamePhase.RoundReveal;
+            flow.State.RoundNumber = 1;
+            flow.State.MyPlayerId = 1;
+            flow.State.RoomId = 10;
+            flow.State.LastActionSequence = 99;
+            flow.State.LastActionType = ActionType.Draw;
+            flow.State.Players.Add(new PlayerInfo
+            {
+                PlayerId = 1,
+                Nickname = "Tester",
+                CardCount = 4,
+                IsHost = true,
+                IsReady = true
+            });
+            flow.State.MyCards.Add(new CardState { SlotIndex = 0, Value = 1, IsKnown = true });
+            flow.State.MyCards.Add(new CardState { SlotIndex = 1, Value = 2, IsKnown = true });
+
+            var panel = new GameTablePanel(root, flow, null);
+            try
+            {
+                panel.SetVisible(true);
+                panel.RenderReveal();
+
+                var pileRow = root.Q<VisualElement>("PileRow");
+                var cardTable = GetCardTableView(panel);
+
+                Assert.NotNull(pileRow);
+                Assert.NotNull(cardTable);
+                Assert.AreEqual(DisplayStyle.None, pileRow.style.display.value);
+                Assert.IsFalse(cardTable.gameObject.activeSelf);
+            }
+            finally
+            {
+                panel.Dispose();
+            }
         }
 
         [Test]
@@ -243,6 +317,12 @@ namespace Cabo.Client.Tests
             Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.Cabo));
             Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.LowSugarSpring));
             Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.SugarBomb));
+        }
+
+        static CardTableView GetCardTableView(GameTablePanel panel)
+        {
+            var field = typeof(GameTablePanel).GetField("_cardTableView", BindingFlags.NonPublic | BindingFlags.Instance);
+            return (CardTableView)field?.GetValue(panel);
         }
     }
 }
