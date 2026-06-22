@@ -45,6 +45,7 @@ namespace Cabo.Client.UI
         const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
+        const int RevealDrainExchangeSelectedSlotBudget = 24;
         public const float PlaybackLayoutSettleDelaySeconds = PlaybackLayoutSettleDelay;
         static readonly CaboSfx[] NoActionSfx = Array.Empty<CaboSfx>();
         static readonly CaboSfx[] DrawActionSfx = { CaboSfx.Draw };
@@ -630,9 +631,11 @@ namespace Cabo.Client.UI
             _isVisible = visible;
             _container.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
             _endGameButton.style.display = DisplayStyle.None;
-            _cardTableView.SetVisible(visible
-                && _flow.State.Phase == GamePhase.Playing
-                && GetEndGameModalKind(_flow.State) == EndGameModalKind.None);
+            _cardTableView.SetVisible(ShouldShowCardTable(
+                visible,
+                _flow.State.Phase,
+                HasPendingActionAnimation,
+                GetEndGameModalKind(_flow.State) != EndGameModalKind.None));
             if (!visible)
             {
                 ResetPresentationForRoomExit();
@@ -864,7 +867,12 @@ namespace Cabo.Client.UI
                 _lastScreenWidth = Screen.width;
                 _lastScreenHeight = Screen.height;
 
-                if (_flow.State.Phase == GamePhase.Playing)
+                if (_flow.State.Phase == GamePhase.Playing
+                    || ShouldRenderGameForRevealLayoutRefresh(
+                        _flow.State.Phase,
+                        _flow.State.RoundJustRevealed,
+                        _flow.Flow,
+                        HasPendingActionAnimation))
                 {
                     RenderGame();
                 }
@@ -1246,7 +1254,11 @@ namespace Cabo.Client.UI
             if (kind == EndGameModalKind.None)
             {
                 _endGameModalOverlay.style.display = DisplayStyle.None;
-                _cardTableView.SetVisible(_isVisible && _flow.State.Phase == GamePhase.Playing);
+                _cardTableView.SetVisible(ShouldShowCardTable(
+                    _isVisible,
+                    _flow.State.Phase,
+                    HasPendingActionAnimation,
+                    false));
                 _endGameModalTitle.text = "";
                 _endGameModalBody.text = "";
                 return;
@@ -2609,17 +2621,7 @@ namespace Cabo.Client.UI
             PlayActionSfx(action);
             PlaySpecialEffectOverlay(action);
 
-            // For exchange actions, capture FinalSourceHandBounds now after layout settle delay
-            // This ensures UI Toolkit has completed layout calculations for the new hand size
-            if ((action.ActionType == ActionType.ReplaceWithDrawn || action.ActionType == ActionType.TakeFromDiscard)
-                && action.FinalSourceHandBounds.Count == 0)
-            {
-                Debug.Log($"[PlayActionAnimation] Capturing FinalSourceHandBounds for {action.ActionType}, before capture count={action.FinalSourceHandBounds.Count}");
-                action.FinalSourceHandBounds.Clear();
-                action.FinalSourceHandBounds.AddRange(CaptureAllSlotBounds(action.SourcePlayerId));
-                Debug.Log($"[PlayActionAnimation] After capture: FinalSourceHandBounds.Count={action.FinalSourceHandBounds.Count}");
-                BuildExchangeMotionPlan(action);
-            }
+            EnsureExchangeAnimationPlan(action);
 
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
             {
@@ -2656,6 +2658,15 @@ namespace Cabo.Client.UI
             _animationQueueUntil = minVisibleDuration > 0f
                 ? Time.realtimeSinceStartup + minVisibleDuration
                 : 0f;
+        }
+
+        void UseFallbackSkillRevealGate(ActionAnimationSnapshot action)
+        {
+            float duration = GetSkillFallbackRevealGateDuration(action.Skill);
+            if (duration <= 0f)
+                return;
+
+            _animationQueueUntil = Mathf.Max(_animationQueueUntil, Time.realtimeSinceStartup + duration);
         }
 
         void PlayActionSfx(ActionAnimationSnapshot action)
@@ -2846,6 +2857,42 @@ namespace Cabo.Client.UI
             return GetActionSpecialEffect(actionType, skill) == CaboSpecialEffect.None ? 0f : SpecialEffectDuration;
         }
 
+        public static float GetSkillFallbackRevealGateDuration(SkillType skill)
+        {
+            if (skill == SkillType.Spy)
+                return GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.Spy, false, false);
+            if (skill == SkillType.PeekSelf)
+                return GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.PeekSelf, false, false);
+            if (skill == SkillType.Swap)
+                return GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.Swap, true, false);
+            return 0f;
+        }
+
+        public static bool ShouldRenderGameForRevealLayoutRefresh(
+            GamePhase phase,
+            bool roundJustRevealed,
+            FlowState flow,
+            bool hasPendingActionAnimation)
+        {
+            bool revealPending = phase == GamePhase.RoundReveal
+                || roundJustRevealed
+                || flow == FlowState.RoundReveal;
+            return revealPending && hasPendingActionAnimation;
+        }
+
+        public static bool ShouldShowCardTable(
+            bool panelVisible,
+            GamePhase phase,
+            bool hasPendingActionAnimation,
+            bool hasEndGameModal)
+        {
+            if (!panelVisible || hasEndGameModal)
+                return false;
+
+            return phase == GamePhase.Playing
+                || hasPendingActionAnimation;
+        }
+
         public static float GetEstimatedRevealBlockingActionDuration(
             ActionType actionType,
             SkillType skill,
@@ -2865,10 +2912,30 @@ namespace Cabo.Client.UI
             if (actionType == ActionType.CallSteady)
                 return CaboCallDuration;
             if (actionType == ActionType.ReplaceWithDrawn || actionType == ActionType.TakeFromDiscard)
-                return QuickMoveDuration + EmptySlotHoldDuration + AnimationSettleDuration;
+                return GetEstimatedRevealBlockingExchangeDuration(actionType, 1, 0);
             if (actionType == ActionType.Draw || actionType == ActionType.DiscardDrawn)
                 return QuickMoveDuration + AnimationSettleDuration;
             return 0f;
+        }
+
+        public static float GetEstimatedRevealBlockingExchangeDuration(
+            ActionType actionType,
+            int selectedSlotCount,
+            int survivorMoveCount)
+        {
+            selectedSlotCount = Mathf.Max(1, selectedSlotCount);
+            survivorMoveCount = Mathf.Max(0, survivorMoveCount);
+            float outgoingTail = GetStaticDiscardStagger(selectedSlotCount - 1, selectedSlotCount);
+
+            if (actionType == ActionType.TakeFromDiscard)
+                return TakeDiscardOutgoingDelay + outgoingTail + QuickMoveDuration + IncomingLandingPause;
+
+            float discardPhase = QuickMoveDuration + outgoingTail;
+            float incomingDelay = discardPhase + EmptyOriginHoldDuration + EmptySlotHoldDuration;
+            float survivorPhase = survivorMoveCount > 0
+                ? (survivorMoveCount - 1) * SurvivorMoveStagger + SurvivorMoveDuration
+                : 0f;
+            return incomingDelay + Mathf.Max(QuickMoveDuration, survivorPhase) + IncomingLandingPause;
         }
 
         public static float LongestRevealBlockingActionDurationSeconds =>
@@ -2878,7 +2945,12 @@ namespace Cabo.Client.UI
                     GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.PeekSelf, false, false),
                     Mathf.Max(
                         GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.Swap, true, false),
-                        GetEstimatedRevealBlockingActionDuration(ActionType.CallSteady, SkillType.Unknown, false, false))));
+                        Mathf.Max(
+                            GetEstimatedRevealBlockingActionDuration(ActionType.CallSteady, SkillType.Unknown, false, false),
+                            GetEstimatedRevealBlockingExchangeDuration(
+                                ActionType.ReplaceWithDrawn,
+                                RevealDrainExchangeSelectedSlotBudget,
+                                RevealDrainExchangeSelectedSlotBudget)))));
 
         public static CaboSpecialEffect GetDrawnCardSpecialEffect(int value)
         {
@@ -3185,6 +3257,91 @@ namespace Cabo.Client.UI
             }
         }
 
+        void EnsureExchangeAnimationPlan(ActionAnimationSnapshot action)
+        {
+            if (action == null
+                || (action.ActionType != ActionType.ReplaceWithDrawn && action.ActionType != ActionType.TakeFromDiscard))
+            {
+                return;
+            }
+
+            if (action.SourceHandBounds.Count == 0 && action.SourceSlotBounds.Count > 0)
+                action.SourceHandBounds.AddRange(action.SourceSlotBounds);
+
+            if (action.FinalSourceHandBounds.Count == 0)
+                action.FinalSourceHandBounds.AddRange(CaptureAllSlotBounds(action.SourcePlayerId));
+            if (action.FinalSourceHandBounds.Count == 0)
+                BuildFallbackFinalSourceHandBounds(action);
+
+            BuildExchangeMotionPlan(action);
+            if (action.ExchangeSucceeded
+                && (action.IncomingFinalBounds.width <= 1
+                    || action.IncomingFinalBounds.height <= 1))
+            {
+                action.IncomingFinalBounds = GetIncomingTargetBounds(action);
+            }
+        }
+
+        void BuildFallbackFinalSourceHandBounds(ActionAnimationSnapshot action)
+        {
+            if (action == null || action.FinalSourceHandBounds.Count > 0 || action.SourceHandBounds.Count == 0)
+                return;
+
+            if (!action.ExchangeSucceeded)
+            {
+                action.FinalSourceHandBounds.AddRange(action.SourceHandBounds);
+                return;
+            }
+
+            var selected = new HashSet<int>(action.SelectedSlots);
+            if (selected.Count == 0 && action.SourceSlot >= 0)
+                selected.Add(action.SourceSlot);
+
+            if (selected.Count <= 1)
+            {
+                int targetSlot = action.SourceSlot;
+                foreach (var slot in selected)
+                {
+                    targetSlot = slot;
+                    break;
+                }
+
+                var target = FindSlotSnapshot(action.SourceHandBounds, targetSlot);
+                if (target.Bounds.width <= 1 && action.SourceSlotBounds.Count > 0)
+                    target = action.SourceSlotBounds[0];
+                if (target.Bounds.width <= 1 && action.SourceHandBounds.Count > 0)
+                    target = action.SourceHandBounds[0];
+                if (target.Bounds.width > 1 && target.Bounds.height > 1)
+                    action.FinalSourceHandBounds.Add(target);
+                return;
+            }
+
+            int finalCount = Mathf.Max(1, action.SourceHandBounds.Count - selected.Count + 1);
+            for (int i = 0; i < action.SourceHandBounds.Count && action.FinalSourceHandBounds.Count < finalCount; i++)
+            {
+                var slot = action.SourceHandBounds[i];
+                action.FinalSourceHandBounds.Add(new SlotSnapshot
+                {
+                    PlayerId = action.SourcePlayerId,
+                    Slot = action.FinalSourceHandBounds.Count,
+                    Bounds = slot.Bounds,
+                    FaceUp = slot.FaceUp,
+                    Value = slot.Value
+                });
+            }
+        }
+
+        static SlotSnapshot FindSlotSnapshot(List<SlotSnapshot> slots, int slotIndex)
+        {
+            if (slots == null)
+                return default;
+
+            for (int i = 0; i < slots.Count; i++)
+                if (slots[i].Slot == slotIndex)
+                    return slots[i];
+            return default;
+        }
+
         Rect GetFinalSlotBounds(ActionAnimationSnapshot action, int slot)
         {
             if (slot < 0)
@@ -3359,6 +3516,7 @@ namespace Cabo.Client.UI
                 }
                 else
                 {
+                    UseFallbackSkillRevealGate(action);
                     PlaySpyCardInspection(action, privateValue, color);
                 }
                 return;
@@ -3374,6 +3532,7 @@ namespace Cabo.Client.UI
                 }
                 else
                 {
+                    UseFallbackSkillRevealGate(action);
                     PlayPeekSelfInspection(action, privateValue, color);
                 }
                 return;
@@ -3533,6 +3692,7 @@ namespace Cabo.Client.UI
                 UseCardTableActiveStateAsRevealGate(action);
                 return;
             }
+            UseFallbackSkillRevealGate(action);
             PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
         }
 
@@ -3543,6 +3703,7 @@ namespace Cabo.Client.UI
                 UseCardTableActiveStateAsRevealGate(action);
                 return;
             }
+            UseFallbackSkillRevealGate(action);
             PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
             PulsePlayer(action.TargetPlayerId, color, FlipRevealDuration);
         }
@@ -3963,6 +4124,11 @@ namespace Cabo.Client.UI
         }
 
         float GetDiscardStagger(int index, int cardCount)
+        {
+            return GetStaticDiscardStagger(index, cardCount);
+        }
+
+        static float GetStaticDiscardStagger(int index, int cardCount)
         {
             if (cardCount <= 1)
                 return 0f;

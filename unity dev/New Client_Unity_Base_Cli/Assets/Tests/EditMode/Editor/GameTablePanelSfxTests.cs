@@ -1,4 +1,5 @@
 using Cabo.Client.Art;
+using Cabo.Client;
 using Cabo.Client.UI;
 using Game.Common;
 using NUnit.Framework;
@@ -62,6 +63,71 @@ namespace Cabo.Client.Tests
                 + GameTablePanel.PlaybackLayoutSettleDelaySeconds;
 
             Assert.GreaterOrEqual(UIManager.RevealAnimationDrainTimeoutSeconds, longestAction);
+        }
+
+        [Test]
+        public void RevealLayoutRefreshKeepsGameViewWhileActionAnimationIsPending()
+        {
+            Assert.IsTrue(GameTablePanel.ShouldRenderGameForRevealLayoutRefresh(
+                GamePhase.RoundReveal,
+                false,
+                FlowState.RoundReveal,
+                true));
+        }
+
+        [Test]
+        public void RevealLayoutRefreshAllowsRevealWhenNoActionAnimationIsPending()
+        {
+            Assert.IsFalse(GameTablePanel.ShouldRenderGameForRevealLayoutRefresh(
+                GamePhase.RoundReveal,
+                false,
+                FlowState.RoundReveal,
+                false));
+        }
+
+        [Test]
+        public void CardTableStaysVisibleDuringRevealActionDrain()
+        {
+            Assert.IsTrue(GameTablePanel.ShouldShowCardTable(
+                panelVisible: true,
+                phase: GamePhase.RoundReveal,
+                hasPendingActionAnimation: true,
+                hasEndGameModal: false));
+        }
+
+        [Test]
+        public void CardTableHidesForRevealWhenActionDrainCompletes()
+        {
+            Assert.IsFalse(GameTablePanel.ShouldShowCardTable(
+                panelVisible: true,
+                phase: GamePhase.RoundReveal,
+                hasPendingActionAnimation: false,
+                hasEndGameModal: false));
+        }
+
+        [Test]
+        public void RevealDrainTimeoutCoversLargeMultiCardExchangeAnimation()
+        {
+            float exchangeDuration = GameTablePanel.GetEstimatedRevealBlockingExchangeDuration(
+                ActionType.ReplaceWithDrawn,
+                selectedSlotCount: 12,
+                survivorMoveCount: 1);
+
+            Assert.GreaterOrEqual(
+                UIManager.RevealAnimationDrainTimeoutSeconds,
+                exchangeDuration + GameTablePanel.PlaybackLayoutSettleDelaySeconds);
+        }
+
+        [Test]
+        public void SkillFallbackRevealGateCoversNonActorView()
+        {
+            Assert.GreaterOrEqual(
+                GameTablePanel.GetSkillFallbackRevealGateDuration(SkillType.Spy),
+                GameTablePanel.GetEstimatedRevealBlockingActionDuration(
+                    ActionType.UseSkill,
+                    SkillType.Spy,
+                    false,
+                    false));
         }
 
         [Test]
