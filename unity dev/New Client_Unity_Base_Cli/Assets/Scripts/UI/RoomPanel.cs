@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UIElements;
 using Cabo.Client.Art;
+using Game.Room;
 
 namespace Cabo.Client.UI
 {
@@ -10,14 +11,16 @@ namespace Cabo.Client.UI
     public class RoomPanel
     {
         VisualElement _root, _container;
-        ScrollView _homeScroll;
+        ScrollView _homeScroll, _browserRoomsScroll, _browserInboxScroll, _onlinePlayersScroll, _waitingInboxScroll;
         VisualElement _serverRow, _nicknameRow, _homeButtonRow, _joinFormRow, _roomButtonRow;
         VisualElement _avatarSection, _avatarPreview, _avatarChoices, _playerListView, _roomContent;
+        VisualElement _browserContent, _browserRoomsView, _browserInboxView, _waitingAccessColumn, _onlinePlayersView, _waitingInboxView;
         ScrollView _playerListScroll;
         RoomChatPanel _chatPanel;
         Label _title, _roomCode, _playerList, _avatarStatus, _status;
-        TextField _serverAddressInput, _nicknameInput, _joinCodeInput;
+        TextField _serverAddressInput, _nicknameInput, _joinCodeInput, _browserCodeInput;
         Button _btnConnect, _btnCreate, _btnShowJoin, _btnConfirmJoin, _btnExitGame;
+        Button _btnBrowserBack, _btnBrowserRefresh, _btnBrowserApplyCode;
         Button _btnReady, _btnStart, _btnLeaveRoom, _btnCopyRoomCode;
         GameFlow _flow;
         bool _joinFormVisible;
@@ -115,21 +118,20 @@ namespace Cabo.Client.UI
 
             _roomContent = new VisualElement { name = "WaitingRoomContent" };
             _roomContent.style.flexDirection = FlexDirection.Row;
+            _roomContent.style.flexWrap = Wrap.Wrap;
             _roomContent.style.justifyContent = Justify.Center;
             _roomContent.style.alignItems = Align.Stretch;
             _roomContent.style.alignSelf = Align.Center;
-            _roomContent.style.width = 980;
+            _roomContent.style.width = 1160;
             _roomContent.style.maxWidth = Length.Percent(100);
-            _roomContent.style.height = 392;
             _roomContent.style.minHeight = 392;
-            _roomContent.style.maxHeight = 392;
             _roomContent.style.marginTop = 12;
             _roomContent.style.overflow = Overflow.Hidden;
             _container.Add(_roomContent);
 
             _playerListScroll = new ScrollView(ScrollViewMode.Vertical);
             _playerListScroll.style.flexShrink = 0;
-            _playerListScroll.style.width = 360;
+            _playerListScroll.style.width = 320;
             _playerListScroll.style.maxWidth = Length.Percent(100);
             _playerListScroll.style.height = 360;
             _playerListScroll.style.minHeight = 360;
@@ -146,6 +148,26 @@ namespace Cabo.Client.UI
             _roomContent.Add(_playerListScroll);
 
             _playerListView = _playerListScroll.contentContainer;
+
+            _waitingAccessColumn = new VisualElement { name = "WaitingRoomAccessColumn" };
+            _waitingAccessColumn.style.flexDirection = FlexDirection.Column;
+            _waitingAccessColumn.style.width = 280;
+            _waitingAccessColumn.style.height = 360;
+            _waitingAccessColumn.style.minHeight = 360;
+            _waitingAccessColumn.style.maxHeight = 360;
+            _waitingAccessColumn.style.marginRight = 16;
+            _waitingAccessColumn.style.flexShrink = 0;
+            _waitingAccessColumn.style.overflow = Overflow.Hidden;
+            _roomContent.Add(_waitingAccessColumn);
+
+            _onlinePlayersScroll = CreateFixedScroll("WaitingOnlineLobbyPlayers", 280, 172);
+            _onlinePlayersScroll.style.marginBottom = 12;
+            _waitingAccessColumn.Add(_onlinePlayersScroll);
+            _onlinePlayersView = _onlinePlayersScroll.contentContainer;
+
+            _waitingInboxScroll = CreateFixedScroll("WaitingAccessInbox", 280, 176);
+            _waitingAccessColumn.Add(_waitingInboxScroll);
+            _waitingInboxView = _waitingInboxScroll.contentContainer;
 
             _status = new Label();
             _status.style.fontSize = 14;
@@ -230,8 +252,10 @@ namespace Cabo.Client.UI
 
             _btnShowJoin = new Button(() =>
             {
-                _joinFormVisible = true;
-                Render();
+                var nickname = GetNicknameOrShowError();
+                if (nickname == null) return;
+                _joinFormVisible = false;
+                _flow.EnterRoomBrowser(nickname, PlayerProfileStore.SelectedCharacterId);
             });
             _btnShowJoin.text = "加入房间";
             UITheme.SetButtonRole(_btnShowJoin, UITheme.SecondaryButtonClass);
@@ -287,6 +311,80 @@ namespace Cabo.Client.UI
             _joinFormRow.RemoveFromHierarchy();
             _container.Insert(_container.IndexOf(_avatarSection), _joinFormRow);
 
+            _browserContent = new VisualElement { name = "RoomBrowserContent" };
+            _browserContent.style.alignSelf = Align.Center;
+            _browserContent.style.width = 1040;
+            _browserContent.style.maxWidth = Length.Percent(100);
+            _browserContent.style.marginTop = 16;
+            _browserContent.style.flexDirection = FlexDirection.Column;
+            _browserContent.style.display = DisplayStyle.None;
+            _container.Add(_browserContent);
+
+            var browserTopRow = new VisualElement { name = "RoomBrowserTopRow" };
+            browserTopRow.style.flexDirection = FlexDirection.Row;
+            browserTopRow.style.flexWrap = Wrap.Wrap;
+            browserTopRow.style.alignItems = Align.Center;
+            browserTopRow.style.justifyContent = Justify.Center;
+            browserTopRow.style.marginBottom = 12;
+            _browserContent.Add(browserTopRow);
+
+            _btnBrowserBack = new Button(() =>
+            {
+                _joinFormVisible = false;
+                _flow.ReturnHomeFromRoomBrowser();
+            });
+            _btnBrowserBack.text = "返回首页";
+            UITheme.SetButtonRole(_btnBrowserBack, UITheme.SoftButtonClass);
+            _btnBrowserBack.style.height = 40;
+            _btnBrowserBack.style.marginRight = 8;
+            browserTopRow.Add(_btnBrowserBack);
+
+            browserTopRow.Add(CreateHomeFormLabel("房间码"));
+
+            _browserCodeInput = new TextField();
+            StyleHomeTextField(_browserCodeInput, 190);
+            _browserCodeInput.maxLength = 16;
+            _browserCodeInput.style.marginRight = 8;
+            browserTopRow.Add(_browserCodeInput);
+
+            _btnBrowserApplyCode = new Button(() =>
+            {
+                var code = _browserCodeInput.value?.Trim().ToUpperInvariant();
+                if (string.IsNullOrEmpty(code))
+                {
+                    _status.text = "请输入房间码。";
+                    return;
+                }
+                _flow.JoinRoomFromBrowser(code);
+            });
+            _btnBrowserApplyCode.text = "直接加入";
+            UITheme.SetButtonRole(_btnBrowserApplyCode, UITheme.PrimaryButtonClass);
+            _btnBrowserApplyCode.style.height = 40;
+            _btnBrowserApplyCode.style.marginRight = 8;
+            browserTopRow.Add(_btnBrowserApplyCode);
+
+            _btnBrowserRefresh = new Button(() => _flow.RefreshRooms());
+            _btnBrowserRefresh.text = "刷新";
+            UITheme.SetButtonRole(_btnBrowserRefresh, UITheme.SecondaryButtonClass);
+            _btnBrowserRefresh.style.height = 40;
+            browserTopRow.Add(_btnBrowserRefresh);
+
+            var browserLists = new VisualElement { name = "RoomBrowserLists" };
+            browserLists.style.flexDirection = FlexDirection.Row;
+            browserLists.style.flexWrap = Wrap.Wrap;
+            browserLists.style.justifyContent = Justify.Center;
+            browserLists.style.alignItems = Align.Stretch;
+            _browserContent.Add(browserLists);
+
+            _browserRoomsScroll = CreateFixedScroll("RoomBrowserRooms", 560, 360);
+            _browserRoomsScroll.style.marginRight = 14;
+            browserLists.Add(_browserRoomsScroll);
+            _browserRoomsView = _browserRoomsScroll.contentContainer;
+
+            _browserInboxScroll = CreateFixedScroll("RoomBrowserInbox", 430, 360);
+            browserLists.Add(_browserInboxScroll);
+            _browserInboxView = _browserInboxScroll.contentContainer;
+
             _roomButtonRow = new VisualElement();
             _roomButtonRow.style.flexDirection = FlexDirection.Row;
             _roomButtonRow.style.justifyContent = Justify.Center;
@@ -318,9 +416,10 @@ namespace Cabo.Client.UI
             _roomButtonRow.Add(_btnLeaveRoom);
 
             _chatPanel = new RoomChatPanel(_flow);
-            _chatPanel.Root.style.flexGrow = 1;
-            _chatPanel.Root.style.flexShrink = 1;
-            _chatPanel.Root.style.width = 600;
+            _chatPanel.Root.style.flexGrow = 0;
+            _chatPanel.Root.style.flexShrink = 0;
+            _chatPanel.Root.style.width = 500;
+            _chatPanel.Root.style.minWidth = 360;
             _chatPanel.Root.style.maxWidth = Length.Percent(100);
             _chatPanel.Root.style.paddingLeft = 12;
             _chatPanel.Root.style.paddingRight = 12;
@@ -381,6 +480,145 @@ namespace Cabo.Client.UI
         }
 
         public void Render()
+        {
+            var state = _flow.State;
+            var inRoom = state.RoomId > 0 || state.Players.Count > 0;
+            var browsing = _flow.Flow == FlowState.RoomBrowser && !inRoom;
+
+            if (browsing)
+            {
+                RenderBrowser();
+                return;
+            }
+
+            if (inRoom)
+            {
+                RenderWaitingRoom();
+                return;
+            }
+
+            RenderHome();
+        }
+
+        void RenderHome()
+        {
+            var connected = _flow.IsConnected;
+            var connecting = _flow.Flow == FlowState.Connecting;
+
+            _title.text = "\u7CD6\u7CD6 CABO";
+            _roomCode.text = "";
+            _btnCopyRoomCode.style.display = DisplayStyle.None;
+
+            _serverRow.style.display = DisplayStyle.Flex;
+            _nicknameRow.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
+            _avatarSection.style.display = connected ? DisplayStyle.Flex : DisplayStyle.None;
+            _homeButtonRow.style.display = DisplayStyle.Flex;
+            _joinFormRow.style.display = DisplayStyle.None;
+            _browserContent.style.display = DisplayStyle.None;
+            _roomButtonRow.style.display = DisplayStyle.None;
+            _roomContent.style.display = DisplayStyle.None;
+            _playerList.style.display = DisplayStyle.None;
+            _playerListView.Clear();
+            _browserRoomsView?.Clear();
+            _browserInboxView?.Clear();
+            _onlinePlayersView?.Clear();
+            _waitingInboxView?.Clear();
+            _chatPanel.Root.style.display = DisplayStyle.None;
+
+            _btnConnect.SetEnabled(!connecting);
+            _btnConnect.text = connecting ? "连接中..." : (connected ? "重新连接" : "连接");
+            _btnCreate.SetEnabled(connected);
+            _btnShowJoin.SetEnabled(connected);
+            _btnConfirmJoin.SetEnabled(connected);
+
+            RenderAvatarSelector();
+
+            if (connecting)
+                _status.text = "正在连接服务器...";
+            else if (connected)
+                _status.text = string.IsNullOrEmpty(_flow.ConnectedAddress)
+                    ? "服务器已连接。"
+                    : $"服务器已连接：{_flow.ConnectedAddress}";
+            else if (!string.IsNullOrEmpty(_flow.LastConnectError))
+                _status.text = $"未连接服务器：{_flow.LastConnectError}";
+            else
+                _status.text = "未连接服务器。请先输入服务器地址并连接。";
+        }
+
+        void RenderBrowser()
+        {
+            var state = _flow.State;
+            var connected = _flow.IsConnected;
+
+            _title.text = "\u7CD6\u7CD6 CABO · 房间大厅";
+            _roomCode.text = state.LobbyPlayerId > 0 ? $"大厅玩家 ID：{state.LobbyPlayerId}" : "正在进入房间大厅...";
+            _btnCopyRoomCode.style.display = DisplayStyle.None;
+
+            _serverRow.style.display = DisplayStyle.None;
+            _nicknameRow.style.display = DisplayStyle.None;
+            _avatarSection.style.display = DisplayStyle.None;
+            _homeButtonRow.style.display = DisplayStyle.None;
+            _joinFormRow.style.display = DisplayStyle.None;
+            _roomButtonRow.style.display = DisplayStyle.None;
+            _roomContent.style.display = DisplayStyle.None;
+            _playerList.style.display = DisplayStyle.None;
+            _browserContent.style.display = DisplayStyle.Flex;
+            _chatPanel.Root.style.display = DisplayStyle.None;
+
+            _btnBrowserBack.SetEnabled(true);
+            _btnBrowserApplyCode.SetEnabled(connected && state.LobbyPlayerId > 0);
+            _btnBrowserRefresh.SetEnabled(connected);
+
+            RenderRoomSummaryList(_browserRoomsView, state, true);
+            RenderInboxList(_browserInboxView, state, true);
+            _status.text = BuildAccessStatus(state, connected ? "选择房间后发送申请，或处理收到的邀请。" : "已断开服务器连接。");
+        }
+
+        void RenderWaitingRoom()
+        {
+            var state = _flow.State;
+            var hasRoomCode = !string.IsNullOrEmpty(state.RoomCode);
+
+            _title.text = "\u7CD6\u7CD6 CABO · 等待房间";
+            _roomCode.text = hasRoomCode ? $"房间码：{state.RoomCode}" : "正在加入...";
+            _btnCopyRoomCode.style.display = hasRoomCode ? DisplayStyle.Flex : DisplayStyle.None;
+
+            _serverRow.style.display = DisplayStyle.None;
+            _nicknameRow.style.display = DisplayStyle.None;
+            _avatarSection.style.display = DisplayStyle.None;
+            _homeButtonRow.style.display = DisplayStyle.None;
+            _joinFormRow.style.display = DisplayStyle.None;
+            _browserContent.style.display = DisplayStyle.None;
+            _roomButtonRow.style.display = DisplayStyle.Flex;
+            _roomContent.style.display = DisplayStyle.Flex;
+            _playerListScroll.style.display = DisplayStyle.Flex;
+            _waitingAccessColumn.style.display = DisplayStyle.Flex;
+            _chatPanel.Root.style.display = DisplayStyle.Flex;
+            _playerList.style.display = DisplayStyle.None;
+
+            var readyCount = 0;
+            _playerListView.Clear();
+            AddSectionTitle(_playerListView, $"房内玩家 {state.Players.Count}/{state.MaxPlayers}");
+            foreach (var player in state.Players)
+            {
+                _playerListView.Add(CreatePlayerListRow(player, player.PlayerId == state.MyPlayerId));
+                if (player.IsReady)
+                    readyCount++;
+            }
+            if (state.Players.Count == 0)
+                _playerListView.Add(CreateEmptyLabel("等待房间状态同步。"));
+
+            RenderOnlineLobbyPlayers(state);
+            RenderInboxList(_waitingInboxView, state, false);
+
+            var allReady = readyCount == state.Players.Count && state.Players.Count >= 2;
+            _btnStart.SetEnabled(state.IsMyselfHost && allReady);
+            _status.text = BuildAccessStatus(state,
+                $"{readyCount}/{state.Players.Count} 已准备" + (allReady && state.IsMyselfHost ? " · 可以开始" : ""));
+            _chatPanel.Render();
+        }
+
+        void RenderLegacy()
         {
             var s = _flow.State;
             bool connected = _flow.IsConnected;
@@ -531,6 +769,285 @@ namespace Cabo.Client.UI
                 RenderAvatarSelector();
             });
             _avatarChoices.Add(choice);
+        }
+
+        ScrollView CreateFixedScroll(string name, float width, float height)
+        {
+            var scroll = new ScrollView(ScrollViewMode.Vertical) { name = name };
+            scroll.style.width = width;
+            scroll.style.maxWidth = Length.Percent(100);
+            scroll.style.height = height;
+            scroll.style.minHeight = height;
+            scroll.style.maxHeight = height;
+            scroll.style.flexShrink = 0;
+            scroll.style.overflow = Overflow.Hidden;
+            scroll.style.paddingLeft = 10;
+            scroll.style.paddingRight = 10;
+            scroll.style.paddingTop = 10;
+            scroll.style.paddingBottom = 10;
+            scroll.verticalScrollerVisibility = ScrollerVisibility.Auto;
+            scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            UITheme.ApplyPanel(scroll, UITheme.PanelGlass, UITheme.PanelBorder, 16f);
+            return scroll;
+        }
+
+        void RenderRoomSummaryList(VisualElement target, GameState state, bool allowApply)
+        {
+            target.Clear();
+            AddSectionTitle(target, $"已有房间 {state.RoomSummaries.Count}");
+            if (state.RoomSummaries.Count == 0)
+            {
+                target.Add(CreateEmptyLabel("暂无等待中的房间。"));
+                return;
+            }
+
+            foreach (var room in state.RoomSummaries)
+                target.Add(CreateRoomSummaryRow(room, state, allowApply));
+        }
+
+        VisualElement CreateRoomSummaryRow(RoomSummaryInfo room, GameState state, bool allowApply)
+        {
+            var row = CreateListCard(room.IsFull ? UITheme.WaitingSurface : UITheme.PanelSurfaceAlt);
+
+            var title = new Label($"{SafeName(room.HostNickname)}的房间");
+            title.style.fontSize = 15;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(title);
+
+            var meta = new Label($"房间码 {room.RoomCode} · {room.PlayerCount}/{room.MaxPlayers}");
+            meta.style.fontSize = 12;
+            meta.style.color = UITheme.TextSecondary;
+            meta.style.marginTop = 3;
+            row.Add(meta);
+
+            var pending = HasPendingJoinApplication(state, room.RoomId, room.RoomCode);
+            var button = CreateSmallButton(room.IsFull ? "已满" : pending ? "已申请" : "申请加入", UITheme.PrimaryButtonClass);
+            button.style.alignSelf = Align.FlexEnd;
+            button.style.marginTop = 7;
+            button.SetEnabled(allowApply && state.LobbyPlayerId > 0 && !room.IsFull && !pending);
+            button.clicked += () => _flow.ApplyJoinRoom(room.RoomId, room.RoomCode);
+            row.Add(button);
+            return row;
+        }
+
+        void RenderOnlineLobbyPlayers(GameState state)
+        {
+            _onlinePlayersView.Clear();
+            AddSectionTitle(_onlinePlayersView, $"在线玩家 {state.OnlineLobbyPlayers.Count}");
+            if (state.OnlineLobbyPlayers.Count == 0)
+            {
+                _onlinePlayersView.Add(CreateEmptyLabel("暂无可邀请玩家。"));
+                return;
+            }
+
+            var full = state.MaxPlayers > 0 && state.Players.Count >= state.MaxPlayers;
+            foreach (var player in state.OnlineLobbyPlayers)
+                _onlinePlayersView.Add(CreateOnlineLobbyPlayerRow(player, state, full));
+        }
+
+        VisualElement CreateOnlineLobbyPlayerRow(OnlineLobbyPlayerInfo player, GameState state, bool full)
+        {
+            var row = CreateListCard(full ? UITheme.WaitingSurface : UITheme.PanelSurfaceAlt);
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+
+            var avatar = PlayerProfileStore.CreateAvatarVisual(
+                player.Nickname,
+                PlayerProfileStore.GetCharacterVisualPath(player.CharacterId),
+                32);
+            avatar.style.marginRight = 8;
+            row.Add(avatar);
+
+            var name = new Label(SafeName(player.Nickname));
+            name.style.flexGrow = 1;
+            name.style.minWidth = 0;
+            name.style.fontSize = 13;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(name);
+
+            var pending = HasPendingInvitation(state, player.LobbyPlayerId);
+            var button = CreateSmallButton(full ? "已满" : pending ? "已邀请" : "邀请", UITheme.SecondaryButtonClass);
+            button.SetEnabled(!full && !pending && state.MyPlayerId > 0 && state.RoomId > 0);
+            button.clicked += () => _flow.InviteLobbyPlayer(player.LobbyPlayerId);
+            row.Add(button);
+            return row;
+        }
+
+        void RenderInboxList(VisualElement target, GameState state, bool browserMode)
+        {
+            target.Clear();
+            AddSectionTitle(target, browserMode ? "我的邀请" : "申请与邀请");
+
+            var visible = 0;
+            foreach (var item in state.AccessInboxItems)
+            {
+                if (browserMode && item.Type != RoomAccessType.RoomInvitation)
+                    continue;
+                if (!browserMode && item.Type != RoomAccessType.JoinApplication && item.Type != RoomAccessType.RoomInvitation)
+                    continue;
+
+                target.Add(CreateInboxRow(item, state, browserMode));
+                visible++;
+            }
+
+            if (visible == 0)
+                target.Add(CreateEmptyLabel(browserMode ? "暂无房间邀请。" : "暂无待处理申请或邀请。"));
+        }
+
+        VisualElement CreateInboxRow(RoomAccessInboxItem item, GameState state, bool browserMode)
+        {
+            var row = CreateListCard(UITheme.PanelSurfaceAlt);
+            var isInvite = item.Type == RoomAccessType.RoomInvitation;
+            var titleText = isInvite
+                ? browserMode
+                    ? $"{SafeName(item.RequesterNickname)}邀请你加入 {SafeName(item.HostNickname)}的房间"
+                    : $"已邀请 {SafeName(item.LobbyNickname)} 加入房间"
+                : $"{SafeName(item.LobbyNickname)}申请加入房间";
+            var title = new Label(titleText);
+            title.style.fontSize = 13;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.whiteSpace = WhiteSpace.Normal;
+            row.Add(title);
+
+            var meta = new Label($"房间码 {item.RoomCode} · {AccessStatusText(item.Status)}");
+            meta.style.fontSize = 11;
+            meta.style.color = UITheme.TextSecondary;
+            meta.style.marginTop = 3;
+            row.Add(meta);
+
+            var actions = new VisualElement();
+            actions.style.flexDirection = FlexDirection.Row;
+            actions.style.justifyContent = Justify.FlexEnd;
+            actions.style.marginTop = 8;
+            row.Add(actions);
+
+            var canRespond = item.Status == RoomAccessStatus.Pending
+                && ((isInvite && browserMode && state.LobbyPlayerId == item.LobbyPlayerId)
+                    || (!isInvite && state.IsMyselfHost));
+            var accept = CreateSmallButton("同意", UITheme.PrimaryButtonClass);
+            accept.style.marginRight = 6;
+            accept.SetEnabled(canRespond);
+            accept.clicked += () =>
+            {
+                if (isInvite)
+                    _flow.RespondRoomInvitation(item.AccessId, true);
+                else
+                    _flow.RespondJoinApplication(item.AccessId, true);
+            };
+            actions.Add(accept);
+
+            var reject = CreateSmallButton("拒绝", UITheme.DangerButtonClass);
+            reject.SetEnabled(canRespond);
+            reject.clicked += () =>
+            {
+                if (isInvite)
+                    _flow.RespondRoomInvitation(item.AccessId, false);
+                else
+                    _flow.RespondJoinApplication(item.AccessId, false);
+            };
+            actions.Add(reject);
+            return row;
+        }
+
+        void AddSectionTitle(VisualElement target, string text)
+        {
+            var label = new Label(text);
+            label.style.fontSize = 14;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.marginBottom = 8;
+            label.style.color = UITheme.TextPrimary;
+            target.Add(label);
+        }
+
+        Label CreateEmptyLabel(string text)
+        {
+            var label = new Label(text);
+            label.style.fontSize = 12;
+            label.style.color = UITheme.TextMuted;
+            label.style.whiteSpace = WhiteSpace.Normal;
+            label.style.marginTop = 4;
+            return label;
+        }
+
+        VisualElement CreateListCard(Color surface)
+        {
+            var card = new VisualElement();
+            card.style.marginBottom = 8;
+            card.style.paddingLeft = 9;
+            card.style.paddingRight = 9;
+            card.style.paddingTop = 7;
+            card.style.paddingBottom = 7;
+            card.style.backgroundColor = surface;
+            card.style.flexShrink = 0;
+            UITheme.SetRadius(card, 7f);
+            UITheme.SetBorderWidth(card, 1f);
+            UITheme.SetBorderColor(card, UITheme.PanelBorder);
+            return card;
+        }
+
+        Button CreateSmallButton(string text, string roleClass)
+        {
+            var button = new Button();
+            button.text = text;
+            UITheme.SetButtonRole(button, roleClass);
+            button.style.height = 30;
+            button.style.minWidth = 62;
+            button.style.fontSize = 12;
+            button.style.paddingLeft = 9;
+            button.style.paddingRight = 9;
+            return button;
+        }
+
+        static string BuildAccessStatus(GameState state, string fallback)
+        {
+            if (!string.IsNullOrWhiteSpace(state.LastRoomAccessError))
+                return state.LastRoomAccessError;
+            if (!string.IsNullOrWhiteSpace(state.LastRoomAccessMessage))
+                return state.LastRoomAccessMessage;
+            return fallback;
+        }
+
+        static bool HasPendingJoinApplication(GameState state, long roomId, string roomCode)
+        {
+            foreach (var item in state.AccessInboxItems)
+            {
+                if (item.Type == RoomAccessType.JoinApplication
+                    && item.Status == RoomAccessStatus.Pending
+                    && (item.RoomId == roomId || string.Equals(item.RoomCode, roomCode, System.StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+            return false;
+        }
+
+        static bool HasPendingInvitation(GameState state, long lobbyPlayerId)
+        {
+            foreach (var item in state.AccessInboxItems)
+            {
+                if (item.Type == RoomAccessType.RoomInvitation
+                    && item.Status == RoomAccessStatus.Pending
+                    && item.LobbyPlayerId == lobbyPlayerId)
+                    return true;
+            }
+            return false;
+        }
+
+        static string AccessStatusText(RoomAccessStatus status)
+        {
+            return status switch
+            {
+                RoomAccessStatus.Pending => "待处理",
+                RoomAccessStatus.Approved => "已同意",
+                RoomAccessStatus.Rejected => "已拒绝",
+                RoomAccessStatus.Expired => "已过期",
+                _ => "未知"
+            };
+        }
+
+        static string SafeName(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "玩家" : value.Trim();
         }
 
         VisualElement CreatePlayerListRow(PlayerInfo player, bool isSelf)

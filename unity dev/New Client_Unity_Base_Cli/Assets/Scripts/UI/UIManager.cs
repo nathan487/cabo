@@ -151,6 +151,7 @@ namespace Cabo.Client.UI
             bool showRoomPanel = _flow.Flow == FlowState.Home
                 || _flow.Flow == FlowState.Connecting
                 || _flow.Flow == FlowState.RoomFlow
+                || _flow.Flow == FlowState.RoomBrowser
                 || _flow.Flow == FlowState.WaitingRoom
                 || state.Phase == GamePhase.WaitingRoom;
 

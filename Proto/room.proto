@@ -102,6 +102,134 @@ message KickPlayerRsp {
   .game.common.ErrorInfo error = 2;
 }
 
+// --- Room browser / lobby ---
+
+message EnterLobbyReq {
+  int64 request_id = 1;
+  string nickname = 2;
+  string character_id = 3;
+}
+
+message EnterLobbyRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+  int64 lobby_player_id = 3;
+}
+
+message LeaveLobbyReq {
+  int64 request_id = 1;
+  int64 lobby_player_id = 2;
+}
+
+message LeaveLobbyRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+}
+
+message RoomSummary {
+  int64 room_id = 1;
+  string room_code = 2;
+  string host_nickname = 3;
+  int32 player_count = 4;
+  int32 max_players = 5;
+  bool is_full = 6;
+}
+
+message OnlineLobbyPlayer {
+  int64 lobby_player_id = 1;
+  string nickname = 2;
+  string character_id = 3;
+}
+
+message ListRoomsReq {
+  int64 request_id = 1;
+}
+
+message ListRoomsRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+  repeated RoomSummary rooms = 3;
+}
+
+enum RoomAccessType {
+  ROOM_ACCESS_TYPE_UNKNOWN = 0;
+  ROOM_ACCESS_TYPE_JOIN_APPLICATION = 1;
+  ROOM_ACCESS_TYPE_ROOM_INVITATION = 2;
+}
+
+enum RoomAccessStatus {
+  ROOM_ACCESS_STATUS_UNKNOWN = 0;
+  ROOM_ACCESS_STATUS_PENDING = 1;
+  ROOM_ACCESS_STATUS_APPROVED = 2;
+  ROOM_ACCESS_STATUS_REJECTED = 3;
+  ROOM_ACCESS_STATUS_EXPIRED = 4;
+}
+
+message RoomAccessItem {
+  int64 access_id = 1;
+  RoomAccessType type = 2;
+  RoomAccessStatus status = 3;
+  int64 room_id = 4;
+  string room_code = 5;
+  string host_nickname = 6;
+  int64 requester_player_id = 7;
+  string requester_nickname = 8;
+  int64 lobby_player_id = 9;
+  string lobby_nickname = 10;
+  int64 created_time_ms = 11;
+}
+
+message ApplyJoinRoomReq {
+  int64 request_id = 1;
+  int64 lobby_player_id = 2;
+  int64 room_id = 3;
+  string room_code = 4;
+}
+
+message ApplyJoinRoomRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+  int64 access_id = 3;
+}
+
+message RespondJoinApplicationReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 access_id = 4;
+  bool approve = 5;
+}
+
+message RespondJoinApplicationRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+}
+
+message InviteLobbyPlayerReq {
+  int64 request_id = 1;
+  int64 player_id = 2;
+  int64 room_id = 3;
+  int64 lobby_player_id = 4;
+}
+
+message InviteLobbyPlayerRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+  int64 access_id = 3;
+}
+
+message RespondRoomInvitationReq {
+  int64 request_id = 1;
+  int64 lobby_player_id = 2;
+  int64 access_id = 3;
+  bool approve = 4;
+}
+
+message RespondRoomInvitationRsp {
+  int64 request_id = 1;
+  .game.common.ErrorInfo error = 2;
+}
+
 // ============================================================
 // 房间状态
 // ============================================================
@@ -148,6 +276,31 @@ message RoomState {
   .game.common.RoomStateType state = 4;
   repeated .game.common.PlayerPublicInfo players = 5;
   int64 host_player_id = 6;
+}
+
+message RoomListNotify {
+  repeated RoomSummary rooms = 1;
+}
+
+message OnlineLobbyPlayersNotify {
+  repeated OnlineLobbyPlayer players = 1;
+}
+
+message RoomAccessInboxNotify {
+  repeated RoomAccessItem items = 1;
+}
+
+message RoomAccessDecisionNotify {
+  int64 access_id = 1;
+  RoomAccessType type = 2;
+  RoomAccessStatus status = 3;
+  .game.common.ErrorInfo error = 4;
+  int64 room_id = 5;
+  string room_code = 6;
+  int64 player_id = 7;
+  string session_token = 8;
+  int32 seat_id = 9;
+  string message = 10;
 }
 
 // ============================================================

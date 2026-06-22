@@ -63,6 +63,38 @@ namespace Cabo.Client
         public long ServerTimeMs;
     }
 
+    public class RoomSummaryInfo
+    {
+        public long RoomId;
+        public string RoomCode;
+        public string HostNickname;
+        public int PlayerCount;
+        public int MaxPlayers;
+        public bool IsFull;
+    }
+
+    public class OnlineLobbyPlayerInfo
+    {
+        public long LobbyPlayerId;
+        public string Nickname;
+        public string CharacterId = "pomelo";
+    }
+
+    public class RoomAccessInboxItem
+    {
+        public long AccessId;
+        public RoomAccessType Type = RoomAccessType.Unknown;
+        public RoomAccessStatus Status = RoomAccessStatus.Unknown;
+        public long RoomId;
+        public string RoomCode;
+        public string HostNickname;
+        public long RequesterPlayerId;
+        public string RequesterNickname;
+        public long LobbyPlayerId;
+        public string LobbyNickname;
+        public long CreatedTimeMs;
+    }
+
     /// <summary>
     /// Client-side game state. Mirrors server state.
     /// Direct C# translation of CLI's GameState.h/cpp.
@@ -71,8 +103,10 @@ namespace Cabo.Client
     {
         // Connection
         public long MyPlayerId;
+        public long LobbyPlayerId;
         public long RoomId;
         public string RoomCode;
+        public int MaxPlayers = 4;
         public string SessionToken;
 
         // Phase
@@ -84,6 +118,7 @@ namespace Cabo.Client
         string _requestedCharacterId = "pomelo";
         bool _hasRequestedCharacterId;
         readonly Dictionary<long, string> _knownCharacterIds = new();
+        public string RequestedCharacterId => _requestedCharacterId;
 
         // My hand
         public List<CardState> MyCards = new();
@@ -132,6 +167,13 @@ namespace Cabo.Client
         // Room chat
         public List<RoomChatMessage> RoomChatMessages = new();
         public string LastRoomChatError = "";
+
+        // Room browser
+        public List<RoomSummaryInfo> RoomSummaries = new();
+        public List<OnlineLobbyPlayerInfo> OnlineLobbyPlayers = new();
+        public List<RoomAccessInboxItem> AccessInboxItems = new();
+        public string LastRoomAccessMessage = "";
+        public string LastRoomAccessError = "";
 
         // Skill results
         public int LastPeekedValue = -1;
@@ -273,6 +315,28 @@ namespace Cabo.Client
                     HandleRoomChatRsp(msg.RoomChatRsp); break;
                 case ServerMessage.PayloadOneofCase.RoomChatNotify:
                     HandleRoomChatNotify(msg.RoomChatNotify); break;
+                case ServerMessage.PayloadOneofCase.EnterLobbyRsp:
+                    HandleEnterLobby(msg.EnterLobbyRsp); break;
+                case ServerMessage.PayloadOneofCase.LeaveLobbyRsp:
+                    HandleLeaveLobby(msg.LeaveLobbyRsp); break;
+                case ServerMessage.PayloadOneofCase.ListRoomsRsp:
+                    HandleListRooms(msg.ListRoomsRsp); break;
+                case ServerMessage.PayloadOneofCase.RoomListNotify:
+                    HandleRoomList(msg.RoomListNotify); break;
+                case ServerMessage.PayloadOneofCase.OnlineLobbyPlayersNotify:
+                    HandleOnlineLobbyPlayers(msg.OnlineLobbyPlayersNotify); break;
+                case ServerMessage.PayloadOneofCase.ApplyJoinRoomRsp:
+                    HandleApplyJoinRoom(msg.ApplyJoinRoomRsp); break;
+                case ServerMessage.PayloadOneofCase.RespondJoinApplicationRsp:
+                    HandleRoomAccessRsp(msg.RespondJoinApplicationRsp?.Error, "已处理加入申请。"); break;
+                case ServerMessage.PayloadOneofCase.InviteLobbyPlayerRsp:
+                    HandleInviteLobbyPlayer(msg.InviteLobbyPlayerRsp); break;
+                case ServerMessage.PayloadOneofCase.RespondRoomInvitationRsp:
+                    HandleRoomAccessRsp(msg.RespondRoomInvitationRsp?.Error, "已处理房间邀请。"); break;
+                case ServerMessage.PayloadOneofCase.RoomAccessInboxNotify:
+                    HandleRoomAccessInbox(msg.RoomAccessInboxNotify); break;
+                case ServerMessage.PayloadOneofCase.RoomAccessDecisionNotify:
+                    HandleRoomAccessDecision(msg.RoomAccessDecisionNotify); break;
                 case ServerMessage.PayloadOneofCase.GameStartNotify:
                     HandleGameStart(msg.GameStartNotify); break;
                 case ServerMessage.PayloadOneofCase.TurnStartNotify:
@@ -315,6 +379,7 @@ namespace Cabo.Client
         void HandleCreateRoom(CreateRoomRsp rsp)
         {
             if (rsp.Error?.Code != 0) return;
+            ClearRoomBrowserState();
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             RoomCode = rsp.RoomCode; SessionToken = rsp.SessionToken; Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
@@ -325,6 +390,7 @@ namespace Cabo.Client
         void HandleJoinRoom(JoinRoomRsp rsp)
         {
             if (rsp.Error?.Code != 0) return;
+            ClearRoomBrowserState();
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             SessionToken = rsp.SessionToken;
             Phase = GamePhase.WaitingRoom;
@@ -344,6 +410,7 @@ namespace Cabo.Client
             var room = notify.Room;
             if (room == null) return;
             RoomId = room.RoomId; RoomCode = room.RoomCode;
+            MaxPlayers = room.MaxPlayers > 0 ? room.MaxPlayers : 4;
 
             if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal || Phase == GamePhase.GameOver)
             {
@@ -367,6 +434,170 @@ namespace Cabo.Client
                     SeatId = p.SeatId, IsReady = p.IsReady,
                     IsHost = p.IsHost, IsConnected = p.IsConnected, TotalScore = p.TotalScore
                 });
+        }
+
+        void HandleEnterLobby(EnterLobbyRsp rsp)
+        {
+            if (rsp.Error?.Code != 0)
+            {
+                LastRoomAccessError = rsp.Error?.Message ?? "进入房间大厅失败";
+                return;
+            }
+
+            LobbyPlayerId = rsp.LobbyPlayerId;
+            LastRoomAccessError = "";
+            LastRoomAccessMessage = "已进入房间大厅。";
+        }
+
+        void HandleLeaveLobby(LeaveLobbyRsp rsp)
+        {
+            if (rsp.Error?.Code != 0)
+            {
+                LastRoomAccessError = rsp.Error?.Message ?? "离开房间大厅失败";
+                return;
+            }
+
+            ClearRoomBrowserState();
+        }
+
+        void HandleListRooms(ListRoomsRsp rsp)
+        {
+            if (rsp.Error?.Code != 0)
+            {
+                LastRoomAccessError = rsp.Error?.Message ?? "获取房间列表失败";
+                return;
+            }
+
+            RoomSummaries.Clear();
+            foreach (var room in rsp.Rooms)
+                RoomSummaries.Add(ToRoomSummaryInfo(room));
+        }
+
+        void HandleRoomList(RoomListNotify notify)
+        {
+            RoomSummaries.Clear();
+            if (notify == null)
+                return;
+            foreach (var room in notify.Rooms)
+                RoomSummaries.Add(ToRoomSummaryInfo(room));
+        }
+
+        void HandleOnlineLobbyPlayers(OnlineLobbyPlayersNotify notify)
+        {
+            OnlineLobbyPlayers.Clear();
+            if (notify == null)
+                return;
+            foreach (var player in notify.Players)
+            {
+                if (player.LobbyPlayerId == LobbyPlayerId)
+                    continue;
+                OnlineLobbyPlayers.Add(new OnlineLobbyPlayerInfo
+                {
+                    LobbyPlayerId = player.LobbyPlayerId,
+                    Nickname = player.Nickname,
+                    CharacterId = ResolveIncomingCharacterId(0, player.CharacterId)
+                });
+            }
+        }
+
+        void HandleApplyJoinRoom(ApplyJoinRoomRsp rsp)
+        {
+            if (rsp.Error?.Code != 0)
+            {
+                LastRoomAccessError = rsp.Error?.Message ?? "申请加入失败";
+                return;
+            }
+            LastRoomAccessError = "";
+            LastRoomAccessMessage = "已发送加入申请。";
+        }
+
+        void HandleInviteLobbyPlayer(InviteLobbyPlayerRsp rsp)
+        {
+            if (rsp.Error?.Code != 0)
+            {
+                LastRoomAccessError = rsp.Error?.Message ?? "邀请失败";
+                return;
+            }
+            LastRoomAccessError = "";
+            LastRoomAccessMessage = "已发送房间邀请。";
+        }
+
+        void HandleRoomAccessRsp(ErrorInfo error, string okMessage)
+        {
+            if (error?.Code != 0)
+            {
+                LastRoomAccessError = error?.Message ?? "处理失败";
+                return;
+            }
+            LastRoomAccessError = "";
+            LastRoomAccessMessage = okMessage;
+        }
+
+        void HandleRoomAccessInbox(RoomAccessInboxNotify notify)
+        {
+            AccessInboxItems.Clear();
+            if (notify == null)
+                return;
+            foreach (var item in notify.Items)
+            {
+                AccessInboxItems.Add(new RoomAccessInboxItem
+                {
+                    AccessId = item.AccessId,
+                    Type = item.Type,
+                    Status = item.Status,
+                    RoomId = item.RoomId,
+                    RoomCode = item.RoomCode,
+                    HostNickname = item.HostNickname,
+                    RequesterPlayerId = item.RequesterPlayerId,
+                    RequesterNickname = item.RequesterNickname,
+                    LobbyPlayerId = item.LobbyPlayerId,
+                    LobbyNickname = item.LobbyNickname,
+                    CreatedTimeMs = item.CreatedTimeMs
+                });
+            }
+        }
+
+        void HandleRoomAccessDecision(RoomAccessDecisionNotify notify)
+        {
+            if (notify == null)
+                return;
+
+            if (notify.Error?.Code != 0)
+            {
+                LastRoomAccessError = notify.Error.Message;
+                return;
+            }
+
+            LastRoomAccessError = "";
+            LastRoomAccessMessage = string.IsNullOrWhiteSpace(notify.Message)
+                ? notify.Status.ToString()
+                : notify.Message;
+
+            if (notify.Status != RoomAccessStatus.Approved)
+                return;
+
+            LobbyPlayerId = 0;
+            RoomSummaries.Clear();
+            OnlineLobbyPlayers.Clear();
+            AccessInboxItems.Clear();
+            RoomId = notify.RoomId;
+            RoomCode = notify.RoomCode;
+            MyPlayerId = notify.PlayerId;
+            SessionToken = notify.SessionToken;
+            Phase = GamePhase.WaitingRoom;
+        }
+
+        static RoomSummaryInfo ToRoomSummaryInfo(RoomSummary room)
+        {
+            return new RoomSummaryInfo
+            {
+                RoomId = room.RoomId,
+                RoomCode = room.RoomCode,
+                HostNickname = room.HostNickname,
+                PlayerCount = room.PlayerCount,
+                MaxPlayers = room.MaxPlayers,
+                IsFull = room.IsFull
+            };
         }
 
         void HandleReconnect(ReconnectRsp rsp)
@@ -454,6 +685,7 @@ namespace Cabo.Client
             if (room == null) return;
             RoomId = room.RoomId;
             RoomCode = room.RoomCode;
+            MaxPlayers = room.MaxPlayers > 0 ? room.MaxPlayers : 4;
 
             foreach (var player in Players)
             {
@@ -1299,13 +1531,16 @@ namespace Cabo.Client
         {
             ResetEarlyEndState();
             ClearLocalCardKnowledge();
+            ClearRoomBrowserState();
             _requestedCharacterId = "pomelo";
             _hasRequestedCharacterId = false;
             _knownCharacterIds.Clear();
             Phase = GamePhase.Lobby;
             MyPlayerId = 0;
+            LobbyPlayerId = 0;
             RoomId = 0;
             RoomCode = "";
+            MaxPlayers = 4;
             SessionToken = "";
             Players.Clear();
             MyCards.Clear();
@@ -1355,6 +1590,16 @@ namespace Cabo.Client
             LastActionAddedCardCount = 0;
             LastActionDrewExtraPenaltyCard = false;
             LastActionSelectedSlots.Clear();
+        }
+
+        public void ClearRoomBrowserState()
+        {
+            LobbyPlayerId = 0;
+            RoomSummaries.Clear();
+            OnlineLobbyPlayers.Clear();
+            AccessInboxItems.Clear();
+            LastRoomAccessMessage = "";
+            LastRoomAccessError = "";
         }
 
         void UpsertPlayer(long playerId, string nickname, string characterId, int seatId, bool isReady, bool isHost,

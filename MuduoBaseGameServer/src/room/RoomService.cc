@@ -130,6 +130,16 @@ int64_t RoomService::nextChatMessageId() {
     return nextChatMessageId_++;
 }
 
+int64_t RoomService::nextLobbyPlayerId() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    return nextLobbyPlayerId_++;
+}
+
+int64_t RoomService::nextAccessId() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    return nextAccessId_++;
+}
+
 std::shared_ptr<PlayerSession> RoomService::findPlayer(Room& room, int64_t playerId) {
     for (auto& player : room.players) {
         if (player->playerId == playerId) return player;
@@ -137,9 +147,80 @@ std::shared_ptr<PlayerSession> RoomService::findPlayer(Room& room, int64_t playe
     return nullptr;
 }
 
+std::shared_ptr<PlayerSession> RoomService::findPlayerByConnection(Room& room,
+                                                                    const TcpConnectionPtr& conn) {
+    if (!conn) return nullptr;
+    for (auto& player : room.players) {
+        if (player->isConnected && player->conn && player->conn.get() == conn.get())
+            return player;
+    }
+    return nullptr;
+}
+
 bool RoomService::isPlayerConnection(const PlayerSession& player,
                                      const TcpConnectionPtr& conn) const {
     return player.isConnected && player.conn && conn && player.conn.get() == conn.get();
+}
+
+bool RoomService::isConnectionInAnyRoom(const TcpConnectionPtr& conn) const {
+    if (!conn) return false;
+    for (const auto& kv : rooms_) {
+        for (const auto& p : kv.second->players) {
+            if (p->isConnected && p->conn && p->conn.get() == conn.get())
+                return true;
+        }
+    }
+    return false;
+}
+
+std::shared_ptr<Room> RoomService::findRoomByCode(const std::string& roomCode) const {
+    const std::string code = trimAsciiWhitespace(roomCode);
+    for (const auto& kv : rooms_) {
+        if (kv.second->roomCode == code)
+            return kv.second;
+    }
+    return nullptr;
+}
+
+std::shared_ptr<LobbyPlayer> RoomService::findLobbyPlayerForConnection(
+    int64_t lobbyPlayerId, const TcpConnectionPtr& conn) const {
+    auto it = lobbyPlayers_.find(lobbyPlayerId);
+    if (it == lobbyPlayers_.end() || !it->second || !it->second->conn || !conn)
+        return nullptr;
+    if (it->second->conn.get() != conn.get())
+        return nullptr;
+    return it->second;
+}
+
+bool RoomService::isRoomJoinable(const Room& room, std::string* errorMessage) const {
+    if (room.state != ::game::common::ROOM_STATE_WAITING) {
+        if (errorMessage) *errorMessage = "Game already in progress";
+        return false;
+    }
+    if (static_cast<int>(room.players.size()) >= room.maxPlayers) {
+        if (errorMessage) *errorMessage = "Room is full";
+        return false;
+    }
+    bool hostOnline = false;
+    for (const auto& p : room.players) {
+        if (p->playerId == room.hostPlayerId && p->isConnected) {
+            hostOnline = true;
+            break;
+        }
+    }
+    if (!hostOnline) {
+        if (errorMessage) *errorMessage = "Host is offline";
+        return false;
+    }
+    return true;
+}
+
+std::string RoomService::hostNickname(const Room& room) const {
+    for (const auto& p : room.players) {
+        if (p->playerId == room.hostPlayerId)
+            return p->nickname;
+    }
+    return "Player";
 }
 
 SendBufferPool::Lease RoomService::encodeServerMessage(
@@ -188,6 +269,233 @@ void RoomService::fillRoomState(const Room& room, ::game::room::RoomState* state
         ppi->set_is_connected(p->isConnected);
         ppi->set_total_score(p->totalScore);
     }
+}
+
+void RoomService::fillRoomSummary(const Room& room, ::game::room::RoomSummary* summary) const {
+    if (!summary) return;
+    summary->set_room_id(room.roomId);
+    summary->set_room_code(room.roomCode);
+    summary->set_host_nickname(hostNickname(room));
+    summary->set_player_count(static_cast<int32_t>(room.players.size()));
+    summary->set_max_players(room.maxPlayers);
+    summary->set_is_full(static_cast<int>(room.players.size()) >= room.maxPlayers);
+}
+
+void RoomService::fillAccessItem(const RoomAccessRecord& record,
+                                 ::game::room::RoomAccessItem* item) const {
+    if (!item) return;
+    item->set_access_id(record.accessId);
+    item->set_type(record.type);
+    item->set_status(record.status);
+    item->set_room_id(record.roomId);
+    item->set_room_code(record.roomCode);
+    item->set_host_nickname(record.hostNickname);
+    item->set_requester_player_id(record.requesterPlayerId);
+    item->set_requester_nickname(record.requesterNickname);
+    item->set_lobby_player_id(record.lobbyPlayerId);
+    item->set_lobby_nickname(record.lobbyNickname);
+    item->set_created_time_ms(record.createdTimeMs);
+}
+
+void RoomService::fillAccessDecision(const RoomAccessRecord& record,
+                                     ::game::room::RoomAccessDecisionNotify* notify,
+                                     ::game::room::RoomAccessStatus status,
+                                     int32_t errorCode,
+                                     const std::string& message) const {
+    if (!notify) return;
+    notify->set_access_id(record.accessId);
+    notify->set_type(record.type);
+    notify->set_status(status);
+    notify->mutable_error()->set_code(errorCode);
+    notify->mutable_error()->set_message(message);
+    notify->set_room_id(record.roomId);
+    notify->set_room_code(record.roomCode);
+    notify->set_message(message);
+}
+
+void RoomService::sendRoomStateToAll(const std::shared_ptr<Room>& room) {
+    if (!room) return;
+    for (auto& p : room->players) {
+        if (p->conn && p->isConnected)
+            sendRoomState(room->roomId, p->conn);
+    }
+}
+
+void RoomService::sendRoomListTo(const TcpConnectionPtr& conn) {
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_room_list_notify();
+    for (const auto& kv : rooms_) {
+        const auto& room = kv.second;
+        if (!room || room->state != ::game::common::ROOM_STATE_WAITING)
+            continue;
+        fillRoomSummary(*room, notify->add_rooms());
+    }
+    sendTo(conn, msg);
+}
+
+void RoomService::broadcastRoomListToLobby() {
+    for (const auto& kv : lobbyPlayers_) {
+        if (kv.second && kv.second->conn)
+            sendRoomListTo(kv.second->conn);
+    }
+}
+
+void RoomService::broadcastOnlineLobbyPlayers() {
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_online_lobby_players_notify();
+    for (const auto& kv : lobbyPlayers_) {
+        const auto& lobby = kv.second;
+        if (!lobby || !lobby->conn)
+            continue;
+        auto* p = notify->add_players();
+        p->set_lobby_player_id(lobby->lobbyPlayerId);
+        p->set_nickname(lobby->nickname);
+        p->set_character_id(lobby->characterId);
+    }
+
+    for (const auto& kv : rooms_) {
+        for (const auto& player : kv.second->players) {
+            if (player->conn && player->isConnected)
+                sendTo(player->conn, msg);
+        }
+    }
+    for (const auto& kv : lobbyPlayers_) {
+        if (kv.second && kv.second->conn)
+            sendTo(kv.second->conn, msg);
+    }
+}
+
+void RoomService::sendAccessInboxTo(const TcpConnectionPtr& conn) {
+    if (!conn) return;
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_room_access_inbox_notify();
+
+    int64_t lobbyPlayerId = 0;
+    auto lit = lobbyPlayersByConn_.find(conn.get());
+    if (lit != lobbyPlayersByConn_.end())
+        lobbyPlayerId = lit->second;
+
+    int64_t playerId = 0;
+    int64_t roomId = 0;
+    for (const auto& kv : rooms_) {
+        for (const auto& p : kv.second->players) {
+            if (p->isConnected && p->conn && p->conn.get() == conn.get()) {
+                playerId = p->playerId;
+                roomId = kv.second->roomId;
+                break;
+            }
+        }
+        if (playerId > 0) break;
+    }
+
+    for (const auto& kv : accessRecords_) {
+        const auto& record = kv.second;
+        if (record.status != ::game::room::ROOM_ACCESS_STATUS_PENDING)
+            continue;
+        if (record.type == ::game::room::ROOM_ACCESS_TYPE_JOIN_APPLICATION
+            && ((roomId > 0 && record.roomId == roomId)
+                || (lobbyPlayerId > 0 && record.lobbyPlayerId == lobbyPlayerId))) {
+            fillAccessItem(record, notify->add_items());
+        } else if (record.type == ::game::room::ROOM_ACCESS_TYPE_ROOM_INVITATION
+                   && ((lobbyPlayerId > 0 && record.lobbyPlayerId == lobbyPlayerId)
+                       || (roomId > 0 && record.roomId == roomId))) {
+            fillAccessItem(record, notify->add_items());
+        }
+    }
+    sendTo(conn, msg);
+}
+
+void RoomService::broadcastAccessInboxes() {
+    for (const auto& kv : rooms_) {
+        for (const auto& p : kv.second->players) {
+            if (p->conn && p->isConnected)
+                sendAccessInboxTo(p->conn);
+        }
+    }
+    for (const auto& kv : lobbyPlayers_) {
+        if (kv.second && kv.second->conn)
+            sendAccessInboxTo(kv.second->conn);
+    }
+}
+
+void RoomService::expireLobbyAccessRecords(int64_t lobbyPlayerId) {
+    for (auto& kv : accessRecords_) {
+        auto& record = kv.second;
+        if (record.lobbyPlayerId == lobbyPlayerId
+            && record.status == ::game::room::ROOM_ACCESS_STATUS_PENDING) {
+            record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        }
+    }
+}
+
+void RoomService::expireRoomAccessRecords(int64_t roomId) {
+    for (auto& kv : accessRecords_) {
+        auto& record = kv.second;
+        if (record.roomId == roomId
+            && record.status == ::game::room::ROOM_ACCESS_STATUS_PENDING) {
+            record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        }
+    }
+}
+
+void RoomService::removeLobbyPlayer(int64_t lobbyPlayerId) {
+    auto it = lobbyPlayers_.find(lobbyPlayerId);
+    if (it == lobbyPlayers_.end())
+        return;
+    if (it->second && it->second->conn)
+        lobbyPlayersByConn_.erase(it->second->conn.get());
+    lobbyPlayers_.erase(it);
+    expireLobbyAccessRecords(lobbyPlayerId);
+}
+
+std::shared_ptr<PlayerSession> RoomService::addLobbyPlayerToRoom(
+    const std::shared_ptr<LobbyPlayer>& lobbyPlayer,
+    const std::shared_ptr<Room>& room) {
+    if (!lobbyPlayer || !room)
+        return nullptr;
+
+    auto player = std::make_shared<PlayerSession>();
+    player->playerId = nextPlayerId();
+    player->nickname = lobbyPlayer->nickname.empty() ? "Player" : lobbyPlayer->nickname;
+    player->characterId = normalizeCharacterId(lobbyPlayer->characterId);
+    player->seatId = static_cast<int32_t>(room->players.size());
+    player->isReady = false;
+    player->isHost = false;
+    player->isConnected = true;
+    player->totalScore = 0;
+    player->conn = lobbyPlayer->conn;
+    player->sessionToken = generateSessionToken();
+
+    room->players.push_back(player);
+    playerRooms_[player->playerId] = room;
+    removeLobbyPlayer(lobbyPlayer->lobbyPlayerId);
+    return player;
+}
+
+void RoomService::sendAccessDecisionToLobby(
+    const RoomAccessRecord& record,
+    ::game::room::RoomAccessStatus status,
+    int32_t errorCode,
+    const std::string& message,
+    const std::shared_ptr<PlayerSession>& joinedPlayer) {
+    TcpConnectionPtr targetConn;
+    auto lobbyIt = lobbyPlayers_.find(record.lobbyPlayerId);
+    if (lobbyIt != lobbyPlayers_.end() && lobbyIt->second)
+        targetConn = lobbyIt->second->conn;
+    if (!targetConn && joinedPlayer)
+        targetConn = joinedPlayer->conn;
+    if (!targetConn)
+        return;
+
+    ::game::messages::ServerMessage msg;
+    auto* notify = msg.mutable_room_access_decision_notify();
+    fillAccessDecision(record, notify, status, errorCode, message);
+    if (joinedPlayer) {
+        notify->set_player_id(joinedPlayer->playerId);
+        notify->set_session_token(joinedPlayer->sessionToken);
+        notify->set_seat_id(joinedPlayer->seatId);
+    }
+    sendTo(targetConn, msg);
 }
 
 void RoomService::broadcastToRoom(int64_t roomId,
@@ -274,6 +582,9 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         rooms_[room->roomId] = room;
         playerRooms_[player->playerId] = room;
+        auto lobbyIt = lobbyPlayersByConn_.find(conn.get());
+        if (lobbyIt != lobbyPlayersByConn_.end())
+            removeLobbyPlayer(lobbyIt->second);
     }
 
     LOG_INFO("[Room] Creating room for '%s' character='%s' (max %d)...",
@@ -292,6 +603,9 @@ void RoomService::handleCreateRoom(const TcpConnectionPtr& conn,
 
     // Send full room state
     sendRoomState(room->roomId, conn);
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
 
     LOG_INFO("[Room] Room %s created — player %lld (host)", room->roomCode.c_str(), (long long)player->playerId);
 }
@@ -375,6 +689,9 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         room->players.push_back(player);
         playerRooms_[player->playerId] = room;
+        auto lobbyIt = lobbyPlayersByConn_.find(conn.get());
+        if (lobbyIt != lobbyPlayersByConn_.end())
+            removeLobbyPlayer(lobbyIt->second);
     }
 
     // JoinRoomRsp
@@ -409,6 +726,389 @@ void RoomService::handleJoinRoom(const TcpConnectionPtr& conn,
     LOG_INFO("[Room] Player %s character='%s' joined room %s (seat %d, %zu/%d players)",
              player->nickname.c_str(), player->characterId.c_str(), room->roomCode.c_str(),
              player->seatId, room->players.size(), room->maxPlayers);
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
+}
+
+void RoomService::handleEnterLobby(const TcpConnectionPtr& conn,
+                                   const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.enter_lobby_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_enter_lobby_rsp();
+    rsp->set_request_id(req.request_id());
+
+    if (!conn) {
+        rsp->mutable_error()->set_code(4001);
+        rsp->mutable_error()->set_message("Invalid connection");
+        sendTo(conn, rspMsg);
+        return;
+    }
+    if (isConnectionInAnyRoom(conn)) {
+        rsp->mutable_error()->set_code(4002);
+        rsp->mutable_error()->set_message("Already in a room");
+        sendTo(conn, rspMsg);
+        return;
+    }
+
+    std::shared_ptr<LobbyPlayer> lobby;
+    auto byConn = lobbyPlayersByConn_.find(conn.get());
+    if (byConn != lobbyPlayersByConn_.end()) {
+        auto it = lobbyPlayers_.find(byConn->second);
+        if (it != lobbyPlayers_.end())
+            lobby = it->second;
+    }
+    if (!lobby) {
+        lobby = std::make_shared<LobbyPlayer>();
+        lobby->lobbyPlayerId = nextLobbyPlayerId();
+    }
+
+    lobby->nickname = req.nickname().empty() ? "Player" : req.nickname();
+    lobby->characterId = normalizeCharacterId(req.character_id());
+    lobby->conn = conn;
+    lobbyPlayers_[lobby->lobbyPlayerId] = lobby;
+    lobbyPlayersByConn_[conn.get()] = lobby->lobbyPlayerId;
+
+    rsp->mutable_error()->set_code(0);
+    rsp->set_lobby_player_id(lobby->lobbyPlayerId);
+    sendTo(conn, rspMsg);
+    sendRoomListTo(conn);
+    sendAccessInboxTo(conn);
+    broadcastOnlineLobbyPlayers();
+}
+
+void RoomService::handleLeaveLobby(const TcpConnectionPtr& conn,
+                                   const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.leave_lobby_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_leave_lobby_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto lobby = findLobbyPlayerForConnection(req.lobby_player_id(), conn);
+    if (!lobby) {
+        rsp->mutable_error()->set_code(4003);
+        rsp->mutable_error()->set_message("Lobby player not found");
+        sendTo(conn, rspMsg);
+        return;
+    }
+
+    removeLobbyPlayer(req.lobby_player_id());
+    rsp->mutable_error()->set_code(0);
+    sendTo(conn, rspMsg);
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
+}
+
+void RoomService::handleListRooms(const TcpConnectionPtr& conn,
+                                  const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.list_rooms_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_list_rooms_rsp();
+    rsp->set_request_id(req.request_id());
+    rsp->mutable_error()->set_code(0);
+    for (const auto& kv : rooms_) {
+        const auto& room = kv.second;
+        if (!room || room->state != ::game::common::ROOM_STATE_WAITING)
+            continue;
+        fillRoomSummary(*room, rsp->add_rooms());
+    }
+    sendTo(conn, rspMsg);
+}
+
+void RoomService::handleApplyJoinRoom(const TcpConnectionPtr& conn,
+                                      const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.apply_join_room_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_apply_join_room_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto lobby = findLobbyPlayerForConnection(req.lobby_player_id(), conn);
+    auto fail = [&](int code, const std::string& message) {
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendTo(conn, rspMsg);
+    };
+
+    if (!lobby) {
+        fail(4101, "Lobby player not found");
+        return;
+    }
+    if (isConnectionInAnyRoom(conn)) {
+        fail(4102, "Already in a room");
+        return;
+    }
+
+    std::shared_ptr<Room> room;
+    if (req.room_id() > 0) {
+        auto it = rooms_.find(req.room_id());
+        if (it != rooms_.end())
+            room = it->second;
+    }
+    if (!room && !req.room_code().empty())
+        room = findRoomByCode(req.room_code());
+    if (!room) {
+        fail(4103, "Room not found");
+        return;
+    }
+
+    std::string roomError;
+    if (!isRoomJoinable(*room, &roomError)) {
+        fail(4104, roomError);
+        return;
+    }
+
+    for (const auto& kv : accessRecords_) {
+        const auto& record = kv.second;
+        if (record.type == ::game::room::ROOM_ACCESS_TYPE_JOIN_APPLICATION
+            && record.status == ::game::room::ROOM_ACCESS_STATUS_PENDING
+            && record.roomId == room->roomId
+            && record.lobbyPlayerId == lobby->lobbyPlayerId) {
+            rsp->mutable_error()->set_code(0);
+            rsp->set_access_id(record.accessId);
+            sendTo(conn, rspMsg);
+            return;
+        }
+    }
+
+    RoomAccessRecord record;
+    record.accessId = nextAccessId();
+    record.type = ::game::room::ROOM_ACCESS_TYPE_JOIN_APPLICATION;
+    record.status = ::game::room::ROOM_ACCESS_STATUS_PENDING;
+    record.roomId = room->roomId;
+    record.roomCode = room->roomCode;
+    record.hostNickname = hostNickname(*room);
+    record.lobbyPlayerId = lobby->lobbyPlayerId;
+    record.lobbyNickname = lobby->nickname;
+    record.createdTimeMs = nowMs();
+    accessRecords_[record.accessId] = record;
+
+    rsp->mutable_error()->set_code(0);
+    rsp->set_access_id(record.accessId);
+    sendTo(conn, rspMsg);
+    broadcastAccessInboxes();
+}
+
+void RoomService::handleRespondJoinApplication(
+    const TcpConnectionPtr& conn,
+    const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.respond_join_application_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_respond_join_application_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto fail = [&](int code, const std::string& message) {
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendTo(conn, rspMsg);
+    };
+
+    auto accessIt = accessRecords_.find(req.access_id());
+    if (accessIt == accessRecords_.end()
+        || accessIt->second.type != ::game::room::ROOM_ACCESS_TYPE_JOIN_APPLICATION
+        || accessIt->second.status != ::game::room::ROOM_ACCESS_STATUS_PENDING) {
+        fail(4201, "Application not found");
+        return;
+    }
+    auto& record = accessIt->second;
+    auto roomIt = rooms_.find(record.roomId);
+    if (roomIt == rooms_.end()) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        fail(4202, "Room not found");
+        return;
+    }
+    auto room = roomIt->second;
+    auto responder = findPlayer(*room, req.player_id());
+    if (!responder || !isPlayerConnection(*responder, conn)
+        || responder->playerId != room->hostPlayerId) {
+        fail(4203, "Only host can respond to applications");
+        return;
+    }
+
+    if (!req.approve()) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_REJECTED;
+        rsp->mutable_error()->set_code(0);
+        sendTo(conn, rspMsg);
+        sendAccessDecisionToLobby(record, record.status, 0, "Application rejected");
+        broadcastAccessInboxes();
+        return;
+    }
+
+    auto lobbyIt = lobbyPlayers_.find(record.lobbyPlayerId);
+    if (lobbyIt == lobbyPlayers_.end() || !lobbyIt->second) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        fail(4204, "Applicant is offline");
+        broadcastAccessInboxes();
+        return;
+    }
+
+    std::string roomError;
+    if (!isRoomJoinable(*room, &roomError)) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        sendAccessDecisionToLobby(record, record.status, 4205, roomError);
+        fail(4205, roomError);
+        broadcastAccessInboxes();
+        return;
+    }
+
+    auto joinedPlayer = addLobbyPlayerToRoom(lobbyIt->second, room);
+    record.status = ::game::room::ROOM_ACCESS_STATUS_APPROVED;
+    rsp->mutable_error()->set_code(0);
+    sendTo(conn, rspMsg);
+    sendAccessDecisionToLobby(record, record.status, 0, "Application approved", joinedPlayer);
+    sendRoomStateToAll(room);
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
+}
+
+void RoomService::handleInviteLobbyPlayer(const TcpConnectionPtr& conn,
+                                          const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.invite_lobby_player_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_invite_lobby_player_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto fail = [&](int code, const std::string& message) {
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendTo(conn, rspMsg);
+    };
+
+    auto roomIt = rooms_.find(req.room_id());
+    if (roomIt == rooms_.end()) {
+        fail(4301, "Room not found");
+        return;
+    }
+    auto room = roomIt->second;
+    auto requester = findPlayer(*room, req.player_id());
+    if (!requester || !isPlayerConnection(*requester, conn)) {
+        fail(4302, "Requester is not in this room");
+        return;
+    }
+    std::string roomError;
+    if (!isRoomJoinable(*room, &roomError)) {
+        fail(4303, roomError);
+        return;
+    }
+    auto lobbyIt = lobbyPlayers_.find(req.lobby_player_id());
+    if (lobbyIt == lobbyPlayers_.end() || !lobbyIt->second) {
+        fail(4304, "Lobby player not found");
+        return;
+    }
+
+    for (const auto& kv : accessRecords_) {
+        const auto& record = kv.second;
+        if (record.type == ::game::room::ROOM_ACCESS_TYPE_ROOM_INVITATION
+            && record.status == ::game::room::ROOM_ACCESS_STATUS_PENDING
+            && record.roomId == room->roomId
+            && record.lobbyPlayerId == lobbyIt->second->lobbyPlayerId) {
+            rsp->mutable_error()->set_code(0);
+            rsp->set_access_id(record.accessId);
+            sendTo(conn, rspMsg);
+            return;
+        }
+    }
+
+    RoomAccessRecord record;
+    record.accessId = nextAccessId();
+    record.type = ::game::room::ROOM_ACCESS_TYPE_ROOM_INVITATION;
+    record.status = ::game::room::ROOM_ACCESS_STATUS_PENDING;
+    record.roomId = room->roomId;
+    record.roomCode = room->roomCode;
+    record.hostNickname = hostNickname(*room);
+    record.requesterPlayerId = requester->playerId;
+    record.requesterNickname = requester->nickname;
+    record.lobbyPlayerId = lobbyIt->second->lobbyPlayerId;
+    record.lobbyNickname = lobbyIt->second->nickname;
+    record.createdTimeMs = nowMs();
+    accessRecords_[record.accessId] = record;
+
+    rsp->mutable_error()->set_code(0);
+    rsp->set_access_id(record.accessId);
+    sendTo(conn, rspMsg);
+    broadcastAccessInboxes();
+}
+
+void RoomService::handleRespondRoomInvitation(
+    const TcpConnectionPtr& conn,
+    const ::game::messages::ClientMessage& msg) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const auto& req = msg.respond_room_invitation_req();
+
+    ::game::messages::ServerMessage rspMsg;
+    auto* rsp = rspMsg.mutable_respond_room_invitation_rsp();
+    rsp->set_request_id(req.request_id());
+
+    auto fail = [&](int code, const std::string& message) {
+        rsp->mutable_error()->set_code(code);
+        rsp->mutable_error()->set_message(message);
+        sendTo(conn, rspMsg);
+    };
+
+    auto lobby = findLobbyPlayerForConnection(req.lobby_player_id(), conn);
+    if (!lobby) {
+        fail(4401, "Lobby player not found");
+        return;
+    }
+
+    auto accessIt = accessRecords_.find(req.access_id());
+    if (accessIt == accessRecords_.end()
+        || accessIt->second.type != ::game::room::ROOM_ACCESS_TYPE_ROOM_INVITATION
+        || accessIt->second.status != ::game::room::ROOM_ACCESS_STATUS_PENDING
+        || accessIt->second.lobbyPlayerId != lobby->lobbyPlayerId) {
+        fail(4402, "Invitation not found");
+        return;
+    }
+    auto& record = accessIt->second;
+
+    if (!req.approve()) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_REJECTED;
+        rsp->mutable_error()->set_code(0);
+        sendTo(conn, rspMsg);
+        sendAccessDecisionToLobby(record, record.status, 0, "Invitation rejected");
+        broadcastAccessInboxes();
+        return;
+    }
+
+    auto roomIt = rooms_.find(record.roomId);
+    if (roomIt == rooms_.end()) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        sendAccessDecisionToLobby(record, record.status, 4403, "Room not found");
+        fail(4403, "Room not found");
+        broadcastAccessInboxes();
+        return;
+    }
+    auto room = roomIt->second;
+    std::string roomError;
+    if (!isRoomJoinable(*room, &roomError)) {
+        record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
+        sendAccessDecisionToLobby(record, record.status, 4404, roomError);
+        fail(4404, roomError);
+        broadcastAccessInboxes();
+        return;
+    }
+
+    auto joinedPlayer = addLobbyPlayerToRoom(lobby, room);
+    record.status = ::game::room::ROOM_ACCESS_STATUS_APPROVED;
+    rsp->mutable_error()->set_code(0);
+    sendTo(conn, rspMsg);
+    sendAccessDecisionToLobby(record, record.status, 0, "Invitation approved", joinedPlayer);
+    sendRoomStateToAll(room);
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
 }
 
 // ── Handle LeaveRoom ──
@@ -477,6 +1177,9 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
         if (p->conn && p->isConnected)
             sendRoomState(room->roomId, p->conn);
     }
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
 
     return true;
 }
@@ -597,6 +1300,7 @@ bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
 
     // Start!
     room->state = ::game::common::ROOM_STATE_PLAYING;
+    expireRoomAccessRecords(room->roomId);
 
     rsp->mutable_error()->set_code(0);
     sendTo(conn, rspMsg);
@@ -618,6 +1322,8 @@ bool RoomService::handleStartGame(const TcpConnectionPtr& conn,
             sendRoomState(room->roomId, p->conn);
         }
     }
+    broadcastRoomListToLobby();
+    broadcastAccessInboxes();
 
     return true;
 }
@@ -826,6 +1532,9 @@ void RoomService::markGameFinished(int64_t roomId) {
         if (p->conn && p->isConnected)
             sendRoomState(roomId, p->conn);
     }
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
 }
 
 // ── Connection closed ──
@@ -863,6 +1572,12 @@ void RoomService::onConnectionClosed(const TcpConnectionPtr& conn) {
             }
         }
     }
+    auto lobbyIt = lobbyPlayersByConn_.find(conn.get());
+    if (lobbyIt != lobbyPlayersByConn_.end())
+        removeLobbyPlayer(lobbyIt->second);
+    broadcastRoomListToLobby();
+    broadcastOnlineLobbyPlayers();
+    broadcastAccessInboxes();
 }
 
 } // namespace game

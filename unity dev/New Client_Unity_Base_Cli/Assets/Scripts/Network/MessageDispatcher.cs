@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Game.Messages;
+using Game.Room;
 using UnityEngine;
 
 namespace Cabo.Client.Network
@@ -90,6 +91,39 @@ namespace Cabo.Client.Network
                     break;
                 case ServerMessage.PayloadOneofCase.RoomChatNotify:
                     InvokeHandler(message.RoomChatNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.EnterLobbyRsp:
+                    InvokeHandler(message.EnterLobbyRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.LeaveLobbyRsp:
+                    InvokeHandler(message.LeaveLobbyRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.ListRoomsRsp:
+                    InvokeHandler(message.ListRoomsRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.RoomListNotify:
+                    InvokeHandler(message.RoomListNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.OnlineLobbyPlayersNotify:
+                    InvokeHandler(message.OnlineLobbyPlayersNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.ApplyJoinRoomRsp:
+                    InvokeHandler(message.ApplyJoinRoomRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.RespondJoinApplicationRsp:
+                    InvokeHandler(message.RespondJoinApplicationRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.InviteLobbyPlayerRsp:
+                    InvokeHandler(message.InviteLobbyPlayerRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.RespondRoomInvitationRsp:
+                    InvokeHandler(message.RespondRoomInvitationRsp);
+                    break;
+                case ServerMessage.PayloadOneofCase.RoomAccessInboxNotify:
+                    InvokeHandler(message.RoomAccessInboxNotify);
+                    break;
+                case ServerMessage.PayloadOneofCase.RoomAccessDecisionNotify:
+                    InvokeHandler(message.RoomAccessDecisionNotify);
                     break;
 
                 // Game

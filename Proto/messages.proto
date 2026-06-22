@@ -33,6 +33,13 @@ message ClientMessage {
     .game.room.StartGameReq start_game_req = 14;
     .game.room.KickPlayerReq kick_player_req = 15;
     .game.room.RoomChatReq room_chat_req = 16;
+    .game.room.EnterLobbyReq enter_lobby_req = 17;
+    .game.room.LeaveLobbyReq leave_lobby_req = 18;
+    .game.room.ListRoomsReq list_rooms_req = 19;
+    .game.room.ApplyJoinRoomReq apply_join_room_req = 28;
+    .game.room.RespondJoinApplicationReq respond_join_application_req = 29;
+    .game.room.InviteLobbyPlayerReq invite_lobby_player_req = 32;
+    .game.room.RespondRoomInvitationReq respond_room_invitation_req = 33;
 
     // Game Actions
     .game.game.DrawCardReq draw_card_req = 20;
@@ -69,6 +76,17 @@ message ServerMessage {
     .game.room.RoomStartNotify room_start_notify = 20;
     .game.room.RoomChatRsp room_chat_rsp = 21;
     .game.room.RoomChatNotify room_chat_notify = 22;
+    .game.room.EnterLobbyRsp enter_lobby_rsp = 23;
+    .game.room.LeaveLobbyRsp leave_lobby_rsp = 24;
+    .game.room.ListRoomsRsp list_rooms_rsp = 25;
+    .game.room.RoomListNotify room_list_notify = 26;
+    .game.room.OnlineLobbyPlayersNotify online_lobby_players_notify = 27;
+    .game.room.ApplyJoinRoomRsp apply_join_room_rsp = 28;
+    .game.room.RespondJoinApplicationRsp respond_join_application_rsp = 29;
+    .game.room.RoomAccessInboxNotify room_access_inbox_notify = 46;
+    .game.room.RoomAccessDecisionNotify room_access_decision_notify = 47;
+    .game.room.InviteLobbyPlayerRsp invite_lobby_player_rsp = 48;
+    .game.room.RespondRoomInvitationRsp respond_room_invitation_rsp = 49;
 
     // Game
     .game.game.GameStartNotify game_start_notify = 30;

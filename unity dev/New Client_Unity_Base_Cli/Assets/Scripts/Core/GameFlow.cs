@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Game.Messages;
+using Game.Room;
 using UnityEngine;
 
 namespace Cabo.Client
@@ -11,7 +12,7 @@ namespace Cabo.Client
     /// </summary>
     public enum FlowState
     {
-        Home, Connecting, Reconnecting, RoomFlow, WaitingRoom, Playing, RoundReveal, GameOver
+        Home, Connecting, Reconnecting, RoomFlow, RoomBrowser, WaitingRoom, Playing, RoundReveal, GameOver
     }
 
     public enum GameSubState
@@ -132,6 +133,77 @@ namespace Cabo.Client
             State.SetRequestedCharacterId(normalizedCharacterId);
             Gateway.SendJoinRoom(roomCode, _nickname, normalizedCharacterId);
             Flow = FlowState.WaitingRoom; StateChanged?.Invoke();
+        }
+
+        public void JoinRoomFromBrowser(string roomCode)
+        {
+            var normalizedCode = roomCode?.Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(normalizedCode))
+                return;
+
+            if (Gateway.IsConnected && State.LobbyPlayerId > 0)
+                Gateway.SendLeaveLobby(State.LobbyPlayerId);
+            State.ClearRoomBrowserState();
+            JoinRoom(normalizedCode, _nickname, State.RequestedCharacterId);
+        }
+
+        public void EnterRoomBrowser(string nickname, string characterId)
+        {
+            _nickname = NormalizeNickname(nickname);
+            var normalizedCharacterId = NormalizeCharacterId(characterId);
+            State.SetRequestedCharacterId(normalizedCharacterId);
+            State.ClearRoomBrowserState();
+            if (Gateway.IsConnected)
+                Gateway.SendEnterLobby(_nickname, normalizedCharacterId);
+            Flow = FlowState.RoomBrowser;
+            StateChanged?.Invoke();
+        }
+
+        public void ReturnHomeFromRoomBrowser()
+        {
+            if (Gateway.IsConnected && State.LobbyPlayerId > 0)
+                Gateway.SendLeaveLobby(State.LobbyPlayerId);
+            State.ClearRoomBrowserState();
+            Flow = Gateway.IsConnected ? FlowState.RoomFlow : FlowState.Home;
+            StateChanged?.Invoke();
+        }
+
+        public void RefreshRooms()
+        {
+            if (Gateway.IsConnected)
+                Gateway.SendListRooms();
+        }
+
+        public void ApplyJoinRoom(long roomId, string roomCode)
+        {
+            if (!Gateway.IsConnected || State.LobbyPlayerId <= 0)
+                return;
+            Gateway.SendApplyJoinRoom(State.LobbyPlayerId, roomId, roomCode);
+            StateChanged?.Invoke();
+        }
+
+        public void InviteLobbyPlayer(long lobbyPlayerId)
+        {
+            if (!Gateway.IsConnected || State.MyPlayerId <= 0 || State.RoomId <= 0 || lobbyPlayerId <= 0)
+                return;
+            Gateway.SendInviteLobbyPlayer(State.MyPlayerId, State.RoomId, lobbyPlayerId);
+            StateChanged?.Invoke();
+        }
+
+        public void RespondJoinApplication(long accessId, bool approve)
+        {
+            if (!Gateway.IsConnected || State.MyPlayerId <= 0 || State.RoomId <= 0 || accessId <= 0)
+                return;
+            Gateway.SendRespondJoinApplication(State.MyPlayerId, State.RoomId, accessId, approve);
+            StateChanged?.Invoke();
+        }
+
+        public void RespondRoomInvitation(long accessId, bool approve)
+        {
+            if (!Gateway.IsConnected || State.LobbyPlayerId <= 0 || accessId <= 0)
+                return;
+            Gateway.SendRespondRoomInvitation(State.LobbyPlayerId, accessId, approve);
+            StateChanged?.Invoke();
         }
 
         static string NormalizeNickname(string nickname)
@@ -407,6 +479,15 @@ namespace Cabo.Client
 
             if (msg.PayloadCase == ServerMessage.PayloadOneofCase.StateSyncNotify)
                 RestoreSubStateFromSynchronizedState();
+
+            if (State.Phase == GamePhase.Lobby
+                && State.LobbyPlayerId > 0
+                && Flow != FlowState.Playing
+                && Flow != FlowState.RoundReveal
+                && Flow != FlowState.GameOver)
+            {
+                Flow = FlowState.RoomBrowser;
+            }
 
             if (Flow != previousFlow || State.Phase != previousPhase || msg.PayloadCase != ServerMessage.PayloadOneofCase.None)
                 StateChanged?.Invoke();

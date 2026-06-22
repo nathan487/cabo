@@ -25,7 +25,7 @@ namespace Game.Messages {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "Cg5tZXNzYWdlcy5wcm90bxINZ2FtZS5tZXNzYWdlcxoKcm9vbS5wcm90bxoK",
-            "Z2FtZS5wcm90bxoKc3luYy5wcm90byK+BwoNQ2xpZW50TWVzc2FnZRILCgNz",
+            "Z2FtZS5wcm90bxoKc3luYy5wcm90byL1CgoNQ2xpZW50TWVzc2FnZRILCgNz",
             "ZXEYASABKAMSMwoPY3JlYXRlX3Jvb21fcmVxGAogASgLMhguZ2FtZS5yb29t",
             "LkNyZWF0ZVJvb21SZXFIABIvCg1qb2luX3Jvb21fcmVxGAsgASgLMhYuZ2Ft",
             "ZS5yb29tLkpvaW5Sb29tUmVxSAASMQoObGVhdmVfcm9vbV9yZXEYDCABKAsy",
@@ -33,68 +33,94 @@ namespace Game.Messages {
             "MhMuZ2FtZS5yb29tLlJlYWR5UmVxSAASMQoOc3RhcnRfZ2FtZV9yZXEYDiAB",
             "KAsyFy5nYW1lLnJvb20uU3RhcnRHYW1lUmVxSAASMwoPa2lja19wbGF5ZXJf",
             "cmVxGA8gASgLMhguZ2FtZS5yb29tLktpY2tQbGF5ZXJSZXFIABIvCg1yb29t",
-            "X2NoYXRfcmVxGBAgASgLMhYuZ2FtZS5yb29tLlJvb21DaGF0UmVxSAASLwoN",
-            "ZHJhd19jYXJkX3JlcRgUIAEoCzIWLmdhbWUuZ2FtZS5EcmF3Q2FyZFJlcUgA",
-            "EjcKEWRpc2NhcmRfZHJhd25fcmVxGBUgASgLMhouZ2FtZS5nYW1lLkRpc2Nh",
-            "cmREcmF3blJlcUgAEkAKFnJlcGxhY2Vfd2l0aF9kcmF3bl9yZXEYFiABKAsy",
-            "Hi5nYW1lLmdhbWUuUmVwbGFjZVdpdGhEcmF3blJlcUgAEj4KFXRha2VfZnJv",
-            "bV9kaXNjYXJkX3JlcRgXIAEoCzIdLmdhbWUuZ2FtZS5UYWtlRnJvbURpc2Nh",
-            "cmRSZXFIABIvCg11c2Vfc2tpbGxfcmVxGBggASgLMhYuZ2FtZS5nYW1lLlVz",
-            "ZVNraWxsUmVxSAASMwoPY2FsbF9zdGVhZHlfcmVxGBkgASgLMhguZ2FtZS5n",
-            "YW1lLkNhbGxTdGVhZHlSZXFIABI4ChJlbmRfZ2FtZV9lYXJseV9yZXEYGiAB",
-            "KAsyGi5nYW1lLmdhbWUuRW5kR2FtZUVhcmx5UmVxSAASSQobZW5kX2dhbWVf",
-            "ZWFybHlfZGVjaXNpb25fcmVxGBsgASgLMiIuZ2FtZS5nYW1lLkVuZEdhbWVF",
-            "YXJseURlY2lzaW9uUmVxSAASMAoNcmVjb25uZWN0X3JlcRgeIAEoCzIXLmdh",
-            "bWUuc3luYy5SZWNvbm5lY3RSZXFIABIwCg1oZWFydGJlYXRfcmVxGB8gASgL",
-            "MhcuZ2FtZS5zeW5jLkhlYXJ0YmVhdFJlcUgAQgkKB3BheWxvYWQi9g4KDVNl",
-            "cnZlck1lc3NhZ2USEgoKc2VydmVyX3NlcRgBIAEoAxIWCg5zZXJ2ZXJfdGlt",
-            "ZV9tcxgCIAEoAxIzCg9jcmVhdGVfcm9vbV9yc3AYCiABKAsyGC5nYW1lLnJv",
-            "b20uQ3JlYXRlUm9vbVJzcEgAEi8KDWpvaW5fcm9vbV9yc3AYCyABKAsyFi5n",
-            "YW1lLnJvb20uSm9pblJvb21Sc3BIABIxCg5sZWF2ZV9yb29tX3JzcBgMIAEo",
-            "CzIXLmdhbWUucm9vbS5MZWF2ZVJvb21Sc3BIABIoCglyZWFkeV9yc3AYDSAB",
-            "KAsyEy5nYW1lLnJvb20uUmVhZHlSc3BIABIxCg5zdGFydF9nYW1lX3JzcBgO",
-            "IAEoCzIXLmdhbWUucm9vbS5TdGFydEdhbWVSc3BIABIzCg9raWNrX3BsYXll",
-            "cl9yc3AYDyABKAsyGC5nYW1lLnJvb20uS2lja1BsYXllclJzcEgAEjcKEXJv",
-            "b21fc3RhdGVfbm90aWZ5GBAgASgLMhouZ2FtZS5yb29tLlJvb21TdGF0ZU5v",
-            "dGlmeUgAEjkKEnBsYXllcl9qb2luX25vdGlmeRgRIAEoCzIbLmdhbWUucm9v",
-            "bS5QbGF5ZXJKb2luTm90aWZ5SAASOwoTcGxheWVyX2xlYXZlX25vdGlmeRgS",
-            "IAEoCzIcLmdhbWUucm9vbS5QbGF5ZXJMZWF2ZU5vdGlmeUgAEjsKE3BsYXll",
-            "cl9yZWFkeV9ub3RpZnkYEyABKAsyHC5nYW1lLnJvb20uUGxheWVyUmVhZHlO",
-            "b3RpZnlIABI3ChFyb29tX3N0YXJ0X25vdGlmeRgUIAEoCzIaLmdhbWUucm9v",
-            "bS5Sb29tU3RhcnROb3RpZnlIABIvCg1yb29tX2NoYXRfcnNwGBUgASgLMhYu",
-            "Z2FtZS5yb29tLlJvb21DaGF0UnNwSAASNQoQcm9vbV9jaGF0X25vdGlmeRgW",
-            "IAEoCzIZLmdhbWUucm9vbS5Sb29tQ2hhdE5vdGlmeUgAEjcKEWdhbWVfc3Rh",
-            "cnRfbm90aWZ5GB4gASgLMhouZ2FtZS5nYW1lLkdhbWVTdGFydE5vdGlmeUgA",
-            "EjcKEXR1cm5fc3RhcnRfbm90aWZ5GB8gASgLMhouZ2FtZS5nYW1lLlR1cm5T",
-            "dGFydE5vdGlmeUgAEi8KDWRyYXdfY2FyZF9yc3AYICABKAsyFi5nYW1lLmdh",
-            "bWUuRHJhd0NhcmRSc3BIABI3ChFkaXNjYXJkX2RyYXduX3JzcBghIAEoCzIa",
-            "LmdhbWUuZ2FtZS5EaXNjYXJkRHJhd25Sc3BIABJAChZyZXBsYWNlX3dpdGhf",
-            "ZHJhd25fcnNwGCIgASgLMh4uZ2FtZS5nYW1lLlJlcGxhY2VXaXRoRHJhd25S",
-            "c3BIABI+ChV0YWtlX2Zyb21fZGlzY2FyZF9yc3AYIyABKAsyHS5nYW1lLmdh",
-            "bWUuVGFrZUZyb21EaXNjYXJkUnNwSAASLwoNdXNlX3NraWxsX3JzcBgkIAEo",
-            "CzIWLmdhbWUuZ2FtZS5Vc2VTa2lsbFJzcEgAEjMKD2NhbGxfc3RlYWR5X3Jz",
-            "cBglIAEoCzIYLmdhbWUuZ2FtZS5DYWxsU3RlYWR5UnNwSAASOAoSZW5kX2dh",
-            "bWVfZWFybHlfcnNwGCYgASgLMhouZ2FtZS5nYW1lLkVuZEdhbWVFYXJseVJz",
-            "cEgAEk0KHWVuZF9nYW1lX2Vhcmx5X3JlcXVlc3Rfbm90aWZ5GCcgASgLMiQu",
-            "Z2FtZS5nYW1lLkVuZEdhbWVFYXJseVJlcXVlc3ROb3RpZnlIABI9ChRhY3Rp",
-            "b25fcmVzdWx0X25vdGlmeRgoIAEoCzIdLmdhbWUuZ2FtZS5BY3Rpb25SZXN1",
-            "bHROb3RpZnlIABJJChtlbmRfZ2FtZV9lYXJseV9kZWNpc2lvbl9yc3AYKSAB",
-            "KAsyIi5nYW1lLmdhbWUuRW5kR2FtZUVhcmx5RGVjaXNpb25Sc3BIABI7ChNy",
-            "b3VuZF9yZXZlYWxfbm90aWZ5GCogASgLMhwuZ2FtZS5nYW1lLlJvdW5kUmV2",
-            "ZWFsTm90aWZ5SAASOwoTc2NvcmVfdXBkYXRlX25vdGlmeRgrIAEoCzIcLmdh",
-            "bWUuZ2FtZS5TY29yZVVwZGF0ZU5vdGlmeUgAEjUKEGdhbWVfb3Zlcl9ub3Rp",
-            "ZnkYLCABKAsyGS5nYW1lLmdhbWUuR2FtZU92ZXJOb3RpZnlIABJPCh5lbmRf",
-            "Z2FtZV9lYXJseV9yZWplY3RlZF9ub3RpZnkYLSABKAsyJS5nYW1lLmdhbWUu",
-            "RW5kR2FtZUVhcmx5UmVqZWN0ZWROb3RpZnlIABIwCg1yZWNvbm5lY3RfcnNw",
-            "GDIgASgLMhcuZ2FtZS5zeW5jLlJlY29ubmVjdFJzcEgAEjcKEXN0YXRlX3N5",
-            "bmNfbm90aWZ5GDMgASgLMhouZ2FtZS5zeW5jLlN0YXRlU3luY05vdGlmeUgA",
-            "EjAKDWhlYXJ0YmVhdF9yc3AYNCABKAsyFy5nYW1lLnN5bmMuSGVhcnRiZWF0",
-            "UnNwSABCCQoHcGF5bG9hZEIQqgINR2FtZS5NZXNzYWdlc2IGcHJvdG8z"));
+            "X2NoYXRfcmVxGBAgASgLMhYuZ2FtZS5yb29tLlJvb21DaGF0UmVxSAASMwoP",
+            "ZW50ZXJfbG9iYnlfcmVxGBEgASgLMhguZ2FtZS5yb29tLkVudGVyTG9iYnlS",
+            "ZXFIABIzCg9sZWF2ZV9sb2JieV9yZXEYEiABKAsyGC5nYW1lLnJvb20uTGVh",
+            "dmVMb2JieVJlcUgAEjEKDmxpc3Rfcm9vbXNfcmVxGBMgASgLMhcuZ2FtZS5y",
+            "b29tLkxpc3RSb29tc1JlcUgAEjoKE2FwcGx5X2pvaW5fcm9vbV9yZXEYHCAB",
+            "KAsyGy5nYW1lLnJvb20uQXBwbHlKb2luUm9vbVJlcUgAEkwKHHJlc3BvbmRf",
+            "am9pbl9hcHBsaWNhdGlvbl9yZXEYHSABKAsyJC5nYW1lLnJvb20uUmVzcG9u",
+            "ZEpvaW5BcHBsaWNhdGlvblJlcUgAEkIKF2ludml0ZV9sb2JieV9wbGF5ZXJf",
+            "cmVxGCAgASgLMh8uZ2FtZS5yb29tLkludml0ZUxvYmJ5UGxheWVyUmVxSAAS",
+            "SgobcmVzcG9uZF9yb29tX2ludml0YXRpb25fcmVxGCEgASgLMiMuZ2FtZS5y",
+            "b29tLlJlc3BvbmRSb29tSW52aXRhdGlvblJlcUgAEi8KDWRyYXdfY2FyZF9y",
+            "ZXEYFCABKAsyFi5nYW1lLmdhbWUuRHJhd0NhcmRSZXFIABI3ChFkaXNjYXJk",
+            "X2RyYXduX3JlcRgVIAEoCzIaLmdhbWUuZ2FtZS5EaXNjYXJkRHJhd25SZXFI",
+            "ABJAChZyZXBsYWNlX3dpdGhfZHJhd25fcmVxGBYgASgLMh4uZ2FtZS5nYW1l",
+            "LlJlcGxhY2VXaXRoRHJhd25SZXFIABI+ChV0YWtlX2Zyb21fZGlzY2FyZF9y",
+            "ZXEYFyABKAsyHS5nYW1lLmdhbWUuVGFrZUZyb21EaXNjYXJkUmVxSAASLwoN",
+            "dXNlX3NraWxsX3JlcRgYIAEoCzIWLmdhbWUuZ2FtZS5Vc2VTa2lsbFJlcUgA",
+            "EjMKD2NhbGxfc3RlYWR5X3JlcRgZIAEoCzIYLmdhbWUuZ2FtZS5DYWxsU3Rl",
+            "YWR5UmVxSAASOAoSZW5kX2dhbWVfZWFybHlfcmVxGBogASgLMhouZ2FtZS5n",
+            "YW1lLkVuZEdhbWVFYXJseVJlcUgAEkkKG2VuZF9nYW1lX2Vhcmx5X2RlY2lz",
+            "aW9uX3JlcRgbIAEoCzIiLmdhbWUuZ2FtZS5FbmRHYW1lRWFybHlEZWNpc2lv",
+            "blJlcUgAEjAKDXJlY29ubmVjdF9yZXEYHiABKAsyFy5nYW1lLnN5bmMuUmVj",
+            "b25uZWN0UmVxSAASMAoNaGVhcnRiZWF0X3JlcRgfIAEoCzIXLmdhbWUuc3lu",
+            "Yy5IZWFydGJlYXRSZXFIAEIJCgdwYXlsb2FkIsIUCg1TZXJ2ZXJNZXNzYWdl",
+            "EhIKCnNlcnZlcl9zZXEYASABKAMSFgoOc2VydmVyX3RpbWVfbXMYAiABKAMS",
+            "MwoPY3JlYXRlX3Jvb21fcnNwGAogASgLMhguZ2FtZS5yb29tLkNyZWF0ZVJv",
+            "b21Sc3BIABIvCg1qb2luX3Jvb21fcnNwGAsgASgLMhYuZ2FtZS5yb29tLkpv",
+            "aW5Sb29tUnNwSAASMQoObGVhdmVfcm9vbV9yc3AYDCABKAsyFy5nYW1lLnJv",
+            "b20uTGVhdmVSb29tUnNwSAASKAoJcmVhZHlfcnNwGA0gASgLMhMuZ2FtZS5y",
+            "b29tLlJlYWR5UnNwSAASMQoOc3RhcnRfZ2FtZV9yc3AYDiABKAsyFy5nYW1l",
+            "LnJvb20uU3RhcnRHYW1lUnNwSAASMwoPa2lja19wbGF5ZXJfcnNwGA8gASgL",
+            "MhguZ2FtZS5yb29tLktpY2tQbGF5ZXJSc3BIABI3ChFyb29tX3N0YXRlX25v",
+            "dGlmeRgQIAEoCzIaLmdhbWUucm9vbS5Sb29tU3RhdGVOb3RpZnlIABI5ChJw",
+            "bGF5ZXJfam9pbl9ub3RpZnkYESABKAsyGy5nYW1lLnJvb20uUGxheWVySm9p",
+            "bk5vdGlmeUgAEjsKE3BsYXllcl9sZWF2ZV9ub3RpZnkYEiABKAsyHC5nYW1l",
+            "LnJvb20uUGxheWVyTGVhdmVOb3RpZnlIABI7ChNwbGF5ZXJfcmVhZHlfbm90",
+            "aWZ5GBMgASgLMhwuZ2FtZS5yb29tLlBsYXllclJlYWR5Tm90aWZ5SAASNwoR",
+            "cm9vbV9zdGFydF9ub3RpZnkYFCABKAsyGi5nYW1lLnJvb20uUm9vbVN0YXJ0",
+            "Tm90aWZ5SAASLwoNcm9vbV9jaGF0X3JzcBgVIAEoCzIWLmdhbWUucm9vbS5S",
+            "b29tQ2hhdFJzcEgAEjUKEHJvb21fY2hhdF9ub3RpZnkYFiABKAsyGS5nYW1l",
+            "LnJvb20uUm9vbUNoYXROb3RpZnlIABIzCg9lbnRlcl9sb2JieV9yc3AYFyAB",
+            "KAsyGC5nYW1lLnJvb20uRW50ZXJMb2JieVJzcEgAEjMKD2xlYXZlX2xvYmJ5",
+            "X3JzcBgYIAEoCzIYLmdhbWUucm9vbS5MZWF2ZUxvYmJ5UnNwSAASMQoObGlz",
+            "dF9yb29tc19yc3AYGSABKAsyFy5nYW1lLnJvb20uTGlzdFJvb21zUnNwSAAS",
+            "NQoQcm9vbV9saXN0X25vdGlmeRgaIAEoCzIZLmdhbWUucm9vbS5Sb29tTGlz",
+            "dE5vdGlmeUgAEkoKG29ubGluZV9sb2JieV9wbGF5ZXJzX25vdGlmeRgbIAEo",
+            "CzIjLmdhbWUucm9vbS5PbmxpbmVMb2JieVBsYXllcnNOb3RpZnlIABI6ChNh",
+            "cHBseV9qb2luX3Jvb21fcnNwGBwgASgLMhsuZ2FtZS5yb29tLkFwcGx5Sm9p",
+            "blJvb21Sc3BIABJMChxyZXNwb25kX2pvaW5fYXBwbGljYXRpb25fcnNwGB0g",
+            "ASgLMiQuZ2FtZS5yb29tLlJlc3BvbmRKb2luQXBwbGljYXRpb25Sc3BIABJE",
+            "Chhyb29tX2FjY2Vzc19pbmJveF9ub3RpZnkYLiABKAsyIC5nYW1lLnJvb20u",
+            "Um9vbUFjY2Vzc0luYm94Tm90aWZ5SAASSgobcm9vbV9hY2Nlc3NfZGVjaXNp",
+            "b25fbm90aWZ5GC8gASgLMiMuZ2FtZS5yb29tLlJvb21BY2Nlc3NEZWNpc2lv",
+            "bk5vdGlmeUgAEkIKF2ludml0ZV9sb2JieV9wbGF5ZXJfcnNwGDAgASgLMh8u",
+            "Z2FtZS5yb29tLkludml0ZUxvYmJ5UGxheWVyUnNwSAASSgobcmVzcG9uZF9y",
+            "b29tX2ludml0YXRpb25fcnNwGDEgASgLMiMuZ2FtZS5yb29tLlJlc3BvbmRS",
+            "b29tSW52aXRhdGlvblJzcEgAEjcKEWdhbWVfc3RhcnRfbm90aWZ5GB4gASgL",
+            "MhouZ2FtZS5nYW1lLkdhbWVTdGFydE5vdGlmeUgAEjcKEXR1cm5fc3RhcnRf",
+            "bm90aWZ5GB8gASgLMhouZ2FtZS5nYW1lLlR1cm5TdGFydE5vdGlmeUgAEi8K",
+            "DWRyYXdfY2FyZF9yc3AYICABKAsyFi5nYW1lLmdhbWUuRHJhd0NhcmRSc3BI",
+            "ABI3ChFkaXNjYXJkX2RyYXduX3JzcBghIAEoCzIaLmdhbWUuZ2FtZS5EaXNj",
+            "YXJkRHJhd25Sc3BIABJAChZyZXBsYWNlX3dpdGhfZHJhd25fcnNwGCIgASgL",
+            "Mh4uZ2FtZS5nYW1lLlJlcGxhY2VXaXRoRHJhd25Sc3BIABI+ChV0YWtlX2Zy",
+            "b21fZGlzY2FyZF9yc3AYIyABKAsyHS5nYW1lLmdhbWUuVGFrZUZyb21EaXNj",
+            "YXJkUnNwSAASLwoNdXNlX3NraWxsX3JzcBgkIAEoCzIWLmdhbWUuZ2FtZS5V",
+            "c2VTa2lsbFJzcEgAEjMKD2NhbGxfc3RlYWR5X3JzcBglIAEoCzIYLmdhbWUu",
+            "Z2FtZS5DYWxsU3RlYWR5UnNwSAASOAoSZW5kX2dhbWVfZWFybHlfcnNwGCYg",
+            "ASgLMhouZ2FtZS5nYW1lLkVuZEdhbWVFYXJseVJzcEgAEk0KHWVuZF9nYW1l",
+            "X2Vhcmx5X3JlcXVlc3Rfbm90aWZ5GCcgASgLMiQuZ2FtZS5nYW1lLkVuZEdh",
+            "bWVFYXJseVJlcXVlc3ROb3RpZnlIABI9ChRhY3Rpb25fcmVzdWx0X25vdGlm",
+            "eRgoIAEoCzIdLmdhbWUuZ2FtZS5BY3Rpb25SZXN1bHROb3RpZnlIABJJChtl",
+            "bmRfZ2FtZV9lYXJseV9kZWNpc2lvbl9yc3AYKSABKAsyIi5nYW1lLmdhbWUu",
+            "RW5kR2FtZUVhcmx5RGVjaXNpb25Sc3BIABI7ChNyb3VuZF9yZXZlYWxfbm90",
+            "aWZ5GCogASgLMhwuZ2FtZS5nYW1lLlJvdW5kUmV2ZWFsTm90aWZ5SAASOwoT",
+            "c2NvcmVfdXBkYXRlX25vdGlmeRgrIAEoCzIcLmdhbWUuZ2FtZS5TY29yZVVw",
+            "ZGF0ZU5vdGlmeUgAEjUKEGdhbWVfb3Zlcl9ub3RpZnkYLCABKAsyGS5nYW1l",
+            "LmdhbWUuR2FtZU92ZXJOb3RpZnlIABJPCh5lbmRfZ2FtZV9lYXJseV9yZWpl",
+            "Y3RlZF9ub3RpZnkYLSABKAsyJS5nYW1lLmdhbWUuRW5kR2FtZUVhcmx5UmVq",
+            "ZWN0ZWROb3RpZnlIABIwCg1yZWNvbm5lY3RfcnNwGDIgASgLMhcuZ2FtZS5z",
+            "eW5jLlJlY29ubmVjdFJzcEgAEjcKEXN0YXRlX3N5bmNfbm90aWZ5GDMgASgL",
+            "MhouZ2FtZS5zeW5jLlN0YXRlU3luY05vdGlmeUgAEjAKDWhlYXJ0YmVhdF9y",
+            "c3AYNCABKAsyFy5nYW1lLnN5bmMuSGVhcnRiZWF0UnNwSABCCQoHcGF5bG9h",
+            "ZEIQqgINR2FtZS5NZXNzYWdlc2IGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Game.Room.RoomReflection.Descriptor, global::Game.Game.GameReflection.Descriptor, global::Game.Sync.SyncReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ClientMessage), global::Game.Messages.ClientMessage.Parser, new[]{ "Seq", "CreateRoomReq", "JoinRoomReq", "LeaveRoomReq", "ReadyReq", "StartGameReq", "KickPlayerReq", "RoomChatReq", "DrawCardReq", "DiscardDrawnReq", "ReplaceWithDrawnReq", "TakeFromDiscardReq", "UseSkillReq", "CallSteadyReq", "EndGameEarlyReq", "EndGameEarlyDecisionReq", "ReconnectReq", "HeartbeatReq" }, new[]{ "Payload" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ServerMessage), global::Game.Messages.ServerMessage.Parser, new[]{ "ServerSeq", "ServerTimeMs", "CreateRoomRsp", "JoinRoomRsp", "LeaveRoomRsp", "ReadyRsp", "StartGameRsp", "KickPlayerRsp", "RoomStateNotify", "PlayerJoinNotify", "PlayerLeaveNotify", "PlayerReadyNotify", "RoomStartNotify", "RoomChatRsp", "RoomChatNotify", "GameStartNotify", "TurnStartNotify", "DrawCardRsp", "DiscardDrawnRsp", "ReplaceWithDrawnRsp", "TakeFromDiscardRsp", "UseSkillRsp", "CallSteadyRsp", "EndGameEarlyRsp", "EndGameEarlyRequestNotify", "ActionResultNotify", "EndGameEarlyDecisionRsp", "RoundRevealNotify", "ScoreUpdateNotify", "GameOverNotify", "EndGameEarlyRejectedNotify", "ReconnectRsp", "StateSyncNotify", "HeartbeatRsp" }, new[]{ "Payload" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ClientMessage), global::Game.Messages.ClientMessage.Parser, new[]{ "Seq", "CreateRoomReq", "JoinRoomReq", "LeaveRoomReq", "ReadyReq", "StartGameReq", "KickPlayerReq", "RoomChatReq", "EnterLobbyReq", "LeaveLobbyReq", "ListRoomsReq", "ApplyJoinRoomReq", "RespondJoinApplicationReq", "InviteLobbyPlayerReq", "RespondRoomInvitationReq", "DrawCardReq", "DiscardDrawnReq", "ReplaceWithDrawnReq", "TakeFromDiscardReq", "UseSkillReq", "CallSteadyReq", "EndGameEarlyReq", "EndGameEarlyDecisionReq", "ReconnectReq", "HeartbeatReq" }, new[]{ "Payload" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Game.Messages.ServerMessage), global::Game.Messages.ServerMessage.Parser, new[]{ "ServerSeq", "ServerTimeMs", "CreateRoomRsp", "JoinRoomRsp", "LeaveRoomRsp", "ReadyRsp", "StartGameRsp", "KickPlayerRsp", "RoomStateNotify", "PlayerJoinNotify", "PlayerLeaveNotify", "PlayerReadyNotify", "RoomStartNotify", "RoomChatRsp", "RoomChatNotify", "EnterLobbyRsp", "LeaveLobbyRsp", "ListRoomsRsp", "RoomListNotify", "OnlineLobbyPlayersNotify", "ApplyJoinRoomRsp", "RespondJoinApplicationRsp", "RoomAccessInboxNotify", "RoomAccessDecisionNotify", "InviteLobbyPlayerRsp", "RespondRoomInvitationRsp", "GameStartNotify", "TurnStartNotify", "DrawCardRsp", "DiscardDrawnRsp", "ReplaceWithDrawnRsp", "TakeFromDiscardRsp", "UseSkillRsp", "CallSteadyRsp", "EndGameEarlyRsp", "EndGameEarlyRequestNotify", "ActionResultNotify", "EndGameEarlyDecisionRsp", "RoundRevealNotify", "ScoreUpdateNotify", "GameOverNotify", "EndGameEarlyRejectedNotify", "ReconnectRsp", "StateSyncNotify", "HeartbeatRsp" }, new[]{ "Payload" }, null, null, null)
           }));
     }
     #endregion
@@ -160,6 +186,27 @@ namespace Game.Messages {
           break;
         case PayloadOneofCase.RoomChatReq:
           RoomChatReq = other.RoomChatReq.Clone();
+          break;
+        case PayloadOneofCase.EnterLobbyReq:
+          EnterLobbyReq = other.EnterLobbyReq.Clone();
+          break;
+        case PayloadOneofCase.LeaveLobbyReq:
+          LeaveLobbyReq = other.LeaveLobbyReq.Clone();
+          break;
+        case PayloadOneofCase.ListRoomsReq:
+          ListRoomsReq = other.ListRoomsReq.Clone();
+          break;
+        case PayloadOneofCase.ApplyJoinRoomReq:
+          ApplyJoinRoomReq = other.ApplyJoinRoomReq.Clone();
+          break;
+        case PayloadOneofCase.RespondJoinApplicationReq:
+          RespondJoinApplicationReq = other.RespondJoinApplicationReq.Clone();
+          break;
+        case PayloadOneofCase.InviteLobbyPlayerReq:
+          InviteLobbyPlayerReq = other.InviteLobbyPlayerReq.Clone();
+          break;
+        case PayloadOneofCase.RespondRoomInvitationReq:
+          RespondRoomInvitationReq = other.RespondRoomInvitationReq.Clone();
           break;
         case PayloadOneofCase.DrawCardReq:
           DrawCardReq = other.DrawCardReq.Clone();
@@ -304,6 +351,90 @@ namespace Game.Messages {
       }
     }
 
+    /// <summary>Field number for the "enter_lobby_req" field.</summary>
+    public const int EnterLobbyReqFieldNumber = 17;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.EnterLobbyReq EnterLobbyReq {
+      get { return payloadCase_ == PayloadOneofCase.EnterLobbyReq ? (global::Game.Room.EnterLobbyReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.EnterLobbyReq;
+      }
+    }
+
+    /// <summary>Field number for the "leave_lobby_req" field.</summary>
+    public const int LeaveLobbyReqFieldNumber = 18;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.LeaveLobbyReq LeaveLobbyReq {
+      get { return payloadCase_ == PayloadOneofCase.LeaveLobbyReq ? (global::Game.Room.LeaveLobbyReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.LeaveLobbyReq;
+      }
+    }
+
+    /// <summary>Field number for the "list_rooms_req" field.</summary>
+    public const int ListRoomsReqFieldNumber = 19;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.ListRoomsReq ListRoomsReq {
+      get { return payloadCase_ == PayloadOneofCase.ListRoomsReq ? (global::Game.Room.ListRoomsReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.ListRoomsReq;
+      }
+    }
+
+    /// <summary>Field number for the "apply_join_room_req" field.</summary>
+    public const int ApplyJoinRoomReqFieldNumber = 28;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.ApplyJoinRoomReq ApplyJoinRoomReq {
+      get { return payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq ? (global::Game.Room.ApplyJoinRoomReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.ApplyJoinRoomReq;
+      }
+    }
+
+    /// <summary>Field number for the "respond_join_application_req" field.</summary>
+    public const int RespondJoinApplicationReqFieldNumber = 29;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RespondJoinApplicationReq RespondJoinApplicationReq {
+      get { return payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq ? (global::Game.Room.RespondJoinApplicationReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RespondJoinApplicationReq;
+      }
+    }
+
+    /// <summary>Field number for the "invite_lobby_player_req" field.</summary>
+    public const int InviteLobbyPlayerReqFieldNumber = 32;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.InviteLobbyPlayerReq InviteLobbyPlayerReq {
+      get { return payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq ? (global::Game.Room.InviteLobbyPlayerReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.InviteLobbyPlayerReq;
+      }
+    }
+
+    /// <summary>Field number for the "respond_room_invitation_req" field.</summary>
+    public const int RespondRoomInvitationReqFieldNumber = 33;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RespondRoomInvitationReq RespondRoomInvitationReq {
+      get { return payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq ? (global::Game.Room.RespondRoomInvitationReq) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RespondRoomInvitationReq;
+      }
+    }
+
     /// <summary>Field number for the "draw_card_req" field.</summary>
     public const int DrawCardReqFieldNumber = 20;
     /// <summary>
@@ -441,6 +572,13 @@ namespace Game.Messages {
       StartGameReq = 14,
       KickPlayerReq = 15,
       RoomChatReq = 16,
+      EnterLobbyReq = 17,
+      LeaveLobbyReq = 18,
+      ListRoomsReq = 19,
+      ApplyJoinRoomReq = 28,
+      RespondJoinApplicationReq = 29,
+      InviteLobbyPlayerReq = 32,
+      RespondRoomInvitationReq = 33,
       DrawCardReq = 20,
       DiscardDrawnReq = 21,
       ReplaceWithDrawnReq = 22,
@@ -489,6 +627,13 @@ namespace Game.Messages {
       if (!object.Equals(StartGameReq, other.StartGameReq)) return false;
       if (!object.Equals(KickPlayerReq, other.KickPlayerReq)) return false;
       if (!object.Equals(RoomChatReq, other.RoomChatReq)) return false;
+      if (!object.Equals(EnterLobbyReq, other.EnterLobbyReq)) return false;
+      if (!object.Equals(LeaveLobbyReq, other.LeaveLobbyReq)) return false;
+      if (!object.Equals(ListRoomsReq, other.ListRoomsReq)) return false;
+      if (!object.Equals(ApplyJoinRoomReq, other.ApplyJoinRoomReq)) return false;
+      if (!object.Equals(RespondJoinApplicationReq, other.RespondJoinApplicationReq)) return false;
+      if (!object.Equals(InviteLobbyPlayerReq, other.InviteLobbyPlayerReq)) return false;
+      if (!object.Equals(RespondRoomInvitationReq, other.RespondRoomInvitationReq)) return false;
       if (!object.Equals(DrawCardReq, other.DrawCardReq)) return false;
       if (!object.Equals(DiscardDrawnReq, other.DiscardDrawnReq)) return false;
       if (!object.Equals(ReplaceWithDrawnReq, other.ReplaceWithDrawnReq)) return false;
@@ -515,6 +660,13 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.StartGameReq) hash ^= StartGameReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.KickPlayerReq) hash ^= KickPlayerReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.RoomChatReq) hash ^= RoomChatReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) hash ^= EnterLobbyReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) hash ^= LeaveLobbyReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.ListRoomsReq) hash ^= ListRoomsReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) hash ^= ApplyJoinRoomReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) hash ^= RespondJoinApplicationReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) hash ^= InviteLobbyPlayerReq.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) hash ^= RespondRoomInvitationReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) hash ^= DrawCardReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DiscardDrawnReq) hash ^= DiscardDrawnReq.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.ReplaceWithDrawnReq) hash ^= ReplaceWithDrawnReq.GetHashCode();
@@ -576,6 +728,18 @@ namespace Game.Messages {
         output.WriteRawTag(130, 1);
         output.WriteMessage(RoomChatReq);
       }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) {
+        output.WriteRawTag(138, 1);
+        output.WriteMessage(EnterLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) {
+        output.WriteRawTag(146, 1);
+        output.WriteMessage(LeaveLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsReq) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(ListRoomsReq);
+      }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         output.WriteRawTag(162, 1);
         output.WriteMessage(DrawCardReq);
@@ -608,6 +772,14 @@ namespace Game.Messages {
         output.WriteRawTag(218, 1);
         output.WriteMessage(EndGameEarlyDecisionReq);
       }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) {
+        output.WriteRawTag(226, 1);
+        output.WriteMessage(ApplyJoinRoomReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) {
+        output.WriteRawTag(234, 1);
+        output.WriteMessage(RespondJoinApplicationReq);
+      }
       if (payloadCase_ == PayloadOneofCase.ReconnectReq) {
         output.WriteRawTag(242, 1);
         output.WriteMessage(ReconnectReq);
@@ -615,6 +787,14 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.HeartbeatReq) {
         output.WriteRawTag(250, 1);
         output.WriteMessage(HeartbeatReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) {
+        output.WriteRawTag(130, 2);
+        output.WriteMessage(InviteLobbyPlayerReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) {
+        output.WriteRawTag(138, 2);
+        output.WriteMessage(RespondRoomInvitationReq);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -658,6 +838,18 @@ namespace Game.Messages {
         output.WriteRawTag(130, 1);
         output.WriteMessage(RoomChatReq);
       }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) {
+        output.WriteRawTag(138, 1);
+        output.WriteMessage(EnterLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) {
+        output.WriteRawTag(146, 1);
+        output.WriteMessage(LeaveLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsReq) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(ListRoomsReq);
+      }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         output.WriteRawTag(162, 1);
         output.WriteMessage(DrawCardReq);
@@ -690,6 +882,14 @@ namespace Game.Messages {
         output.WriteRawTag(218, 1);
         output.WriteMessage(EndGameEarlyDecisionReq);
       }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) {
+        output.WriteRawTag(226, 1);
+        output.WriteMessage(ApplyJoinRoomReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) {
+        output.WriteRawTag(234, 1);
+        output.WriteMessage(RespondJoinApplicationReq);
+      }
       if (payloadCase_ == PayloadOneofCase.ReconnectReq) {
         output.WriteRawTag(242, 1);
         output.WriteMessage(ReconnectReq);
@@ -697,6 +897,14 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.HeartbeatReq) {
         output.WriteRawTag(250, 1);
         output.WriteMessage(HeartbeatReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) {
+        output.WriteRawTag(130, 2);
+        output.WriteMessage(InviteLobbyPlayerReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) {
+        output.WriteRawTag(138, 2);
+        output.WriteMessage(RespondRoomInvitationReq);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -731,6 +939,27 @@ namespace Game.Messages {
       }
       if (payloadCase_ == PayloadOneofCase.RoomChatReq) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomChatReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(EnterLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(LeaveLobbyReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(ListRoomsReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(ApplyJoinRoomReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RespondJoinApplicationReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(InviteLobbyPlayerReq);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RespondRoomInvitationReq);
       }
       if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(DrawCardReq);
@@ -819,6 +1048,48 @@ namespace Game.Messages {
             RoomChatReq = new global::Game.Room.RoomChatReq();
           }
           RoomChatReq.MergeFrom(other.RoomChatReq);
+          break;
+        case PayloadOneofCase.EnterLobbyReq:
+          if (EnterLobbyReq == null) {
+            EnterLobbyReq = new global::Game.Room.EnterLobbyReq();
+          }
+          EnterLobbyReq.MergeFrom(other.EnterLobbyReq);
+          break;
+        case PayloadOneofCase.LeaveLobbyReq:
+          if (LeaveLobbyReq == null) {
+            LeaveLobbyReq = new global::Game.Room.LeaveLobbyReq();
+          }
+          LeaveLobbyReq.MergeFrom(other.LeaveLobbyReq);
+          break;
+        case PayloadOneofCase.ListRoomsReq:
+          if (ListRoomsReq == null) {
+            ListRoomsReq = new global::Game.Room.ListRoomsReq();
+          }
+          ListRoomsReq.MergeFrom(other.ListRoomsReq);
+          break;
+        case PayloadOneofCase.ApplyJoinRoomReq:
+          if (ApplyJoinRoomReq == null) {
+            ApplyJoinRoomReq = new global::Game.Room.ApplyJoinRoomReq();
+          }
+          ApplyJoinRoomReq.MergeFrom(other.ApplyJoinRoomReq);
+          break;
+        case PayloadOneofCase.RespondJoinApplicationReq:
+          if (RespondJoinApplicationReq == null) {
+            RespondJoinApplicationReq = new global::Game.Room.RespondJoinApplicationReq();
+          }
+          RespondJoinApplicationReq.MergeFrom(other.RespondJoinApplicationReq);
+          break;
+        case PayloadOneofCase.InviteLobbyPlayerReq:
+          if (InviteLobbyPlayerReq == null) {
+            InviteLobbyPlayerReq = new global::Game.Room.InviteLobbyPlayerReq();
+          }
+          InviteLobbyPlayerReq.MergeFrom(other.InviteLobbyPlayerReq);
+          break;
+        case PayloadOneofCase.RespondRoomInvitationReq:
+          if (RespondRoomInvitationReq == null) {
+            RespondRoomInvitationReq = new global::Game.Room.RespondRoomInvitationReq();
+          }
+          RespondRoomInvitationReq.MergeFrom(other.RespondRoomInvitationReq);
           break;
         case PayloadOneofCase.DrawCardReq:
           if (DrawCardReq == null) {
@@ -964,6 +1235,33 @@ namespace Game.Messages {
             RoomChatReq = subBuilder;
             break;
           }
+          case 138: {
+            global::Game.Room.EnterLobbyReq subBuilder = new global::Game.Room.EnterLobbyReq();
+            if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) {
+              subBuilder.MergeFrom(EnterLobbyReq);
+            }
+            input.ReadMessage(subBuilder);
+            EnterLobbyReq = subBuilder;
+            break;
+          }
+          case 146: {
+            global::Game.Room.LeaveLobbyReq subBuilder = new global::Game.Room.LeaveLobbyReq();
+            if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) {
+              subBuilder.MergeFrom(LeaveLobbyReq);
+            }
+            input.ReadMessage(subBuilder);
+            LeaveLobbyReq = subBuilder;
+            break;
+          }
+          case 154: {
+            global::Game.Room.ListRoomsReq subBuilder = new global::Game.Room.ListRoomsReq();
+            if (payloadCase_ == PayloadOneofCase.ListRoomsReq) {
+              subBuilder.MergeFrom(ListRoomsReq);
+            }
+            input.ReadMessage(subBuilder);
+            ListRoomsReq = subBuilder;
+            break;
+          }
           case 162: {
             global::Game.Game.DrawCardReq subBuilder = new global::Game.Game.DrawCardReq();
             if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
@@ -1036,6 +1334,24 @@ namespace Game.Messages {
             EndGameEarlyDecisionReq = subBuilder;
             break;
           }
+          case 226: {
+            global::Game.Room.ApplyJoinRoomReq subBuilder = new global::Game.Room.ApplyJoinRoomReq();
+            if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) {
+              subBuilder.MergeFrom(ApplyJoinRoomReq);
+            }
+            input.ReadMessage(subBuilder);
+            ApplyJoinRoomReq = subBuilder;
+            break;
+          }
+          case 234: {
+            global::Game.Room.RespondJoinApplicationReq subBuilder = new global::Game.Room.RespondJoinApplicationReq();
+            if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) {
+              subBuilder.MergeFrom(RespondJoinApplicationReq);
+            }
+            input.ReadMessage(subBuilder);
+            RespondJoinApplicationReq = subBuilder;
+            break;
+          }
           case 242: {
             global::Game.Sync.ReconnectReq subBuilder = new global::Game.Sync.ReconnectReq();
             if (payloadCase_ == PayloadOneofCase.ReconnectReq) {
@@ -1052,6 +1368,24 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             HeartbeatReq = subBuilder;
+            break;
+          }
+          case 258: {
+            global::Game.Room.InviteLobbyPlayerReq subBuilder = new global::Game.Room.InviteLobbyPlayerReq();
+            if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) {
+              subBuilder.MergeFrom(InviteLobbyPlayerReq);
+            }
+            input.ReadMessage(subBuilder);
+            InviteLobbyPlayerReq = subBuilder;
+            break;
+          }
+          case 266: {
+            global::Game.Room.RespondRoomInvitationReq subBuilder = new global::Game.Room.RespondRoomInvitationReq();
+            if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) {
+              subBuilder.MergeFrom(RespondRoomInvitationReq);
+            }
+            input.ReadMessage(subBuilder);
+            RespondRoomInvitationReq = subBuilder;
             break;
           }
         }
@@ -1136,6 +1470,33 @@ namespace Game.Messages {
             RoomChatReq = subBuilder;
             break;
           }
+          case 138: {
+            global::Game.Room.EnterLobbyReq subBuilder = new global::Game.Room.EnterLobbyReq();
+            if (payloadCase_ == PayloadOneofCase.EnterLobbyReq) {
+              subBuilder.MergeFrom(EnterLobbyReq);
+            }
+            input.ReadMessage(subBuilder);
+            EnterLobbyReq = subBuilder;
+            break;
+          }
+          case 146: {
+            global::Game.Room.LeaveLobbyReq subBuilder = new global::Game.Room.LeaveLobbyReq();
+            if (payloadCase_ == PayloadOneofCase.LeaveLobbyReq) {
+              subBuilder.MergeFrom(LeaveLobbyReq);
+            }
+            input.ReadMessage(subBuilder);
+            LeaveLobbyReq = subBuilder;
+            break;
+          }
+          case 154: {
+            global::Game.Room.ListRoomsReq subBuilder = new global::Game.Room.ListRoomsReq();
+            if (payloadCase_ == PayloadOneofCase.ListRoomsReq) {
+              subBuilder.MergeFrom(ListRoomsReq);
+            }
+            input.ReadMessage(subBuilder);
+            ListRoomsReq = subBuilder;
+            break;
+          }
           case 162: {
             global::Game.Game.DrawCardReq subBuilder = new global::Game.Game.DrawCardReq();
             if (payloadCase_ == PayloadOneofCase.DrawCardReq) {
@@ -1208,6 +1569,24 @@ namespace Game.Messages {
             EndGameEarlyDecisionReq = subBuilder;
             break;
           }
+          case 226: {
+            global::Game.Room.ApplyJoinRoomReq subBuilder = new global::Game.Room.ApplyJoinRoomReq();
+            if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomReq) {
+              subBuilder.MergeFrom(ApplyJoinRoomReq);
+            }
+            input.ReadMessage(subBuilder);
+            ApplyJoinRoomReq = subBuilder;
+            break;
+          }
+          case 234: {
+            global::Game.Room.RespondJoinApplicationReq subBuilder = new global::Game.Room.RespondJoinApplicationReq();
+            if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationReq) {
+              subBuilder.MergeFrom(RespondJoinApplicationReq);
+            }
+            input.ReadMessage(subBuilder);
+            RespondJoinApplicationReq = subBuilder;
+            break;
+          }
           case 242: {
             global::Game.Sync.ReconnectReq subBuilder = new global::Game.Sync.ReconnectReq();
             if (payloadCase_ == PayloadOneofCase.ReconnectReq) {
@@ -1224,6 +1603,24 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             HeartbeatReq = subBuilder;
+            break;
+          }
+          case 258: {
+            global::Game.Room.InviteLobbyPlayerReq subBuilder = new global::Game.Room.InviteLobbyPlayerReq();
+            if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerReq) {
+              subBuilder.MergeFrom(InviteLobbyPlayerReq);
+            }
+            input.ReadMessage(subBuilder);
+            InviteLobbyPlayerReq = subBuilder;
+            break;
+          }
+          case 266: {
+            global::Game.Room.RespondRoomInvitationReq subBuilder = new global::Game.Room.RespondRoomInvitationReq();
+            if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationReq) {
+              subBuilder.MergeFrom(RespondRoomInvitationReq);
+            }
+            input.ReadMessage(subBuilder);
+            RespondRoomInvitationReq = subBuilder;
             break;
           }
         }
@@ -1311,6 +1708,39 @@ namespace Game.Messages {
           break;
         case PayloadOneofCase.RoomChatNotify:
           RoomChatNotify = other.RoomChatNotify.Clone();
+          break;
+        case PayloadOneofCase.EnterLobbyRsp:
+          EnterLobbyRsp = other.EnterLobbyRsp.Clone();
+          break;
+        case PayloadOneofCase.LeaveLobbyRsp:
+          LeaveLobbyRsp = other.LeaveLobbyRsp.Clone();
+          break;
+        case PayloadOneofCase.ListRoomsRsp:
+          ListRoomsRsp = other.ListRoomsRsp.Clone();
+          break;
+        case PayloadOneofCase.RoomListNotify:
+          RoomListNotify = other.RoomListNotify.Clone();
+          break;
+        case PayloadOneofCase.OnlineLobbyPlayersNotify:
+          OnlineLobbyPlayersNotify = other.OnlineLobbyPlayersNotify.Clone();
+          break;
+        case PayloadOneofCase.ApplyJoinRoomRsp:
+          ApplyJoinRoomRsp = other.ApplyJoinRoomRsp.Clone();
+          break;
+        case PayloadOneofCase.RespondJoinApplicationRsp:
+          RespondJoinApplicationRsp = other.RespondJoinApplicationRsp.Clone();
+          break;
+        case PayloadOneofCase.RoomAccessInboxNotify:
+          RoomAccessInboxNotify = other.RoomAccessInboxNotify.Clone();
+          break;
+        case PayloadOneofCase.RoomAccessDecisionNotify:
+          RoomAccessDecisionNotify = other.RoomAccessDecisionNotify.Clone();
+          break;
+        case PayloadOneofCase.InviteLobbyPlayerRsp:
+          InviteLobbyPlayerRsp = other.InviteLobbyPlayerRsp.Clone();
+          break;
+        case PayloadOneofCase.RespondRoomInvitationRsp:
+          RespondRoomInvitationRsp = other.RespondRoomInvitationRsp.Clone();
           break;
         case PayloadOneofCase.GameStartNotify:
           GameStartNotify = other.GameStartNotify.Clone();
@@ -1569,6 +1999,138 @@ namespace Game.Messages {
       }
     }
 
+    /// <summary>Field number for the "enter_lobby_rsp" field.</summary>
+    public const int EnterLobbyRspFieldNumber = 23;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.EnterLobbyRsp EnterLobbyRsp {
+      get { return payloadCase_ == PayloadOneofCase.EnterLobbyRsp ? (global::Game.Room.EnterLobbyRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.EnterLobbyRsp;
+      }
+    }
+
+    /// <summary>Field number for the "leave_lobby_rsp" field.</summary>
+    public const int LeaveLobbyRspFieldNumber = 24;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.LeaveLobbyRsp LeaveLobbyRsp {
+      get { return payloadCase_ == PayloadOneofCase.LeaveLobbyRsp ? (global::Game.Room.LeaveLobbyRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.LeaveLobbyRsp;
+      }
+    }
+
+    /// <summary>Field number for the "list_rooms_rsp" field.</summary>
+    public const int ListRoomsRspFieldNumber = 25;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.ListRoomsRsp ListRoomsRsp {
+      get { return payloadCase_ == PayloadOneofCase.ListRoomsRsp ? (global::Game.Room.ListRoomsRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.ListRoomsRsp;
+      }
+    }
+
+    /// <summary>Field number for the "room_list_notify" field.</summary>
+    public const int RoomListNotifyFieldNumber = 26;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomListNotify RoomListNotify {
+      get { return payloadCase_ == PayloadOneofCase.RoomListNotify ? (global::Game.Room.RoomListNotify) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomListNotify;
+      }
+    }
+
+    /// <summary>Field number for the "online_lobby_players_notify" field.</summary>
+    public const int OnlineLobbyPlayersNotifyFieldNumber = 27;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.OnlineLobbyPlayersNotify OnlineLobbyPlayersNotify {
+      get { return payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify ? (global::Game.Room.OnlineLobbyPlayersNotify) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.OnlineLobbyPlayersNotify;
+      }
+    }
+
+    /// <summary>Field number for the "apply_join_room_rsp" field.</summary>
+    public const int ApplyJoinRoomRspFieldNumber = 28;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.ApplyJoinRoomRsp ApplyJoinRoomRsp {
+      get { return payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp ? (global::Game.Room.ApplyJoinRoomRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.ApplyJoinRoomRsp;
+      }
+    }
+
+    /// <summary>Field number for the "respond_join_application_rsp" field.</summary>
+    public const int RespondJoinApplicationRspFieldNumber = 29;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RespondJoinApplicationRsp RespondJoinApplicationRsp {
+      get { return payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp ? (global::Game.Room.RespondJoinApplicationRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RespondJoinApplicationRsp;
+      }
+    }
+
+    /// <summary>Field number for the "room_access_inbox_notify" field.</summary>
+    public const int RoomAccessInboxNotifyFieldNumber = 46;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomAccessInboxNotify RoomAccessInboxNotify {
+      get { return payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify ? (global::Game.Room.RoomAccessInboxNotify) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomAccessInboxNotify;
+      }
+    }
+
+    /// <summary>Field number for the "room_access_decision_notify" field.</summary>
+    public const int RoomAccessDecisionNotifyFieldNumber = 47;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RoomAccessDecisionNotify RoomAccessDecisionNotify {
+      get { return payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify ? (global::Game.Room.RoomAccessDecisionNotify) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RoomAccessDecisionNotify;
+      }
+    }
+
+    /// <summary>Field number for the "invite_lobby_player_rsp" field.</summary>
+    public const int InviteLobbyPlayerRspFieldNumber = 48;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.InviteLobbyPlayerRsp InviteLobbyPlayerRsp {
+      get { return payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp ? (global::Game.Room.InviteLobbyPlayerRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.InviteLobbyPlayerRsp;
+      }
+    }
+
+    /// <summary>Field number for the "respond_room_invitation_rsp" field.</summary>
+    public const int RespondRoomInvitationRspFieldNumber = 49;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Game.Room.RespondRoomInvitationRsp RespondRoomInvitationRsp {
+      get { return payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp ? (global::Game.Room.RespondRoomInvitationRsp) payload_ : null; }
+      set {
+        payload_ = value;
+        payloadCase_ = value == null ? PayloadOneofCase.None : PayloadOneofCase.RespondRoomInvitationRsp;
+      }
+    }
+
     /// <summary>Field number for the "game_start_notify" field.</summary>
     public const int GameStartNotifyFieldNumber = 30;
     /// <summary>
@@ -1820,6 +2382,17 @@ namespace Game.Messages {
       RoomStartNotify = 20,
       RoomChatRsp = 21,
       RoomChatNotify = 22,
+      EnterLobbyRsp = 23,
+      LeaveLobbyRsp = 24,
+      ListRoomsRsp = 25,
+      RoomListNotify = 26,
+      OnlineLobbyPlayersNotify = 27,
+      ApplyJoinRoomRsp = 28,
+      RespondJoinApplicationRsp = 29,
+      RoomAccessInboxNotify = 46,
+      RoomAccessDecisionNotify = 47,
+      InviteLobbyPlayerRsp = 48,
+      RespondRoomInvitationRsp = 49,
       GameStartNotify = 30,
       TurnStartNotify = 31,
       DrawCardRsp = 32,
@@ -1884,6 +2457,17 @@ namespace Game.Messages {
       if (!object.Equals(RoomStartNotify, other.RoomStartNotify)) return false;
       if (!object.Equals(RoomChatRsp, other.RoomChatRsp)) return false;
       if (!object.Equals(RoomChatNotify, other.RoomChatNotify)) return false;
+      if (!object.Equals(EnterLobbyRsp, other.EnterLobbyRsp)) return false;
+      if (!object.Equals(LeaveLobbyRsp, other.LeaveLobbyRsp)) return false;
+      if (!object.Equals(ListRoomsRsp, other.ListRoomsRsp)) return false;
+      if (!object.Equals(RoomListNotify, other.RoomListNotify)) return false;
+      if (!object.Equals(OnlineLobbyPlayersNotify, other.OnlineLobbyPlayersNotify)) return false;
+      if (!object.Equals(ApplyJoinRoomRsp, other.ApplyJoinRoomRsp)) return false;
+      if (!object.Equals(RespondJoinApplicationRsp, other.RespondJoinApplicationRsp)) return false;
+      if (!object.Equals(RoomAccessInboxNotify, other.RoomAccessInboxNotify)) return false;
+      if (!object.Equals(RoomAccessDecisionNotify, other.RoomAccessDecisionNotify)) return false;
+      if (!object.Equals(InviteLobbyPlayerRsp, other.InviteLobbyPlayerRsp)) return false;
+      if (!object.Equals(RespondRoomInvitationRsp, other.RespondRoomInvitationRsp)) return false;
       if (!object.Equals(GameStartNotify, other.GameStartNotify)) return false;
       if (!object.Equals(TurnStartNotify, other.TurnStartNotify)) return false;
       if (!object.Equals(DrawCardRsp, other.DrawCardRsp)) return false;
@@ -1926,6 +2510,17 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.RoomStartNotify) hash ^= RoomStartNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.RoomChatRsp) hash ^= RoomChatRsp.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.RoomChatNotify) hash ^= RoomChatNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) hash ^= EnterLobbyRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) hash ^= LeaveLobbyRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) hash ^= ListRoomsRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomListNotify) hash ^= RoomListNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) hash ^= OnlineLobbyPlayersNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) hash ^= ApplyJoinRoomRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) hash ^= RespondJoinApplicationRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) hash ^= RoomAccessInboxNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) hash ^= RoomAccessDecisionNotify.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) hash ^= InviteLobbyPlayerRsp.GetHashCode();
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) hash ^= RespondRoomInvitationRsp.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) hash ^= GameStartNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.TurnStartNotify) hash ^= TurnStartNotify.GetHashCode();
       if (payloadCase_ == PayloadOneofCase.DrawCardRsp) hash ^= DrawCardRsp.GetHashCode();
@@ -2024,6 +2619,34 @@ namespace Game.Messages {
         output.WriteRawTag(178, 1);
         output.WriteMessage(RoomChatNotify);
       }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) {
+        output.WriteRawTag(186, 1);
+        output.WriteMessage(EnterLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) {
+        output.WriteRawTag(194, 1);
+        output.WriteMessage(LeaveLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) {
+        output.WriteRawTag(202, 1);
+        output.WriteMessage(ListRoomsRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomListNotify) {
+        output.WriteRawTag(210, 1);
+        output.WriteMessage(RoomListNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) {
+        output.WriteRawTag(218, 1);
+        output.WriteMessage(OnlineLobbyPlayersNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) {
+        output.WriteRawTag(226, 1);
+        output.WriteMessage(ApplyJoinRoomRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) {
+        output.WriteRawTag(234, 1);
+        output.WriteMessage(RespondJoinApplicationRsp);
+      }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         output.WriteRawTag(242, 1);
         output.WriteMessage(GameStartNotify);
@@ -2087,6 +2710,22 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.EndGameEarlyRejectedNotify) {
         output.WriteRawTag(234, 2);
         output.WriteMessage(EndGameEarlyRejectedNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) {
+        output.WriteRawTag(242, 2);
+        output.WriteMessage(RoomAccessInboxNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) {
+        output.WriteRawTag(250, 2);
+        output.WriteMessage(RoomAccessDecisionNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) {
+        output.WriteRawTag(130, 3);
+        output.WriteMessage(InviteLobbyPlayerRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) {
+        output.WriteRawTag(138, 3);
+        output.WriteMessage(RespondRoomInvitationRsp);
       }
       if (payloadCase_ == PayloadOneofCase.ReconnectRsp) {
         output.WriteRawTag(146, 3);
@@ -2170,6 +2809,34 @@ namespace Game.Messages {
         output.WriteRawTag(178, 1);
         output.WriteMessage(RoomChatNotify);
       }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) {
+        output.WriteRawTag(186, 1);
+        output.WriteMessage(EnterLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) {
+        output.WriteRawTag(194, 1);
+        output.WriteMessage(LeaveLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) {
+        output.WriteRawTag(202, 1);
+        output.WriteMessage(ListRoomsRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomListNotify) {
+        output.WriteRawTag(210, 1);
+        output.WriteMessage(RoomListNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) {
+        output.WriteRawTag(218, 1);
+        output.WriteMessage(OnlineLobbyPlayersNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) {
+        output.WriteRawTag(226, 1);
+        output.WriteMessage(ApplyJoinRoomRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) {
+        output.WriteRawTag(234, 1);
+        output.WriteMessage(RespondJoinApplicationRsp);
+      }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         output.WriteRawTag(242, 1);
         output.WriteMessage(GameStartNotify);
@@ -2233,6 +2900,22 @@ namespace Game.Messages {
       if (payloadCase_ == PayloadOneofCase.EndGameEarlyRejectedNotify) {
         output.WriteRawTag(234, 2);
         output.WriteMessage(EndGameEarlyRejectedNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) {
+        output.WriteRawTag(242, 2);
+        output.WriteMessage(RoomAccessInboxNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) {
+        output.WriteRawTag(250, 2);
+        output.WriteMessage(RoomAccessDecisionNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) {
+        output.WriteRawTag(130, 3);
+        output.WriteMessage(InviteLobbyPlayerRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) {
+        output.WriteRawTag(138, 3);
+        output.WriteMessage(RespondRoomInvitationRsp);
       }
       if (payloadCase_ == PayloadOneofCase.ReconnectRsp) {
         output.WriteRawTag(146, 3);
@@ -2300,6 +2983,39 @@ namespace Game.Messages {
       }
       if (payloadCase_ == PayloadOneofCase.RoomChatNotify) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomChatNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(EnterLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(LeaveLobbyRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(ListRoomsRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomListNotify) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomListNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(OnlineLobbyPlayersNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(ApplyJoinRoomRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RespondJoinApplicationRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomAccessInboxNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RoomAccessDecisionNotify);
+      }
+      if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(InviteLobbyPlayerRsp);
+      }
+      if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(RespondRoomInvitationRsp);
       }
       if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(GameStartNotify);
@@ -2454,6 +3170,72 @@ namespace Game.Messages {
             RoomChatNotify = new global::Game.Room.RoomChatNotify();
           }
           RoomChatNotify.MergeFrom(other.RoomChatNotify);
+          break;
+        case PayloadOneofCase.EnterLobbyRsp:
+          if (EnterLobbyRsp == null) {
+            EnterLobbyRsp = new global::Game.Room.EnterLobbyRsp();
+          }
+          EnterLobbyRsp.MergeFrom(other.EnterLobbyRsp);
+          break;
+        case PayloadOneofCase.LeaveLobbyRsp:
+          if (LeaveLobbyRsp == null) {
+            LeaveLobbyRsp = new global::Game.Room.LeaveLobbyRsp();
+          }
+          LeaveLobbyRsp.MergeFrom(other.LeaveLobbyRsp);
+          break;
+        case PayloadOneofCase.ListRoomsRsp:
+          if (ListRoomsRsp == null) {
+            ListRoomsRsp = new global::Game.Room.ListRoomsRsp();
+          }
+          ListRoomsRsp.MergeFrom(other.ListRoomsRsp);
+          break;
+        case PayloadOneofCase.RoomListNotify:
+          if (RoomListNotify == null) {
+            RoomListNotify = new global::Game.Room.RoomListNotify();
+          }
+          RoomListNotify.MergeFrom(other.RoomListNotify);
+          break;
+        case PayloadOneofCase.OnlineLobbyPlayersNotify:
+          if (OnlineLobbyPlayersNotify == null) {
+            OnlineLobbyPlayersNotify = new global::Game.Room.OnlineLobbyPlayersNotify();
+          }
+          OnlineLobbyPlayersNotify.MergeFrom(other.OnlineLobbyPlayersNotify);
+          break;
+        case PayloadOneofCase.ApplyJoinRoomRsp:
+          if (ApplyJoinRoomRsp == null) {
+            ApplyJoinRoomRsp = new global::Game.Room.ApplyJoinRoomRsp();
+          }
+          ApplyJoinRoomRsp.MergeFrom(other.ApplyJoinRoomRsp);
+          break;
+        case PayloadOneofCase.RespondJoinApplicationRsp:
+          if (RespondJoinApplicationRsp == null) {
+            RespondJoinApplicationRsp = new global::Game.Room.RespondJoinApplicationRsp();
+          }
+          RespondJoinApplicationRsp.MergeFrom(other.RespondJoinApplicationRsp);
+          break;
+        case PayloadOneofCase.RoomAccessInboxNotify:
+          if (RoomAccessInboxNotify == null) {
+            RoomAccessInboxNotify = new global::Game.Room.RoomAccessInboxNotify();
+          }
+          RoomAccessInboxNotify.MergeFrom(other.RoomAccessInboxNotify);
+          break;
+        case PayloadOneofCase.RoomAccessDecisionNotify:
+          if (RoomAccessDecisionNotify == null) {
+            RoomAccessDecisionNotify = new global::Game.Room.RoomAccessDecisionNotify();
+          }
+          RoomAccessDecisionNotify.MergeFrom(other.RoomAccessDecisionNotify);
+          break;
+        case PayloadOneofCase.InviteLobbyPlayerRsp:
+          if (InviteLobbyPlayerRsp == null) {
+            InviteLobbyPlayerRsp = new global::Game.Room.InviteLobbyPlayerRsp();
+          }
+          InviteLobbyPlayerRsp.MergeFrom(other.InviteLobbyPlayerRsp);
+          break;
+        case PayloadOneofCase.RespondRoomInvitationRsp:
+          if (RespondRoomInvitationRsp == null) {
+            RespondRoomInvitationRsp = new global::Game.Room.RespondRoomInvitationRsp();
+          }
+          RespondRoomInvitationRsp.MergeFrom(other.RespondRoomInvitationRsp);
           break;
         case PayloadOneofCase.GameStartNotify:
           if (GameStartNotify == null) {
@@ -2711,6 +3493,69 @@ namespace Game.Messages {
             RoomChatNotify = subBuilder;
             break;
           }
+          case 186: {
+            global::Game.Room.EnterLobbyRsp subBuilder = new global::Game.Room.EnterLobbyRsp();
+            if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) {
+              subBuilder.MergeFrom(EnterLobbyRsp);
+            }
+            input.ReadMessage(subBuilder);
+            EnterLobbyRsp = subBuilder;
+            break;
+          }
+          case 194: {
+            global::Game.Room.LeaveLobbyRsp subBuilder = new global::Game.Room.LeaveLobbyRsp();
+            if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) {
+              subBuilder.MergeFrom(LeaveLobbyRsp);
+            }
+            input.ReadMessage(subBuilder);
+            LeaveLobbyRsp = subBuilder;
+            break;
+          }
+          case 202: {
+            global::Game.Room.ListRoomsRsp subBuilder = new global::Game.Room.ListRoomsRsp();
+            if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) {
+              subBuilder.MergeFrom(ListRoomsRsp);
+            }
+            input.ReadMessage(subBuilder);
+            ListRoomsRsp = subBuilder;
+            break;
+          }
+          case 210: {
+            global::Game.Room.RoomListNotify subBuilder = new global::Game.Room.RoomListNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomListNotify) {
+              subBuilder.MergeFrom(RoomListNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomListNotify = subBuilder;
+            break;
+          }
+          case 218: {
+            global::Game.Room.OnlineLobbyPlayersNotify subBuilder = new global::Game.Room.OnlineLobbyPlayersNotify();
+            if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) {
+              subBuilder.MergeFrom(OnlineLobbyPlayersNotify);
+            }
+            input.ReadMessage(subBuilder);
+            OnlineLobbyPlayersNotify = subBuilder;
+            break;
+          }
+          case 226: {
+            global::Game.Room.ApplyJoinRoomRsp subBuilder = new global::Game.Room.ApplyJoinRoomRsp();
+            if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) {
+              subBuilder.MergeFrom(ApplyJoinRoomRsp);
+            }
+            input.ReadMessage(subBuilder);
+            ApplyJoinRoomRsp = subBuilder;
+            break;
+          }
+          case 234: {
+            global::Game.Room.RespondJoinApplicationRsp subBuilder = new global::Game.Room.RespondJoinApplicationRsp();
+            if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) {
+              subBuilder.MergeFrom(RespondJoinApplicationRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RespondJoinApplicationRsp = subBuilder;
+            break;
+          }
           case 242: {
             global::Game.Game.GameStartNotify subBuilder = new global::Game.Game.GameStartNotify();
             if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
@@ -2853,6 +3698,42 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             EndGameEarlyRejectedNotify = subBuilder;
+            break;
+          }
+          case 370: {
+            global::Game.Room.RoomAccessInboxNotify subBuilder = new global::Game.Room.RoomAccessInboxNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) {
+              subBuilder.MergeFrom(RoomAccessInboxNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomAccessInboxNotify = subBuilder;
+            break;
+          }
+          case 378: {
+            global::Game.Room.RoomAccessDecisionNotify subBuilder = new global::Game.Room.RoomAccessDecisionNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) {
+              subBuilder.MergeFrom(RoomAccessDecisionNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomAccessDecisionNotify = subBuilder;
+            break;
+          }
+          case 386: {
+            global::Game.Room.InviteLobbyPlayerRsp subBuilder = new global::Game.Room.InviteLobbyPlayerRsp();
+            if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) {
+              subBuilder.MergeFrom(InviteLobbyPlayerRsp);
+            }
+            input.ReadMessage(subBuilder);
+            InviteLobbyPlayerRsp = subBuilder;
+            break;
+          }
+          case 394: {
+            global::Game.Room.RespondRoomInvitationRsp subBuilder = new global::Game.Room.RespondRoomInvitationRsp();
+            if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) {
+              subBuilder.MergeFrom(RespondRoomInvitationRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RespondRoomInvitationRsp = subBuilder;
             break;
           }
           case 402: {
@@ -3022,6 +3903,69 @@ namespace Game.Messages {
             RoomChatNotify = subBuilder;
             break;
           }
+          case 186: {
+            global::Game.Room.EnterLobbyRsp subBuilder = new global::Game.Room.EnterLobbyRsp();
+            if (payloadCase_ == PayloadOneofCase.EnterLobbyRsp) {
+              subBuilder.MergeFrom(EnterLobbyRsp);
+            }
+            input.ReadMessage(subBuilder);
+            EnterLobbyRsp = subBuilder;
+            break;
+          }
+          case 194: {
+            global::Game.Room.LeaveLobbyRsp subBuilder = new global::Game.Room.LeaveLobbyRsp();
+            if (payloadCase_ == PayloadOneofCase.LeaveLobbyRsp) {
+              subBuilder.MergeFrom(LeaveLobbyRsp);
+            }
+            input.ReadMessage(subBuilder);
+            LeaveLobbyRsp = subBuilder;
+            break;
+          }
+          case 202: {
+            global::Game.Room.ListRoomsRsp subBuilder = new global::Game.Room.ListRoomsRsp();
+            if (payloadCase_ == PayloadOneofCase.ListRoomsRsp) {
+              subBuilder.MergeFrom(ListRoomsRsp);
+            }
+            input.ReadMessage(subBuilder);
+            ListRoomsRsp = subBuilder;
+            break;
+          }
+          case 210: {
+            global::Game.Room.RoomListNotify subBuilder = new global::Game.Room.RoomListNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomListNotify) {
+              subBuilder.MergeFrom(RoomListNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomListNotify = subBuilder;
+            break;
+          }
+          case 218: {
+            global::Game.Room.OnlineLobbyPlayersNotify subBuilder = new global::Game.Room.OnlineLobbyPlayersNotify();
+            if (payloadCase_ == PayloadOneofCase.OnlineLobbyPlayersNotify) {
+              subBuilder.MergeFrom(OnlineLobbyPlayersNotify);
+            }
+            input.ReadMessage(subBuilder);
+            OnlineLobbyPlayersNotify = subBuilder;
+            break;
+          }
+          case 226: {
+            global::Game.Room.ApplyJoinRoomRsp subBuilder = new global::Game.Room.ApplyJoinRoomRsp();
+            if (payloadCase_ == PayloadOneofCase.ApplyJoinRoomRsp) {
+              subBuilder.MergeFrom(ApplyJoinRoomRsp);
+            }
+            input.ReadMessage(subBuilder);
+            ApplyJoinRoomRsp = subBuilder;
+            break;
+          }
+          case 234: {
+            global::Game.Room.RespondJoinApplicationRsp subBuilder = new global::Game.Room.RespondJoinApplicationRsp();
+            if (payloadCase_ == PayloadOneofCase.RespondJoinApplicationRsp) {
+              subBuilder.MergeFrom(RespondJoinApplicationRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RespondJoinApplicationRsp = subBuilder;
+            break;
+          }
           case 242: {
             global::Game.Game.GameStartNotify subBuilder = new global::Game.Game.GameStartNotify();
             if (payloadCase_ == PayloadOneofCase.GameStartNotify) {
@@ -3164,6 +4108,42 @@ namespace Game.Messages {
             }
             input.ReadMessage(subBuilder);
             EndGameEarlyRejectedNotify = subBuilder;
+            break;
+          }
+          case 370: {
+            global::Game.Room.RoomAccessInboxNotify subBuilder = new global::Game.Room.RoomAccessInboxNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomAccessInboxNotify) {
+              subBuilder.MergeFrom(RoomAccessInboxNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomAccessInboxNotify = subBuilder;
+            break;
+          }
+          case 378: {
+            global::Game.Room.RoomAccessDecisionNotify subBuilder = new global::Game.Room.RoomAccessDecisionNotify();
+            if (payloadCase_ == PayloadOneofCase.RoomAccessDecisionNotify) {
+              subBuilder.MergeFrom(RoomAccessDecisionNotify);
+            }
+            input.ReadMessage(subBuilder);
+            RoomAccessDecisionNotify = subBuilder;
+            break;
+          }
+          case 386: {
+            global::Game.Room.InviteLobbyPlayerRsp subBuilder = new global::Game.Room.InviteLobbyPlayerRsp();
+            if (payloadCase_ == PayloadOneofCase.InviteLobbyPlayerRsp) {
+              subBuilder.MergeFrom(InviteLobbyPlayerRsp);
+            }
+            input.ReadMessage(subBuilder);
+            InviteLobbyPlayerRsp = subBuilder;
+            break;
+          }
+          case 394: {
+            global::Game.Room.RespondRoomInvitationRsp subBuilder = new global::Game.Room.RespondRoomInvitationRsp();
+            if (payloadCase_ == PayloadOneofCase.RespondRoomInvitationRsp) {
+              subBuilder.MergeFrom(RespondRoomInvitationRsp);
+            }
+            input.ReadMessage(subBuilder);
+            RespondRoomInvitationRsp = subBuilder;
             break;
           }
           case 402: {

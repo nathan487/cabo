@@ -153,6 +153,88 @@ namespace Cabo.Client
             });
         }
 
+        public void SendEnterLobby(string nickname, string characterId)
+        {
+            var reqId = _nextSeq;
+            Send(new ClientMessage
+            {
+                EnterLobbyReq = new EnterLobbyReq { RequestId = reqId, Nickname = nickname, CharacterId = characterId }
+            });
+        }
+
+        public void SendLeaveLobby(long lobbyPlayerId)
+        {
+            Send(new ClientMessage
+            {
+                LeaveLobbyReq = new LeaveLobbyReq { RequestId = _nextSeq, LobbyPlayerId = lobbyPlayerId }
+            });
+        }
+
+        public void SendListRooms()
+        {
+            Send(new ClientMessage
+            {
+                ListRoomsReq = new ListRoomsReq { RequestId = _nextSeq }
+            });
+        }
+
+        public void SendApplyJoinRoom(long lobbyPlayerId, long roomId, string roomCode)
+        {
+            Send(new ClientMessage
+            {
+                ApplyJoinRoomReq = new ApplyJoinRoomReq
+                {
+                    RequestId = _nextSeq,
+                    LobbyPlayerId = lobbyPlayerId,
+                    RoomId = roomId,
+                    RoomCode = roomCode ?? ""
+                }
+            });
+        }
+
+        public void SendRespondJoinApplication(long playerId, long roomId, long accessId, bool approve)
+        {
+            Send(new ClientMessage
+            {
+                RespondJoinApplicationReq = new RespondJoinApplicationReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    RoomId = roomId,
+                    AccessId = accessId,
+                    Approve = approve
+                }
+            });
+        }
+
+        public void SendInviteLobbyPlayer(long playerId, long roomId, long lobbyPlayerId)
+        {
+            Send(new ClientMessage
+            {
+                InviteLobbyPlayerReq = new InviteLobbyPlayerReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    RoomId = roomId,
+                    LobbyPlayerId = lobbyPlayerId
+                }
+            });
+        }
+
+        public void SendRespondRoomInvitation(long lobbyPlayerId, long accessId, bool approve)
+        {
+            Send(new ClientMessage
+            {
+                RespondRoomInvitationReq = new RespondRoomInvitationReq
+                {
+                    RequestId = _nextSeq,
+                    LobbyPlayerId = lobbyPlayerId,
+                    AccessId = accessId,
+                    Approve = approve
+                }
+            });
+        }
+
         public void SendLeaveRoom(long playerId, long roomId)
         {
             Send(new ClientMessage

@@ -75,6 +75,41 @@ public:
                    const ::game::messages::ClientMessage& msg) {
                 roomService_.handleRoomChat(conn, msg);
             });
+        dispatcher_.registerHandler(17, // enter_lobby_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleEnterLobby(conn, msg);
+            });
+        dispatcher_.registerHandler(18, // leave_lobby_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleLeaveLobby(conn, msg);
+            });
+        dispatcher_.registerHandler(19, // list_rooms_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleListRooms(conn, msg);
+            });
+        dispatcher_.registerHandler(28, // apply_join_room_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleApplyJoinRoom(conn, msg);
+            });
+        dispatcher_.registerHandler(29, // respond_join_application_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleRespondJoinApplication(conn, msg);
+            });
+        dispatcher_.registerHandler(32, // invite_lobby_player_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleInviteLobbyPlayer(conn, msg);
+            });
+        dispatcher_.registerHandler(33, // respond_room_invitation_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                roomService_.handleRespondRoomInvitation(conn, msg);
+            });
 
         dispatcher_.registerHandler(20, // draw_card_req
             [this](const cabogame::TcpConnectionPtr& conn,
