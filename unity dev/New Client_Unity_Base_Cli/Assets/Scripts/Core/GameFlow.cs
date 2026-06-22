@@ -11,7 +11,7 @@ namespace Cabo.Client
     /// </summary>
     public enum FlowState
     {
-        Home, Connecting, RoomFlow, WaitingRoom, Playing, RoundReveal, GameOver
+        Home, Connecting, Reconnecting, RoomFlow, WaitingRoom, Playing, RoundReveal, GameOver
     }
 
     public enum GameSubState
@@ -32,6 +32,7 @@ namespace Cabo.Client
         public FlowState Flow { get; private set; } = FlowState.Home;
         public bool IsConnected => Gateway?.IsConnected ?? false;
         public bool CanSendRoomChat => IsConnected && State.MyPlayerId > 0 && State.RoomId > 0;
+        public bool IsReconnecting { get; private set; }
         public string ConnectedAddress { get; private set; } = "";
         public string LastConnectError { get; private set; } = "";
 
@@ -45,10 +46,18 @@ namespace Cabo.Client
 
         public const string ServerAddressPrefsKey = "Cabo.LastServerAddress";
         public const string DefaultServerAddress = "ws://127.0.0.1:8888";
+        const float ReconnectWindowSeconds = 60f;
+        const float ReconnectAttemptIntervalSeconds = 2f;
 
         string _nickname = "玩家";
         bool _running = true;
         bool _wasConnected;
+        bool _reconnectAttemptInFlight;
+        bool _reconnectRequestSent;
+        float _reconnectStartedAt;
+        float _nextReconnectAttemptAt;
+        string _reconnectSessionToken = "";
+        long _reconnectLastServerSeq;
 
         public GameFlow(NetworkGateway gw) { Gateway = gw; }
 
@@ -84,6 +93,9 @@ namespace Cabo.Client
                 Gateway.Disconnect();
             }
 
+            IsReconnecting = false;
+            _reconnectAttemptInFlight = false;
+            _reconnectRequestSent = false;
             LastConnectError = "";
             ConnectedAddress = url;
             if (!string.IsNullOrWhiteSpace(nickname))
@@ -355,6 +367,21 @@ namespace Cabo.Client
             Debug.Log($"[GameFlow] ProcessServerMessage {msg.PayloadCase}");
             State.UpdateFromMessage(msg);
 
+            if (IsReconnecting)
+            {
+                if (msg.PayloadCase == ServerMessage.PayloadOneofCase.ReconnectRsp
+                    && msg.ReconnectRsp?.Error?.Code != 0)
+                {
+                    FailReconnect(string.IsNullOrEmpty(msg.ReconnectRsp.Error.Message)
+                        ? "重连失败，已离开牌局。"
+                        : msg.ReconnectRsp.Error.Message);
+                    return;
+                }
+
+                if (msg.PayloadCase == ServerMessage.PayloadOneofCase.StateSyncNotify)
+                    CompleteReconnect();
+            }
+
             switch (State.Phase)
             {
                 case GamePhase.WaitingRoom:
@@ -377,6 +404,9 @@ namespace Cabo.Client
                     SubState = GameSubState.Idle;
                     break;
             }
+
+            if (msg.PayloadCase == ServerMessage.PayloadOneofCase.StateSyncNotify)
+                RestoreSubStateFromSynchronizedState();
 
             if (Flow != previousFlow || State.Phase != previousPhase || msg.PayloadCase != ServerMessage.PayloadOneofCase.None)
                 StateChanged?.Invoke();
@@ -555,12 +585,19 @@ namespace Cabo.Client
             if (_wasConnected && !Gateway.IsConnected)
             {
                 _wasConnected = false;
-                ConnectedAddress = "";
-                LastConnectError = "已断开服务器连接。";
-                State.ReturnHome();
-                Flow = FlowState.Home;
-                SubState = GameSubState.Idle;
-                StateChanged?.Invoke();
+                if (CanBeginReconnect())
+                {
+                    BeginReconnect();
+                }
+                else
+                {
+                    ConnectedAddress = "";
+                    LastConnectError = "已断开服务器连接。";
+                    State.ReturnHome();
+                    Flow = FlowState.Home;
+                    SubState = GameSubState.Idle;
+                    StateChanged?.Invoke();
+                }
             }
             else if (!_wasConnected && Gateway.IsConnected)
             {
@@ -570,10 +607,113 @@ namespace Cabo.Client
             // Drain all pending TCP messages before the state machine decides what UI/actions are valid.
             Gateway.DrainMessages(ProcessServerMessage);
 
+            if (IsReconnecting)
+            {
+                TickReconnect();
+                return;
+            }
+
             if (Flow != FlowState.Playing) return;
 
             // Step 1: Check transitions
             CheckTransitions();
+        }
+
+        bool CanBeginReconnect()
+        {
+            return !string.IsNullOrEmpty(ConnectedAddress)
+                && !string.IsNullOrEmpty(State.SessionToken)
+                && State.MyPlayerId > 0
+                && State.RoomId > 0;
+        }
+
+        void BeginReconnect()
+        {
+            IsReconnecting = true;
+            _reconnectAttemptInFlight = false;
+            _reconnectRequestSent = false;
+            _reconnectStartedAt = Time.realtimeSinceStartup;
+            _nextReconnectAttemptAt = 0f;
+            _reconnectSessionToken = State.SessionToken;
+            _reconnectLastServerSeq = Gateway.LastServerSeq;
+            LastConnectError = "正在重连...";
+            Flow = FlowState.Reconnecting;
+            RestoreSubStateFromSynchronizedState();
+            StateChanged?.Invoke();
+        }
+
+        void TickReconnect()
+        {
+            if (Time.realtimeSinceStartup - _reconnectStartedAt > ReconnectWindowSeconds)
+            {
+                FailReconnect("重连超时，已离开牌局。");
+                return;
+            }
+
+            if (Gateway.IsConnected)
+            {
+                if (!_reconnectRequestSent)
+                {
+                    Gateway.SendReconnect(_reconnectSessionToken, _reconnectLastServerSeq);
+                    _reconnectRequestSent = true;
+                    StateChanged?.Invoke();
+                }
+                return;
+            }
+
+            if (_reconnectAttemptInFlight || Time.realtimeSinceStartup < _nextReconnectAttemptAt)
+                return;
+
+            AttemptReconnect();
+        }
+
+        async void AttemptReconnect()
+        {
+            _reconnectAttemptInFlight = true;
+            _nextReconnectAttemptAt = Time.realtimeSinceStartup + ReconnectAttemptIntervalSeconds;
+            await Gateway.ConnectAsync(ConnectedAddress);
+            _reconnectAttemptInFlight = false;
+            if (!IsReconnecting)
+                return;
+
+            if (Gateway.IsConnected)
+            {
+                _wasConnected = true;
+                _reconnectRequestSent = false;
+            }
+        }
+
+        void CompleteReconnect()
+        {
+            IsReconnecting = false;
+            _reconnectAttemptInFlight = false;
+            _reconnectRequestSent = false;
+            LastConnectError = "";
+            _wasConnected = Gateway.IsConnected;
+            Flow = State.Phase switch
+            {
+                GamePhase.WaitingRoom => FlowState.WaitingRoom,
+                GamePhase.Playing => FlowState.Playing,
+                GamePhase.RoundReveal => FlowState.RoundReveal,
+                GamePhase.GameOver => FlowState.GameOver,
+                _ => FlowState.RoomFlow
+            };
+            SubState = GameSubState.Idle;
+            StateChanged?.Invoke();
+        }
+
+        void FailReconnect(string message)
+        {
+            IsReconnecting = false;
+            _reconnectAttemptInFlight = false;
+            _reconnectRequestSent = false;
+            LastConnectError = string.IsNullOrEmpty(message) ? "重连失败，已离开牌局。" : message;
+            ConnectedAddress = "";
+            State.ReturnHome();
+            Flow = FlowState.Home;
+            SubState = GameSubState.Idle;
+            _wasConnected = false;
+            StateChanged?.Invoke();
         }
 
         void CheckTransitions()
@@ -673,6 +813,33 @@ namespace Cabo.Client
 
             // My turn + Idle → show main menu
             if (State.IsMyTurn && SubState == GameSubState.Idle
+                && State.PendingSkillCardId != 0
+                && GameState.IsPlayableSkill(State.PendingSkillCardSkill))
+            {
+                SkillTypePending = State.PendingSkillCardSkill;
+                SkillTypeJustCompleted = 0;
+                SkillMySlot = -1;
+                SkillTargetSlot = -1;
+                SkillTargetPlayerId = 0;
+                SubState = SkillTypePending switch
+                {
+                    2 => GameSubState.SkillPeekSlot,
+                    3 => GameSubState.SkillSpyTarget,
+                    4 => GameSubState.SkillSwapMySlot,
+                    _ => GameSubState.Idle
+                };
+                StateChanged?.Invoke();
+            }
+
+            if (State.IsMyTurn && SubState == GameSubState.Idle
+                && State.HasDrawnCard
+                && !State.WaitingForDrawResponse)
+            {
+                SubState = GameSubState.AwaitingDrawnDecision;
+                StateChanged?.Invoke();
+            }
+
+            if (State.IsMyTurn && SubState == GameSubState.Idle
                 && !State.HasDrawnCard
                 && !State.WaitingForDrawResponse
                 && !State.WaitingForTakeResponse
@@ -684,6 +851,52 @@ namespace Cabo.Client
 
             if (SubState != previousSubState)
                 StateChanged?.Invoke();
+        }
+
+        void RestoreSubStateFromSynchronizedState()
+        {
+            SkillTypePending = 0;
+            SkillTypeJustCompleted = 0;
+            SkillMySlot = -1;
+            SkillTargetSlot = -1;
+            SkillTargetPlayerId = 0;
+
+            if (State.Phase != GamePhase.Playing || !State.IsMyTurn)
+            {
+                SubState = GameSubState.Idle;
+                return;
+            }
+
+            if (State.PendingSkillCardId != 0
+                && GameState.IsPlayableSkill(State.PendingSkillCardSkill))
+            {
+                SkillTypePending = State.PendingSkillCardSkill;
+                SubState = SkillTypePending switch
+                {
+                    2 => GameSubState.SkillPeekSlot,
+                    3 => GameSubState.SkillSpyTarget,
+                    4 => GameSubState.SkillSwapMySlot,
+                    _ => GameSubState.Idle
+                };
+                return;
+            }
+
+            if (State.HasDrawnCard)
+            {
+                SubState = GameSubState.AwaitingDrawnDecision;
+                return;
+            }
+
+            if (!State.WaitingForDrawResponse
+                && !State.WaitingForTakeResponse
+                && !State.WaitingForCallSteadyResponse
+                && !State.WaitingForSkillResponse)
+            {
+                SubState = GameSubState.AwaitingMainInput;
+                return;
+            }
+
+            SubState = GameSubState.Idle;
         }
 
         public void Dispose()

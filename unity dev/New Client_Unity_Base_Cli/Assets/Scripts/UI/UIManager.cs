@@ -24,6 +24,9 @@ namespace Cabo.Client.UI
 
         GameFlow _flow;
         VisualElement _backgroundLayer;
+        VisualElement _reconnectOverlay;
+        Label _reconnectLabel;
+        Button _debugDisconnectButton;
         System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
         bool _waitingForRevealAnimationDrain;
         float _revealAnimationDrainStartedAt;
@@ -79,6 +82,8 @@ namespace Cabo.Client.UI
             RoomPanel = new RoomPanel(Root, flow);
             GameTablePanel = new GameTablePanel(Root, flow, transform);
             GameTablePanel.SetAnimationQueueDrainedCallback(OnStateChanged);
+            CreateReconnectOverlay();
+            CreateReconnectDebugButton();
 
             // Listen for state changes
             flow.StateChanged += OnStateChanged;
@@ -160,6 +165,8 @@ namespace Cabo.Client.UI
             if (showGame) GameTablePanel.RenderGame();
             if (showReveal) GameTablePanel.RenderReveal();
             if (showOver) GameTablePanel.RenderGameOver();
+            UpdateReconnectDebugButton();
+            UpdateReconnectOverlay();
 
             ApplyRuntimeUiFallback();
         }
@@ -179,6 +186,130 @@ namespace Cabo.Client.UI
             _backgroundLayer.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             _backgroundLayer.pickingMode = PickingMode.Ignore;
             Root.Add(_backgroundLayer);
+        }
+
+        void CreateReconnectOverlay()
+        {
+            if (Root == null)
+                return;
+
+            _reconnectOverlay = new VisualElement { name = "CaboReconnectOverlay" };
+            _reconnectOverlay.style.position = Position.Absolute;
+            _reconnectOverlay.style.left = 0;
+            _reconnectOverlay.style.right = 0;
+            _reconnectOverlay.style.top = 0;
+            _reconnectOverlay.style.bottom = 0;
+            _reconnectOverlay.style.alignItems = Align.Center;
+            _reconnectOverlay.style.justifyContent = Justify.Center;
+            _reconnectOverlay.style.backgroundColor = new Color(0f, 0f, 0f, 0.45f);
+            _reconnectOverlay.style.display = DisplayStyle.None;
+            _reconnectOverlay.pickingMode = PickingMode.Position;
+
+            _reconnectLabel = new Label("正在重连...");
+            _reconnectLabel.style.paddingLeft = 18;
+            _reconnectLabel.style.paddingRight = 18;
+            _reconnectLabel.style.paddingTop = 10;
+            _reconnectLabel.style.paddingBottom = 10;
+            _reconnectLabel.style.backgroundColor = new Color(0.06f, 0.08f, 0.12f, 0.92f);
+            _reconnectLabel.style.color = Color.white;
+            _reconnectLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _reconnectOverlay.Add(_reconnectLabel);
+            Root.Add(_reconnectOverlay);
+        }
+
+        void UpdateReconnectOverlay()
+        {
+            if (_reconnectOverlay == null || _flow == null)
+                return;
+
+            _reconnectOverlay.style.display = _flow.IsReconnecting ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_reconnectLabel != null)
+                _reconnectLabel.text = string.IsNullOrEmpty(_flow.LastConnectError)
+                    ? "正在重连..."
+                    : _flow.LastConnectError;
+            if (_flow.IsReconnecting)
+                _reconnectOverlay.BringToFront();
+        }
+
+        void CreateReconnectDebugButton()
+        {
+            if (Root == null || !ShouldShowReconnectDebugButton(Application.isEditor, Debug.isDebugBuild))
+                return;
+
+            _debugDisconnectButton = new Button(OnReconnectDebugDisconnectClicked)
+            {
+                name = "CaboReconnectDebugDisconnectButton",
+                text = "模拟断线",
+                tooltip = "断开当前连接，用于测试自动重连"
+            };
+            _debugDisconnectButton.style.position = Position.Absolute;
+            _debugDisconnectButton.style.top = 12;
+            _debugDisconnectButton.style.right = 12;
+            _debugDisconnectButton.style.minWidth = 86;
+            _debugDisconnectButton.style.height = 32;
+            _debugDisconnectButton.style.paddingLeft = 10;
+            _debugDisconnectButton.style.paddingRight = 10;
+            _debugDisconnectButton.style.unityFontStyleAndWeight = FontStyle.Bold;
+            UITheme.ApplyButton(_debugDisconnectButton, true);
+            Root.Add(_debugDisconnectButton);
+        }
+
+        void UpdateReconnectDebugButton()
+        {
+            if (_debugDisconnectButton == null || _flow == null)
+                return;
+
+            bool shouldShow = ShouldShowReconnectDebugButton(Application.isEditor, Debug.isDebugBuild)
+                && !_flow.IsReconnecting;
+            _debugDisconnectButton.style.display = shouldShow ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!shouldShow)
+                return;
+
+            bool enabled = ShouldEnableReconnectDebugButton(
+                _flow.IsConnected,
+                _flow.IsReconnecting,
+                _flow.State.SessionToken,
+                _flow.State.MyPlayerId,
+                _flow.State.RoomId);
+            _debugDisconnectButton.SetEnabled(enabled);
+            _debugDisconnectButton.tooltip = enabled
+                ? "断开当前连接，用于测试自动重连"
+                : "进入房间并拿到 session_token 后可模拟断线";
+            _debugDisconnectButton.BringToFront();
+        }
+
+        void OnReconnectDebugDisconnectClicked()
+        {
+            if (_flow == null || !ShouldEnableReconnectDebugButton(
+                    _flow.IsConnected,
+                    _flow.IsReconnecting,
+                    _flow.State.SessionToken,
+                    _flow.State.MyPlayerId,
+                    _flow.State.RoomId))
+                return;
+
+            Debug.Log("[UIManager] Simulating connection drop for reconnect test.");
+            _flow.Gateway.Disconnect();
+            UpdateReconnectDebugButton();
+        }
+
+        public static bool ShouldShowReconnectDebugButton(bool isEditor, bool isDevelopmentBuild)
+        {
+            return isEditor || isDevelopmentBuild;
+        }
+
+        public static bool ShouldEnableReconnectDebugButton(
+            bool isConnected,
+            bool isReconnecting,
+            string sessionToken,
+            long playerId,
+            long roomId)
+        {
+            return isConnected
+                && !isReconnecting
+                && !string.IsNullOrWhiteSpace(sessionToken)
+                && playerId > 0
+                && roomId > 0;
         }
 
         void ApplyScreenBackground(Sprite sprite)

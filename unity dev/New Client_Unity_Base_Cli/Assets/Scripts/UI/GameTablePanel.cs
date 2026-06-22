@@ -1623,7 +1623,7 @@ namespace Cabo.Client.UI
                     _actionTitle.text = "你的回合";
                     _actionBody.text = "选择牌堆操作，或喊 CABO。";
                     AddActionButton("抽牌", () => _flow.DoDraw(), true);
-                    AddActionButton("拿弃牌", () => _flow.DoTakeFromDiscard(), state.TurnNumber > 1 && state.DiscardPileCount > 0);
+                    AddActionButton("拿弃牌", () => _flow.DoTakeFromDiscard(), CanTakeFromDiscard(state));
                     AddActionButton("喊 CABO", () => _flow.DoCallSteady(), !state.IsFinalRound);
                     break;
 
@@ -1725,6 +1725,13 @@ namespace Cabo.Client.UI
                 || subState == GameSubState.SkillSwapMySlot
                 || subState == GameSubState.SkillSwapTargetPlayer
                 || subState == GameSubState.SkillSwapTargetSlot;
+        }
+
+        public static bool CanTakeFromDiscard(GameState state)
+        {
+            return state != null
+                && state.DiscardPileCount > 0
+                && state.TurnNumber != 1;
         }
 
         void UpdateGameLogFromState(GameState state)

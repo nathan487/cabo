@@ -3,6 +3,7 @@ using Game.Messages;
 using Game.Room;
 using Game.Game;
 using Game.Common;
+using Game.Sync;
 using UnityEngine;
 
 namespace Cabo.Client
@@ -26,6 +27,7 @@ namespace Cabo.Client
         public int CardCount;
         public bool IsReady;
         public bool IsHost;
+        public bool IsConnected = true;
         public List<CardState> PublicCards = new();
     }
 
@@ -71,6 +73,7 @@ namespace Cabo.Client
         public long MyPlayerId;
         public long RoomId;
         public string RoomCode;
+        public string SessionToken;
 
         // Phase
         public GamePhase Phase = GamePhase.Lobby;
@@ -302,6 +305,10 @@ namespace Cabo.Client
                     HandleGameOver(msg.GameOverNotify); break;
                 case ServerMessage.PayloadOneofCase.EndGameEarlyRejectedNotify:
                     HandleEndGameEarlyRejectedNotify(msg.EndGameEarlyRejectedNotify); break;
+                case ServerMessage.PayloadOneofCase.ReconnectRsp:
+                    HandleReconnect(msg.ReconnectRsp); break;
+                case ServerMessage.PayloadOneofCase.StateSyncNotify:
+                    HandleStateSync(msg.StateSyncNotify); break;
             }
         }
 
@@ -309,7 +316,7 @@ namespace Cabo.Client
         {
             if (rsp.Error?.Code != 0) return;
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
-            RoomCode = rsp.RoomCode; Phase = GamePhase.WaitingRoom;
+            RoomCode = rsp.RoomCode; SessionToken = rsp.SessionToken; Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
             Debug.Log($"[GameState] CreateRoom: {RoomCode} player={MyPlayerId}");
@@ -319,6 +326,7 @@ namespace Cabo.Client
         {
             if (rsp.Error?.Code != 0) return;
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
+            SessionToken = rsp.SessionToken;
             Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
@@ -340,7 +348,7 @@ namespace Cabo.Client
             if (Phase == GamePhase.Playing || Phase == GamePhase.RoundReveal || Phase == GamePhase.GameOver)
             {
                 foreach (var p in room.Players)
-                    UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore, false);
+                    UpsertPlayer(p.PlayerId, p.Nickname, p.CharacterId, p.SeatId, p.IsReady, p.IsHost, p.TotalScore, false, p.IsConnected);
                 return;
             }
 
@@ -357,8 +365,183 @@ namespace Cabo.Client
                     PlayerId = p.PlayerId, Nickname = p.Nickname,
                     CharacterId = ResolveIncomingCharacterId(p.PlayerId, p.CharacterId),
                     SeatId = p.SeatId, IsReady = p.IsReady,
-                    IsHost = p.IsHost, TotalScore = p.TotalScore
+                    IsHost = p.IsHost, IsConnected = p.IsConnected, TotalScore = p.TotalScore
                 });
+        }
+
+        void HandleReconnect(ReconnectRsp rsp)
+        {
+            if (rsp.Error?.Code != 0) return;
+            MyPlayerId = rsp.PlayerId;
+            RoomId = rsp.RoomId;
+            Phase = rsp.IsInGame ? GamePhase.Playing : GamePhase.WaitingRoom;
+        }
+
+        void HandleStateSync(StateSyncNotify notify)
+        {
+            if (notify == null) return;
+            var sync = notify.GameState;
+            var view = sync?.PlayerView;
+            if (view != null && view.PlayerId > 0)
+                MyPlayerId = view.PlayerId;
+
+            if (notify.RoomState != null)
+                ApplyFullRoomState(notify.RoomState);
+            else
+                RoomId = notify.RoomId;
+
+            if (!notify.IsInGame || sync == null)
+            {
+                Phase = GamePhase.WaitingRoom;
+                HasDrawnCard = false;
+                ClearPendingSkillCard();
+                return;
+            }
+
+            Phase = sync.Phase == Game.Common.GamePhase.Reveal
+                ? GamePhase.RoundReveal
+                : sync.Phase == Game.Common.GamePhase.GameOver
+                    ? GamePhase.GameOver
+                    : GamePhase.Playing;
+            RoundNumber = sync.RoundNumber;
+            CurrentPlayerId = sync.CurrentTurnPlayerId;
+            SteadyCallerId = sync.SteadyCallerPlayerId;
+            IsFinalRound = sync.Phase == Game.Common.GamePhase.FinalRound;
+            FinalRoundRemaining = sync.FinalRoundRemaining;
+            DrawPileCount = sync.DrawPile?.Count ?? 0;
+            DiscardPileCount = sync.DiscardPile?.Count ?? 0;
+            DiscardTopValue = sync.DiscardPile?.TopCard?.Value ?? -1;
+
+            WaitingForDrawResponse = false;
+            WaitingForTakeResponse = false;
+            WaitingForCallSteadyResponse = false;
+            WaitingForSkillResponse = false;
+            ClearPendingSkillCard();
+            ApplyPlayerView(view);
+
+            HasDrawnCard = false;
+            DrawnCardId = 0;
+            DrawnCardValue = 0;
+            DrawnCardSkill = 0;
+            if (sync.PendingStep?.StepType == TurnStepState.Types.StepType.WaitingDrawDecision
+                && sync.PendingStep.WaitingPlayerId == MyPlayerId
+                && sync.PendingStep.DrawnCardId != 0)
+            {
+                int pendingSkill = (int)sync.PendingStep.DrawnCardSkill;
+                bool pendingCardAlreadyDiscarded = IsPlayableSkill(pendingSkill)
+                    && sync.DiscardPile?.TopCard != null
+                    && sync.DiscardPile.TopCard.CardId == sync.PendingStep.DrawnCardId;
+
+                if (pendingCardAlreadyDiscarded)
+                {
+                    PendingSkillCardId = sync.PendingStep.DrawnCardId;
+                    PendingSkillCardSkill = pendingSkill;
+                }
+                else
+                {
+                    HasDrawnCard = true;
+                    DrawnCardId = sync.PendingStep.DrawnCardId;
+                    DrawnCardValue = sync.PendingStep.DrawnCardValue;
+                    DrawnCardSkill = pendingSkill;
+                }
+            }
+
+            Debug.Log($"[GameState] StateSync: room={RoomId} player={MyPlayerId} cards={MyCards.Count} drawn={HasDrawnCard}");
+        }
+
+        void ApplyFullRoomState(RoomState room)
+        {
+            if (room == null) return;
+            RoomId = room.RoomId;
+            RoomCode = room.RoomCode;
+
+            foreach (var player in Players)
+            {
+                if (!string.IsNullOrWhiteSpace(player.CharacterId))
+                    RememberCharacterId(player.PlayerId, player.CharacterId);
+            }
+
+            Players.Clear();
+            foreach (var p in room.Players)
+            {
+                Players.Add(new PlayerInfo
+                {
+                    PlayerId = p.PlayerId,
+                    Nickname = p.Nickname,
+                    CharacterId = ResolveIncomingCharacterId(p.PlayerId, p.CharacterId),
+                    SeatId = p.SeatId,
+                    IsReady = p.IsReady,
+                    IsHost = p.IsHost,
+                    IsConnected = p.IsConnected,
+                    TotalScore = p.TotalScore
+                });
+            }
+        }
+
+        void ApplyPlayerView(PlayerGameView view)
+        {
+            if (view == null) return;
+            if (view.PlayerId > 0)
+                MyPlayerId = view.PlayerId;
+
+            MyCards.Clear();
+            foreach (var oc in view.OwnCards)
+            {
+                MyCards.Add(new CardState
+                {
+                    SlotIndex = oc.SlotIndex,
+                    IsKnown = oc.IsKnown,
+                    Value = oc.IsKnown ? oc.Value : 0
+                });
+            }
+
+            var me = Players.Find(x => x.PlayerId == MyPlayerId);
+            if (me != null)
+                me.CardCount = MyCards.Count;
+            else
+                Players.Add(new PlayerInfo
+                {
+                    PlayerId = MyPlayerId,
+                    Nickname = "你",
+                    SeatId = 0,
+                    CardCount = MyCards.Count,
+                    IsHost = true,
+                    IsConnected = true
+                });
+
+            DrawPileCount = view.DrawPile?.Count ?? DrawPileCount;
+            DiscardPileCount = view.DiscardPile?.Count ?? DiscardPileCount;
+            DiscardTopValue = view.DiscardPile?.TopCard?.Value ?? DiscardTopValue;
+
+            foreach (var oh in view.OpponentHands)
+            {
+                var p = Players.Find(x => x.PlayerId == oh.PlayerId);
+                if (p != null)
+                {
+                    p.CardCount = oh.CardCount;
+                    ApplyVisibleCards(p, oh.VisibleCards);
+                }
+                else
+                {
+                    var opponent = new PlayerInfo
+                    {
+                        PlayerId = oh.PlayerId,
+                        Nickname = $"玩家 {Players.Count + 1}",
+                        SeatId = Players.Count,
+                        CharacterId = ResolveIncomingCharacterId(oh.PlayerId, ""),
+                        CardCount = oh.CardCount
+                    };
+                    ApplyVisibleCards(opponent, oh.VisibleCards);
+                    Players.Add(opponent);
+                }
+            }
+
+            foreach (var score in view.Scores)
+            {
+                var player = Players.Find(x => x.PlayerId == score.PlayerId);
+                if (player != null)
+                    player.TotalScore = score.TotalScore;
+            }
         }
 
         void HandlePlayerJoin(PlayerJoinNotify notify)
@@ -1123,6 +1306,7 @@ namespace Cabo.Client
             MyPlayerId = 0;
             RoomId = 0;
             RoomCode = "";
+            SessionToken = "";
             Players.Clear();
             MyCards.Clear();
             DrawPileCount = 0;
@@ -1174,7 +1358,7 @@ namespace Cabo.Client
         }
 
         void UpsertPlayer(long playerId, string nickname, string characterId, int seatId, bool isReady, bool isHost,
-            int totalScore, bool updateScore = true)
+            int totalScore, bool updateScore = true, bool isConnected = true)
         {
             var existing = Players.Find(x => x.PlayerId == playerId);
             if (existing != null)
@@ -1184,6 +1368,7 @@ namespace Cabo.Client
                 existing.SeatId = seatId;
                 existing.IsReady = isReady;
                 existing.IsHost = isHost;
+                existing.IsConnected = isConnected;
                 if (updateScore)
                     existing.TotalScore = totalScore;
                 return;
@@ -1197,6 +1382,7 @@ namespace Cabo.Client
                 SeatId = seatId,
                 IsReady = isReady,
                 IsHost = isHost,
+                IsConnected = isConnected,
                 TotalScore = totalScore
             });
         }

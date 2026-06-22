@@ -247,7 +247,7 @@ void rejectsSkillTypeMismatch() {
             "mismatched skill should receive an error response");
 }
 
-void removesDisconnectedPlayerFromActiveGame() {
+void marksDisconnectedPlayerOfflineInActiveGame() {
     cabogame::GameService service;
     std::vector<SentFrame> sentFrames;
     service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
@@ -263,21 +263,63 @@ void removesDisconnectedPlayerFromActiveGame() {
 
     service.onConnectionClosed(p1Conn);
 
-    require(room->players.size() == 1,
-            "disconnected player should be removed from game state");
-    require(room->players[0]->playerId == 10001,
-            "remaining player should stay in game state");
-    require(room->step == cabogame::GameStep::GameOver,
-            "single remaining player should end the active game");
+    require(room->players.size() == 2,
+            "transient disconnect should keep the player in game state");
+    require(room->players[0]->playerId == 10000,
+            "disconnected player should keep their seat");
+    require(!room->players[0]->isConnected,
+            "disconnected player should be marked offline");
+    require(room->players[0]->conn == nullptr,
+            "disconnected player should release the dead connection");
+    require(room->step == cabogame::GameStep::Playing,
+            "transient disconnect should not end an active game");
+    require(sentFrames.empty(),
+            "transient disconnect should not broadcast GameOver");
+}
 
-    bool remainingSawGameOver = false;
-    for (const auto& serverMsg : messagesForConn(sentFrames, p2Conn)) {
-        if (serverMsg.has_game_over_notify()) {
-            remainingSawGameOver = true;
-        }
-    }
-    require(remainingSawGameOver,
-            "remaining player should receive GameOver after opponent disconnects");
+void reconnectRestoresConnectionAndBuildsPendingDrawSnapshot() {
+    cabogame::GameService service;
+    std::vector<SentFrame> sentFrames;
+    service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
+        sentFrames.push_back({conn.get(), frame});
+    });
+
+    auto oldConn = fakeConn(29);
+    auto p2Conn = fakeConn(30);
+    auto newConn = fakeConn(31);
+    auto room = makeRoom(oldConn, p2Conn);
+    room->step = cabogame::GameStep::WaitingDrawDecision;
+    room->currentPlayerSeat = 0;
+    room->pendingDrewFromDiscard = false;
+    room->pendingDrawnCard = card(800, 9);
+    service.games_[room->roomId] = room;
+
+    service.onConnectionClosed(oldConn);
+
+    require(service.reconnectPlayer(room->roomId, 10000, newConn),
+            "reconnect should bind a new connection to an offline player");
+
+    ::game::sync::GameSyncState syncState;
+    require(service.fillGameSyncState(room->roomId, 10000, &syncState),
+            "reconnect should build a player-specific game sync snapshot");
+
+    require(room->players[0]->isConnected,
+            "reconnected player should be marked online");
+    require(room->players[0]->conn.get() == newConn.get(),
+            "reconnected player should use the new connection");
+    require(syncState.phase() == ::game::common::GAME_PHASE_PLAYING,
+            "waiting draw decision should restore as active playing phase");
+    require(syncState.current_turn_player_id() == 10000,
+            "sync snapshot should restore current turn player");
+    require(syncState.pending_step().step_type()
+                == ::game::sync::TurnStepState::STEP_TYPE_WAITING_DRAW_DECISION,
+            "sync snapshot should restore the pending draw decision");
+    require(syncState.pending_step().drawn_card_id() == 800,
+            "sync snapshot should include the reconnecting player's drawn card id");
+    require(syncState.pending_step().drawn_card_value() == 9,
+            "sync snapshot should include the reconnecting player's drawn card value");
+    require(syncState.player_view().own_cards_size() == 4,
+            "sync snapshot should include the reconnecting player's own cards");
 }
 
 void gameFinishedCallbackRunsAfterRoomLockReleased() {
@@ -301,7 +343,7 @@ void gameFinishedCallbackRunsAfterRoomLockReleased() {
     });
 
     auto closeTask = std::async(std::launch::async, [&]() {
-        service.onConnectionClosed(p1Conn);
+        service.onPlayerLeft(p1Conn);
     });
 
     if (closeTask.wait_for(std::chrono::milliseconds(500)) != std::future_status::ready) {
@@ -517,7 +559,7 @@ void publicGameBroadcastEncodesFrameOnceForAllRecipients() {
             "public game broadcast should encode and frame the shared payload once");
 }
 
-void finalRoundDisconnectConsumesPendingTurn() {
+void explicitLeaveConsumesPendingFinalRoundTurn() {
     cabogame::GameService service;
     std::vector<SentFrame> sentFrames;
     service.setSendFunc([&](const cabogame::TcpConnectionPtr& conn, const std::string& frame) {
@@ -546,16 +588,16 @@ void finalRoundDisconnectConsumesPendingTurn() {
     room->drawPile.push_back(card(700, 2));
     service.games_[room->roomId] = room;
 
-    service.onConnectionClosed(disconnectingConn);
+    service.onPlayerLeft(disconnectingConn);
 
     require(room->players.size() == 3,
-            "only the disconnected final-round player should be removed");
+            "only the leaving final-round player should be removed");
     require(room->currentPlayerSeat == 2,
             "turn should advance to the next remaining final-round player");
     require(room->players[room->currentPlayerSeat]->playerId == 10003,
-            "next remaining player should become current after disconnect");
+            "next remaining player should become current after leave");
     require(room->finalRoundRemaining == 1,
-            "disconnecting a pending final-round player should consume that pending turn");
+            "leaving during a pending final-round turn should consume that pending turn");
     require(room->steadyCallerSeat == 0,
             "steady caller index should remain valid after later player disconnects");
 }
@@ -566,7 +608,8 @@ int main() {
     rejectsForgedConnectionForDraw();
     hidesDrawnIncomingValueFromOtherPlayers();
     rejectsSkillTypeMismatch();
-    removesDisconnectedPlayerFromActiveGame();
+    marksDisconnectedPlayerOfflineInActiveGame();
+    reconnectRestoresConnectionAndBuildsPendingDrawSnapshot();
     gameFinishedCallbackRunsAfterRoomLockReleased();
     rejectsRestartRoundWhileRoundIsActive();
     deckEmptyDrawReturnsAnError();
@@ -574,7 +617,7 @@ int main() {
     callSteadyUsesPlayerVectorIndex();
     discardDrawnDoesNotBlockForAnimationDelay();
     publicGameBroadcastEncodesFrameOnceForAllRecipients();
-    finalRoundDisconnectConsumesPendingTurn();
+    explicitLeaveConsumesPendingFinalRoundTurn();
     std::cout << "game_service_regression_test passed\n";
     return 0;
 }

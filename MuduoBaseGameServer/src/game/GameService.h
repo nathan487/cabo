@@ -2,6 +2,7 @@
 #include "proto/game.pb.h"
 #include "proto/common.pb.h"
 #include "proto/messages.pb.h"
+#include "proto/sync.pb.h"
 #include "common/SendBufferPool.h"
 #include <functional>
 #include "common/MessageDispatcher.h" // for TcpConnectionPtr
@@ -25,6 +26,7 @@ struct PlayerGameState {
     int32_t seatId;
     TcpConnectionPtr conn;
     bool isConnected;
+    int64_t disconnectedAtMs = 0;
 
     // Cards in player's area (starts at 4, can increase via penalty)
     std::vector<::game::common::CardInfo> cards;
@@ -117,6 +119,13 @@ public:
     bool canRestartRound(int64_t roomId) const;
     void restartRound(int64_t roomId);
     void onConnectionClosed(const TcpConnectionPtr& conn);
+    void onPlayerLeft(const TcpConnectionPtr& conn);
+    bool reconnectPlayer(int64_t roomId,
+                         int64_t playerId,
+                         const TcpConnectionPtr& conn);
+    bool fillGameSyncState(int64_t roomId,
+                           int64_t playerId,
+                           ::game::sync::GameSyncState* state);
 
     // Player action handlers
     void handleDrawCard(const TcpConnectionPtr& conn,

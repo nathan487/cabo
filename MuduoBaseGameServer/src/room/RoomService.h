@@ -29,6 +29,7 @@ struct PlayerSession {
     int32_t totalScore = 0;
     TcpConnectionPtr conn;
     std::string sessionToken;
+    int64_t disconnectedAtMs = 0;
 };
 
 struct Room {
@@ -55,6 +56,16 @@ struct RoomGameStartSnapshot {
     int64_t roomId = 0;
     int64_t hostPlayerId = 0;
     std::vector<PlayerSessionSnapshot> players;
+};
+
+struct ReconnectSessionResult {
+    bool ok = false;
+    int32_t errorCode = 0;
+    std::string errorMessage;
+    int64_t playerId = 0;
+    int64_t roomId = 0;
+    bool isInGame = false;
+    ::game::room::RoomState roomState;
 };
 
 // Manages rooms and player sessions in memory.
@@ -100,6 +111,9 @@ public:
                          const ::game::messages::ClientMessage& msg);
     void handleRoomChat(const TcpConnectionPtr& conn,
                         const ::game::messages::ClientMessage& msg);
+    bool reconnectSession(const std::string& sessionToken,
+                          const TcpConnectionPtr& conn,
+                          ReconnectSessionResult* result);
 
     // Called by GameService after final GameOver has been broadcast.
     void markGameFinished(int64_t roomId);
@@ -117,6 +131,7 @@ private:
                          const ::game::messages::ServerMessage& msg,
                          int64_t excludePlayerId = 0);
     void sendRoomState(int64_t roomId, const TcpConnectionPtr& conn);
+    void fillRoomState(const Room& room, ::game::room::RoomState* state) const;
     std::string generateRoomCode();
     std::string generateSessionToken();
     int64_t nextPlayerId();

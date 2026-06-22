@@ -203,6 +203,36 @@ namespace Cabo.Client.Tests
         }
 
         [Test]
+        public void TakeFromDiscardIsAllowedWhenTurnNumberIsUnknownAfterStateSync()
+        {
+            Assert.IsTrue(GameTablePanel.CanTakeFromDiscard(new GameState
+            {
+                TurnNumber = 0,
+                DiscardPileCount = 1
+            }));
+        }
+
+        [Test]
+        public void TakeFromDiscardIsDisabledOnlyForKnownFirstTurnOrEmptyDiscardPile()
+        {
+            Assert.IsFalse(GameTablePanel.CanTakeFromDiscard(new GameState
+            {
+                TurnNumber = 1,
+                DiscardPileCount = 1
+            }));
+            Assert.IsFalse(GameTablePanel.CanTakeFromDiscard(new GameState
+            {
+                TurnNumber = 0,
+                DiscardPileCount = 0
+            }));
+            Assert.IsTrue(GameTablePanel.CanTakeFromDiscard(new GameState
+            {
+                TurnNumber = 2,
+                DiscardPileCount = 1
+            }));
+        }
+
+        [Test]
         public void SpecialEffectSpritesAreConfiguredInArtCatalog()
         {
             CaboArt.ResetCache();

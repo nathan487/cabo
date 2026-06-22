@@ -10,6 +10,8 @@ namespace game {
 
 namespace {
 
+constexpr int64_t kReconnectWindowMs = 60 * 1000;
+
 std::string trimAsciiWhitespace(const std::string& input) {
     size_t begin = 0;
     size_t end = input.size();
@@ -165,6 +167,29 @@ void RoomService::sendTo(const TcpConnectionPtr& conn,
     sendFrame(conn, frame.get());
 }
 
+void RoomService::fillRoomState(const Room& room, ::game::room::RoomState* state) const {
+    if (!state) return;
+
+    state->Clear();
+    state->set_room_id(room.roomId);
+    state->set_room_code(room.roomCode);
+    state->set_max_players(room.maxPlayers);
+    state->set_state(room.state);
+    state->set_host_player_id(room.hostPlayerId);
+
+    for (auto& p : room.players) {
+        auto* ppi = state->add_players();
+        ppi->set_player_id(p->playerId);
+        ppi->set_nickname(p->nickname);
+        ppi->set_character_id(p->characterId);
+        ppi->set_seat_id(p->seatId);
+        ppi->set_is_ready(p->isReady);
+        ppi->set_is_host(p->isHost);
+        ppi->set_is_connected(p->isConnected);
+        ppi->set_total_score(p->totalScore);
+    }
+}
+
 void RoomService::broadcastToRoom(int64_t roomId,
                                    const ::game::messages::ServerMessage& msg,
                                    int64_t excludePlayerId) {
@@ -194,24 +219,7 @@ void RoomService::sendRoomState(int64_t roomId, const TcpConnectionPtr& conn) {
     ::game::messages::ServerMessage msg;
     auto* notify = msg.mutable_room_state_notify();
     notify->set_room_id(room->roomId);
-    auto* rs = notify->mutable_room();
-    rs->set_room_id(room->roomId);
-    rs->set_room_code(room->roomCode);
-    rs->set_max_players(room->maxPlayers);
-    rs->set_state(room->state);
-    rs->set_host_player_id(room->hostPlayerId);
-
-    for (auto& p : room->players) {
-        auto* ppi = rs->add_players();
-        ppi->set_player_id(p->playerId);
-        ppi->set_nickname(p->nickname);
-        ppi->set_character_id(p->characterId);
-        ppi->set_seat_id(p->seatId);
-        ppi->set_is_ready(p->isReady);
-        ppi->set_is_host(p->isHost);
-        ppi->set_is_connected(p->isConnected);
-        ppi->set_total_score(p->totalScore);
-    }
+    fillRoomState(*room, notify->mutable_room());
 
     sendTo(conn, msg);
 }
@@ -710,6 +718,66 @@ void RoomService::handleRoomChat(const TcpConnectionPtr& conn,
     broadcastToRoom(roomId, notifyMsg);
 }
 
+bool RoomService::reconnectSession(const std::string& sessionToken,
+                                   const TcpConnectionPtr& conn,
+                                   ReconnectSessionResult* result) {
+    if (result) {
+        *result = ReconnectSessionResult{};
+    }
+
+    const std::string token = trimAsciiWhitespace(sessionToken);
+    if (token.empty()) {
+        if (result) {
+            result->errorCode = 1016;
+            result->errorMessage = "session_token is empty";
+        }
+        return false;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    const int64_t now = nowMs();
+
+    for (auto& kv : rooms_) {
+        auto& room = kv.second;
+        for (auto& player : room->players) {
+            if (player->sessionToken != token)
+                continue;
+
+            if (!player->isConnected
+                && player->disconnectedAtMs > 0
+                && now - player->disconnectedAtMs > kReconnectWindowMs) {
+                if (result) {
+                    result->errorCode = 1017;
+                    result->errorMessage = "Reconnect window expired";
+                    result->playerId = player->playerId;
+                    result->roomId = room->roomId;
+                }
+                return false;
+            }
+
+            player->conn = conn;
+            player->isConnected = true;
+            player->disconnectedAtMs = 0;
+
+            if (result) {
+                result->ok = true;
+                result->errorCode = 0;
+                result->playerId = player->playerId;
+                result->roomId = room->roomId;
+                result->isInGame = room->state == ::game::common::ROOM_STATE_PLAYING;
+                fillRoomState(*room, &result->roomState);
+            }
+            return true;
+        }
+    }
+
+    if (result) {
+        result->errorCode = 1016;
+        result->errorMessage = "session_token invalid";
+    }
+    return false;
+}
+
 void RoomService::markGameFinished(int64_t roomId) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     std::shared_ptr<Room> room;
@@ -771,26 +839,15 @@ void RoomService::onConnectionClosed(const TcpConnectionPtr& conn) {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         for (auto& kv : rooms_) {
             auto& room = kv.second;
-            for (auto it = room->players.begin(); it != room->players.end(); ) {
-                if ((*it)->conn && (*it)->conn.get() == conn.get()) {
-                    int64_t pid = (*it)->playerId;
-                    LOG_INFO("[Room] Player %lld disconnected, removing from room %s",
-                             (long long)pid, room->roomCode.c_str());
-                    bool wasHost = (*it)->isHost;
-                    it = room->players.erase(it);
-                    playerRooms_.erase(pid);
-
-                    // Reassign host if needed
-                    if (wasHost && !room->players.empty()) {
-                        room->players[0]->isHost = true;
-                        room->hostPlayerId = room->players[0]->playerId;
-                        LOG_INFO("[Room] New host: %lld", (long long)room->hostPlayerId);
-                    }
-
-                    if (!room->players.empty())
-                        roomsToUpdate.push_back(room->roomId);
-                } else {
-                    ++it;
+            for (auto& player : room->players) {
+                if (player->conn && player->conn.get() == conn.get()) {
+                    LOG_INFO("[Room] Player %lld disconnected from room %s",
+                             (long long)player->playerId, room->roomCode.c_str());
+                    player->isConnected = false;
+                    player->conn.reset();
+                    player->disconnectedAtMs = nowMs();
+                    roomsToUpdate.push_back(room->roomId);
+                    break;
                 }
             }
         }

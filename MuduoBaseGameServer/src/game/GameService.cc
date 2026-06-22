@@ -12,6 +12,11 @@ namespace cabogame {
 
 namespace {
 
+int64_t nowMs() {
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
 const char* serverMessageTypeForLog(const ::game::messages::ServerMessage& msg) {
     if (msg.has_create_room_rsp()) return "CreateRoomRsp";
     if (msg.has_join_room_rsp()) return "JoinRoomRsp";
@@ -277,6 +282,39 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
     }
 
     for (auto& roomPtr : rooms) {
+        std::lock_guard<std::mutex> roomLock(roomPtr->stateMutex);
+        auto& room = *roomPtr;
+        if (room.step == GameStep::GameOver) continue;
+
+        for (auto& player : room.players) {
+            if (player->conn && player->conn.get() == conn.get()) {
+                LOG_INFO("[Game] Player %lld disconnected from active game room=%lld",
+                         (long long)player->playerId, (long long)room.roomId);
+                player->isConnected = false;
+                player->conn.reset();
+                player->disconnectedAtMs = nowMs();
+                if (room.pendingEndGameRequesterConn
+                    && room.pendingEndGameRequesterConn.get() == conn.get()) {
+                    room.pendingEndGameRequesterConn.reset();
+                }
+                break;
+            }
+        }
+    }
+}
+
+void GameService::onPlayerLeft(const TcpConnectionPtr& conn) {
+    if (!conn) return;
+
+    std::vector<std::shared_ptr<GameRoom>> rooms;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& kv : games_) {
+            rooms.push_back(kv.second);
+        }
+    }
+
+    for (auto& roomPtr : rooms) {
         std::unique_lock<std::mutex> roomLock(roomPtr->stateMutex);
         auto& room = *roomPtr;
         if (room.step == GameStep::GameOver) continue;
@@ -382,6 +420,111 @@ void GameService::onConnectionClosed(const TcpConnectionPtr& conn) {
             sendTurnStart(room);
         }
     }
+}
+
+bool GameService::reconnectPlayer(int64_t roomId,
+                                  int64_t playerId,
+                                  const TcpConnectionPtr& conn) {
+    auto room = getRoom(roomId);
+    if (!room) return false;
+
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    auto player = getPlayer(*room, playerId);
+    if (!player) return false;
+
+    player->conn = conn;
+    player->isConnected = true;
+    player->disconnectedAtMs = 0;
+    if (room->pendingEndGameRequesterPlayerId == playerId) {
+        room->pendingEndGameRequesterConn = conn;
+    }
+    return room->step != GameStep::GameOver;
+}
+
+bool GameService::fillGameSyncState(int64_t roomId,
+                                    int64_t playerId,
+                                    ::game::sync::GameSyncState* state) {
+    if (!state) return false;
+
+    auto room = getRoom(roomId);
+    if (!room) return false;
+
+    std::lock_guard<std::mutex> roomLock(room->stateMutex);
+    auto player = getPlayer(*room, playerId);
+    if (!player) return false;
+
+    state->Clear();
+    state->set_round_number(room->roundNumber);
+    if (room->step == GameStep::WaitingToStart) {
+        state->set_phase(::game::common::GAME_PHASE_WAITING);
+    } else if (room->step == GameStep::Reveal) {
+        state->set_phase(::game::common::GAME_PHASE_REVEAL);
+    } else if (room->step == GameStep::GameOver) {
+        state->set_phase(::game::common::GAME_PHASE_GAME_OVER);
+    } else if (room->steadyCallerSeat >= 0) {
+        state->set_phase(::game::common::GAME_PHASE_FINAL_ROUND);
+    } else {
+        state->set_phase(::game::common::GAME_PHASE_PLAYING);
+    }
+
+    if (room->currentPlayerSeat >= 0
+        && room->currentPlayerSeat < static_cast<int32_t>(room->players.size())) {
+        state->set_current_turn_player_id(room->players[room->currentPlayerSeat]->playerId);
+    }
+    if (room->steadyCallerSeat >= 0
+        && room->steadyCallerSeat < static_cast<int32_t>(room->players.size())) {
+        state->set_steady_caller_player_id(room->players[room->steadyCallerSeat]->playerId);
+    }
+    state->set_final_round_remaining(room->finalRoundRemaining);
+
+    auto* dp = state->mutable_draw_pile();
+    dp->set_count(static_cast<int32_t>(room->drawPile.size()));
+    auto* dcp = state->mutable_discard_pile();
+    dcp->set_count(static_cast<int32_t>(room->discardPile.size()));
+    if (!room->discardPile.empty()) {
+        *dcp->mutable_top_card() = room->discardPile.back();
+    }
+
+    auto* view = state->mutable_player_view();
+    view->set_player_id(playerId);
+    for (size_t i = 0; i < player->cards.size(); ++i) {
+        auto* own = view->add_own_cards();
+        const bool isKnown = (i < player->knownSlots.size() && player->knownSlots[i])
+            || player->cards[i].publicly_known();
+        own->set_slot_index(static_cast<int32_t>(i));
+        own->set_is_known(isKnown);
+        if (isKnown) {
+            own->set_value(player->cards[i].value());
+        }
+    }
+    for (auto& other : room->players) {
+        if (other->playerId == playerId) continue;
+        fillVisibleHandState(view->add_opponent_hands(), *other);
+    }
+    for (auto& p : room->players) {
+        auto* si = state->add_scores();
+        si->set_player_id(p->playerId);
+        si->set_total_score(p->totalScore);
+        si->set_current_round_score(p->lastRoundScore == 0 ? -1 : p->lastRoundScore);
+    }
+
+    auto* pending = state->mutable_pending_step();
+    if (room->step == GameStep::WaitingDrawDecision
+        && room->currentPlayerSeat >= 0
+        && room->currentPlayerSeat < static_cast<int32_t>(room->players.size())) {
+        const auto waitingPlayerId = room->players[room->currentPlayerSeat]->playerId;
+        pending->set_step_type(::game::sync::TurnStepState::STEP_TYPE_WAITING_DRAW_DECISION);
+        pending->set_waiting_player_id(waitingPlayerId);
+        if (waitingPlayerId == playerId && room->pendingDrawnCard.card_id() != 0) {
+            pending->set_drawn_card_id(room->pendingDrawnCard.card_id());
+            pending->set_drawn_card_value(room->pendingDrawnCard.value());
+            pending->set_drawn_card_skill(room->pendingDrawnCard.skill());
+        }
+    } else {
+        pending->set_step_type(::game::sync::TurnStepState::STEP_TYPE_NONE);
+    }
+
+    return true;
 }
 
 void GameService::startNewRound(GameRoom& room) {

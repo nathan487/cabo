@@ -14,6 +14,16 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <chrono>
+
+namespace {
+
+int64_t nowMs() {
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+} // namespace
 
 class GameServer {
 public:
@@ -45,7 +55,7 @@ public:
             [this](const cabogame::TcpConnectionPtr& conn,
                    const ::game::messages::ClientMessage& msg) {
                 if (roomService_.handleLeaveRoom(conn, msg)) {
-                    gameService_.onConnectionClosed(conn);
+                    gameService_.onPlayerLeft(conn);
                 }
             });
         dispatcher_.registerHandler(13, // ready_req
@@ -107,6 +117,17 @@ public:
                 gameService_.handleEndGameEarlyDecision(conn, msg);
             });
 
+        dispatcher_.registerHandler(30, // reconnect_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                onReconnect(conn, msg);
+            });
+        dispatcher_.registerHandler(31, // heartbeat_req
+            [this](const cabogame::TcpConnectionPtr& conn,
+                   const ::game::messages::ClientMessage& msg) {
+                onHeartbeat(conn, msg);
+            });
+
         // Wire room send function
         roomService_.setSendFunc(
             [](const cabogame::TcpConnectionPtr& conn, const std::string& framedData) {
@@ -128,6 +149,14 @@ public:
     void start() { server_.start(); }
 
 private:
+    void sendServerMessage(const cabogame::TcpConnectionPtr& conn,
+                           const ::game::messages::ServerMessage& msg) {
+        if (!conn) return;
+        std::string payload;
+        msg.SerializeToString(&payload);
+        conn->send(game::WebSocketCodec::encode(payload));
+    }
+
     void sendStartGameError(const cabogame::TcpConnectionPtr& conn,
                             int64_t requestId,
                             int32_t code,
@@ -141,6 +170,56 @@ private:
         std::string payload;
         rspMsg.SerializeToString(&payload);
         conn->send(game::WebSocketCodec::encode(payload));
+    }
+
+    void onReconnect(const cabogame::TcpConnectionPtr& conn,
+                     const ::game::messages::ClientMessage& msg) {
+        const auto& req = msg.reconnect_req();
+
+        game::ReconnectSessionResult result;
+        const bool roomOk = roomService_.reconnectSession(req.session_token(), conn, &result);
+
+        ::game::messages::ServerMessage rspMsg;
+        auto* rsp = rspMsg.mutable_reconnect_rsp();
+        rsp->set_request_id(req.request_id());
+        if (!roomOk) {
+            rsp->mutable_error()->set_code(result.errorCode == 0 ? 1016 : result.errorCode);
+            rsp->mutable_error()->set_message(result.errorMessage.empty()
+                ? "Reconnect failed"
+                : result.errorMessage);
+            sendServerMessage(conn, rspMsg);
+            return;
+        }
+
+        const bool isInGame = gameService_.reconnectPlayer(result.roomId, result.playerId, conn);
+        rsp->mutable_error()->set_code(0);
+        rsp->set_player_id(result.playerId);
+        rsp->set_room_id(result.roomId);
+        rsp->set_is_in_game(isInGame);
+        sendServerMessage(conn, rspMsg);
+
+        ::game::messages::ServerMessage syncMsg;
+        auto* sync = syncMsg.mutable_state_sync_notify();
+        sync->set_room_id(result.roomId);
+        sync->set_server_time_ms(nowMs());
+        *sync->mutable_room_state() = result.roomState;
+        sync->set_is_in_game(isInGame);
+        if (isInGame) {
+            gameService_.fillGameSyncState(result.roomId, result.playerId,
+                                           sync->mutable_game_state());
+        }
+        sendServerMessage(conn, syncMsg);
+    }
+
+    void onHeartbeat(const cabogame::TcpConnectionPtr& conn,
+                     const ::game::messages::ClientMessage& msg) {
+        const auto& req = msg.heartbeat_req();
+        ::game::messages::ServerMessage rspMsg;
+        auto* rsp = rspMsg.mutable_heartbeat_rsp();
+        rsp->set_request_id(req.request_id());
+        rsp->set_server_time_ms(nowMs());
+        rsp->set_client_time_ms(req.client_time_ms());
+        sendServerMessage(conn, rspMsg);
     }
 
     // Triggered when host clicks Start Game.

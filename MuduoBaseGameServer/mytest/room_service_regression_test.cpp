@@ -34,6 +34,7 @@ std::shared_ptr<game::PlayerSession> player(int64_t playerId,
     p->conn = conn;
     p->isConnected = true;
     p->isHost = isHost;
+    p->sessionToken = "token-" + std::to_string(playerId);
     return p;
 }
 
@@ -148,7 +149,7 @@ void rejectsForgedLeaveRoom() {
             "forged leave should receive an error response");
 }
 
-void gameStartSnapshotSurvivesLaterRoomMutation() {
+void connectionCloseKeepsPlayerSessionForReconnect() {
     game::RoomService service;
     service.setSendFunc([](const game::TcpConnectionPtr&, const std::string&) {});
 
@@ -164,10 +165,47 @@ void gameStartSnapshotSurvivesLaterRoomMutation() {
     require(snapshot.valid, "game start snapshot should exist for a valid room");
     require(snapshot.players.size() == 2,
             "game start snapshot should keep the validated player list stable");
-    require(room->players.size() == 1,
-            "test setup should remove the disconnected player from live room state");
+    require(room->players.size() == 2,
+            "transient connection close should keep the disconnected player in live room state");
     require(snapshot.players[1].playerId == 10001,
             "game start snapshot should preserve the disconnected player's identity");
+    require(!room->players[1]->isConnected,
+            "closed connection should mark the session offline");
+    require(room->players[1]->conn == nullptr,
+            "closed connection should release the stale connection");
+    require(room->players[1]->disconnectedAtMs > 0,
+            "closed connection should record when the reconnect window started");
+    require(service.playerRooms_.find(10001) != service.playerRooms_.end(),
+            "closed connection should keep player to room lookup for reconnect");
+}
+
+void reconnectSessionBindsNewConnectionWithinWindow() {
+    game::RoomService service;
+    service.setSendFunc([](const game::TcpConnectionPtr&, const std::string&) {});
+
+    auto hostConn = fakeConn(11);
+    auto guestConn = fakeConn(12);
+    auto newGuestConn = fakeConn(13);
+    auto room = makeRoom(hostConn, guestConn);
+    installRoom(service, room);
+
+    service.onConnectionClosed(guestConn);
+
+    game::ReconnectSessionResult result;
+    require(service.reconnectSession("token-10001", newGuestConn, &result),
+            "valid session token inside the reconnect window should reconnect");
+    require(result.playerId == 10001,
+            "reconnect result should identify the restored player");
+    require(result.roomId == room->roomId,
+            "reconnect result should identify the restored room");
+    require(result.roomState.players_size() == 2,
+            "reconnect result should include the full room state");
+    require(room->players[1]->isConnected,
+            "reconnected session should be marked online");
+    require(room->players[1]->conn.get() == newGuestConn.get(),
+            "reconnected session should bind the new connection");
+    require(room->players[1]->disconnectedAtMs == 0,
+            "reconnected session should clear the disconnect timestamp");
 }
 
 void publicRoomBroadcastEncodesFrameOnceForAllRecipients() {
@@ -201,7 +239,8 @@ int main() {
     rejectsForgedReady();
     rejectsForgedStartGame();
     rejectsForgedLeaveRoom();
-    gameStartSnapshotSurvivesLaterRoomMutation();
+    connectionCloseKeepsPlayerSessionForReconnect();
+    reconnectSessionBindsNewConnectionWithinWindow();
     publicRoomBroadcastEncodesFrameOnceForAllRecipients();
     std::cout << "room_service_regression_test passed\n";
     return 0;

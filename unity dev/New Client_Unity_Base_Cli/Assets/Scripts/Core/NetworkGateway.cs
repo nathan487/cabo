@@ -6,6 +6,7 @@ using Game.Messages;
 using Game.Room;
 using Game.Game;
 using Game.Common;
+using Game.Sync;
 using Cabo.Client.Network;
 using UnityEngine;
 
@@ -25,6 +26,7 @@ namespace Cabo.Client
         private int isConnected;
         public bool IsConnected => Volatile.Read(ref isConnected) != 0;
         public long NextSeq => _nextSeq;
+        public long LastServerSeq { get; private set; }
         private long _nextSeq = 1;
 
         public event Action Connected;
@@ -56,6 +58,8 @@ namespace Cabo.Client
 
             foreach (var msg in drained)
             {
+                if (msg.ServerSeq > LastServerSeq)
+                    LastServerSeq = msg.ServerSeq;
                 beforeDispatch?.Invoke(msg);
                 dispatcher.Dispatch(msg);
                 MessageReceived?.Invoke(msg);
@@ -170,6 +174,32 @@ namespace Cabo.Client
             Send(new ClientMessage
             {
                 StartGameReq = new Game.Room.StartGameReq { RequestId = _nextSeq, PlayerId = playerId, RoomId = roomId }
+            });
+        }
+
+        public void SendReconnect(string sessionToken, long lastServerSeq)
+        {
+            Send(new ClientMessage
+            {
+                ReconnectReq = new ReconnectReq
+                {
+                    RequestId = _nextSeq,
+                    SessionToken = sessionToken ?? "",
+                    LastServerSeq = lastServerSeq
+                }
+            });
+        }
+
+        public void SendHeartbeat(long playerId)
+        {
+            Send(new ClientMessage
+            {
+                HeartbeatReq = new HeartbeatReq
+                {
+                    RequestId = _nextSeq,
+                    PlayerId = playerId,
+                    ClientTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                }
             });
         }
 
