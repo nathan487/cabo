@@ -120,6 +120,31 @@ namespace Cabo.Client.Tests
             }
         }
 
+        [Test]
+        public void NonSelfDrawReportsActiveTransientAnimationWhenMarkerMoves()
+        {
+            var host = new GameObject("CardTableViewDrawHost", typeof(RectTransform));
+            var view = CardTableView.Create(host.transform);
+
+            try
+            {
+                view.Render(CreateState(1, 2, 3, 4), CreateLayout(1, 2, 3, 4));
+
+                var action = new CardTableActionSnapshot
+                {
+                    ActionType = ActionType.Draw,
+                    SourcePlayerId = PlayerId + 1
+                };
+
+                Assert.IsTrue(view.PlayAction(action));
+                Assert.IsTrue(view.HasActiveTransientAnimation);
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
         static IEnumerator RunLayoutRefreshRoutine(CardTableView view)
         {
             var method = typeof(CardTableView).GetMethod("LayoutRefreshRoutine", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -182,6 +207,16 @@ namespace Cabo.Client.Tests
                     Value = values[i]
                 });
             }
+
+            layout.Slots.Add(new CardTableSlotLayout
+            {
+                PlayerId = PlayerId + 1,
+                SlotIndex = 0,
+                AnchoredPosition = new Vector2(120f, 300f),
+                Size = new Vector2(60f, 84f),
+                FaceUp = false,
+                Value = 0
+            });
             return layout;
         }
     }

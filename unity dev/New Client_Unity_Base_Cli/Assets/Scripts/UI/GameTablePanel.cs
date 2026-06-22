@@ -45,6 +45,7 @@ namespace Cabo.Client.UI
         const float PlaybackLayoutSettleDelay = 0.1f;
         const float SurvivorMoveStagger = 0f;
         const float TakeDiscardOutgoingDelay = 0.08f;
+        public const float PlaybackLayoutSettleDelaySeconds = PlaybackLayoutSettleDelay;
         static readonly CaboSfx[] NoActionSfx = Array.Empty<CaboSfx>();
         static readonly CaboSfx[] DrawActionSfx = { CaboSfx.Draw };
         static readonly CaboSfx[] DiscardActionSfx = { CaboSfx.Discard };
@@ -656,10 +657,22 @@ namespace Cabo.Client.UI
         }
 
         public bool HasPendingActionAnimation =>
-            (_flow != null && _flow.State.LastActionSequence > _lastAnimatedActionSequence)
+            HasPendingRevealBlockingAction()
             || Time.realtimeSinceStartup < _animationQueueUntil
             || _cardTableView.HasActiveTransientAnimation
             || _inspectionActive;
+
+        bool HasPendingRevealBlockingAction()
+        {
+            if (_flow == null || _flow.State.LastActionSequence <= _lastAnimatedActionSequence)
+                return false;
+
+            var state = _flow.State;
+            return ShouldBlockRevealForActionAnimation(
+                state.LastActionType,
+                state.LastActionSkill,
+                state.LastActionSwapOccurred);
+        }
 
         public void ForceCompletePendingActionAnimationForReveal()
         {
@@ -762,7 +775,13 @@ namespace Cabo.Client.UI
             if (state.LastActionSequence > _lastAnimatedActionSequence)
             {
                 _lastAnimatedActionSequence = state.LastActionSequence;
-                pendingAction = BuildActionAnimationSnapshot(state);
+                if (ShouldBlockRevealForActionAnimation(
+                    state.LastActionType,
+                    state.LastActionSkill,
+                    state.LastActionSwapOccurred))
+                {
+                    pendingAction = BuildActionAnimationSnapshot(state);
+                }
             }
 
             ResetSelectionWhenSubStateChanges(_flow.SubState);
@@ -2603,7 +2622,10 @@ namespace Cabo.Client.UI
             }
 
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
+            {
+                UseCardTableActiveStateAsRevealGate(action);
                 return;
+            }
 
             switch (action.ActionType)
             {
@@ -2626,6 +2648,14 @@ namespace Cabo.Client.UI
                     PlayCaboCallAnimation(action.SourcePlayerId);
                     break;
             }
+        }
+
+        void UseCardTableActiveStateAsRevealGate(ActionAnimationSnapshot action)
+        {
+            float minVisibleDuration = GetCardTableRevealGateMinimumDuration(action.ActionType, action.Skill);
+            _animationQueueUntil = minVisibleDuration > 0f
+                ? Time.realtimeSinceStartup + minVisibleDuration
+                : 0f;
         }
 
         void PlayActionSfx(ActionAnimationSnapshot action)
@@ -2792,6 +2822,64 @@ namespace Cabo.Client.UI
             }
         }
 
+        public static bool ShouldBlockRevealForActionAnimation(ActionType actionType, SkillType skill, bool swapOccurred)
+        {
+            switch (actionType)
+            {
+                case ActionType.Draw:
+                case ActionType.DiscardDrawn:
+                case ActionType.ReplaceWithDrawn:
+                case ActionType.TakeFromDiscard:
+                case ActionType.CallSteady:
+                    return true;
+                case ActionType.UseSkill:
+                    if (skill == SkillType.Swap)
+                        return swapOccurred;
+                    return skill == SkillType.PeekSelf || skill == SkillType.Spy;
+                default:
+                    return false;
+            }
+        }
+
+        public static float GetCardTableRevealGateMinimumDuration(ActionType actionType, SkillType skill)
+        {
+            return GetActionSpecialEffect(actionType, skill) == CaboSpecialEffect.None ? 0f : SpecialEffectDuration;
+        }
+
+        public static float GetEstimatedRevealBlockingActionDuration(
+            ActionType actionType,
+            SkillType skill,
+            bool swapOccurred,
+            bool sourceIsSelf)
+        {
+            if (actionType == ActionType.UseSkill && skill == SkillType.Spy)
+                return CardTableMoveDuration + CardTableFlipDuration + CardTableInspectHoldDuration + CardTableFlipDuration + CardTableMoveDuration;
+            if (actionType == ActionType.UseSkill && skill == SkillType.PeekSelf)
+            {
+                if (sourceIsSelf)
+                    return CardTableFlipDuration + CardTableInspectHoldDuration;
+                return CardTableMoveDuration + CardTableInspectHoldDuration + CardTableMoveDuration;
+            }
+            if (actionType == ActionType.UseSkill && skill == SkillType.Swap && swapOccurred)
+                return SwapEmptyHoldDuration + SwapMoveDuration + SwapSettleDuration;
+            if (actionType == ActionType.CallSteady)
+                return CaboCallDuration;
+            if (actionType == ActionType.ReplaceWithDrawn || actionType == ActionType.TakeFromDiscard)
+                return QuickMoveDuration + EmptySlotHoldDuration + AnimationSettleDuration;
+            if (actionType == ActionType.Draw || actionType == ActionType.DiscardDrawn)
+                return QuickMoveDuration + AnimationSettleDuration;
+            return 0f;
+        }
+
+        public static float LongestRevealBlockingActionDurationSeconds =>
+            Mathf.Max(
+                GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.Spy, false, false),
+                Mathf.Max(
+                    GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.PeekSelf, false, false),
+                    Mathf.Max(
+                        GetEstimatedRevealBlockingActionDuration(ActionType.UseSkill, SkillType.Swap, true, false),
+                        GetEstimatedRevealBlockingActionDuration(ActionType.CallSteady, SkillType.Unknown, false, false))));
+
         public static CaboSpecialEffect GetDrawnCardSpecialEffect(int value)
         {
             if (value == 0)
@@ -2903,7 +2991,10 @@ namespace Cabo.Client.UI
         void PlayDrawAction(ActionAnimationSnapshot action)
         {
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
+            {
+                UseCardTableActiveStateAsRevealGate(action);
                 return;
+            }
 
             var color = UITheme.SkillPeek;
             var start = CenterOf(action.DrawPileBounds);
@@ -3262,8 +3353,14 @@ namespace Cabo.Client.UI
             {
                 int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? action.PeekedValue : -1;
                 action.PeekedValue = privateValue;
-                if (!_cardTableView.PlayAction(ToCardTableAction(action)))
+                if (_cardTableView.PlayAction(ToCardTableAction(action)))
+                {
+                    UseCardTableActiveStateAsRevealGate(action);
+                }
+                else
+                {
                     PlaySpyCardInspection(action, privateValue, color);
+                }
                 return;
             }
 
@@ -3271,8 +3368,14 @@ namespace Cabo.Client.UI
             {
                 int privateValue = action.SourcePlayerId == _flow.State.MyPlayerId ? GetKnownOwnCardValue(action.SourceSlot, action.PeekedValue) : -1;
                 action.PeekedValue = privateValue;
-                if (!_cardTableView.PlayAction(ToCardTableAction(action)))
+                if (_cardTableView.PlayAction(ToCardTableAction(action)))
+                {
+                    UseCardTableActiveStateAsRevealGate(action);
+                }
+                else
+                {
                     PlayPeekSelfInspection(action, privateValue, color);
+                }
                 return;
             }
 
@@ -3426,14 +3529,20 @@ namespace Cabo.Client.UI
         void PlayPeekSelfInspection(ActionAnimationSnapshot action, int privateValue, Color color)
         {
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
+            {
+                UseCardTableActiveStateAsRevealGate(action);
                 return;
+            }
             PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
         }
 
         void PlaySpyCardInspection(ActionAnimationSnapshot action, int privateValue, Color color)
         {
             if (_cardTableView.PlayAction(ToCardTableAction(action)))
+            {
+                UseCardTableActiveStateAsRevealGate(action);
                 return;
+            }
             PulsePlayer(action.SourcePlayerId, color, FlipRevealDuration);
             PulsePlayer(action.TargetPlayerId, color, FlipRevealDuration);
         }

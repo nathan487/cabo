@@ -139,7 +139,7 @@ namespace Cabo.Client.UI.CardTable
         long _lastSecondFrozenPlayerId;
 
         public bool HasRenderableLayout { get; private set; }
-        public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0;
+        public bool HasActiveTransientAnimation => _animatingPlayers.Count > 0 || _movingDrawnMarkers.Count > 0;
 
         public bool TryGetCardFace(long playerId, int slotIndex, out bool faceUp, out int value)
         {

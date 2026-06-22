@@ -10,7 +10,11 @@ namespace Cabo.Client.UI
     /// </summary>
     public class UIManager : MonoBehaviour
     {
-        const float RevealAnimationDrainTimeout = 3.5f;
+        const float RevealAnimationDrainTimeoutMargin = 2.0f;
+        public static float RevealAnimationDrainTimeoutSeconds =>
+            GameTablePanel.LongestRevealBlockingActionDurationSeconds
+            + GameTablePanel.PlaybackLayoutSettleDelaySeconds
+            + RevealAnimationDrainTimeoutMargin;
 
         [SerializeField] public UIDocument uiDocument;
 
@@ -111,7 +115,7 @@ namespace Cabo.Client.UI
             if (_revealAnimationDrainStartedAt <= 0f)
                 _revealAnimationDrainStartedAt = Time.realtimeSinceStartup;
 
-            if (Time.realtimeSinceStartup - _revealAnimationDrainStartedAt >= RevealAnimationDrainTimeout)
+            if (Time.realtimeSinceStartup - _revealAnimationDrainStartedAt >= RevealAnimationDrainTimeoutSeconds)
             {
                 Debug.LogWarning("[UIManager] Reveal animation drain timed out; forcing settlement render.");
                 GameTablePanel.ForceCompletePendingActionAnimationForReveal();

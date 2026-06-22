@@ -56,6 +56,46 @@ namespace Cabo.Client.Tests
         }
 
         [Test]
+        public void RevealDrainTimeoutCoversLongestBlockingActionAnimation()
+        {
+            float longestAction = GameTablePanel.LongestRevealBlockingActionDurationSeconds
+                + GameTablePanel.PlaybackLayoutSettleDelaySeconds;
+
+            Assert.GreaterOrEqual(UIManager.RevealAnimationDrainTimeoutSeconds, longestAction);
+        }
+
+        [Test]
+        public void SkippedSkillActionDoesNotBlockSettlementReveal()
+        {
+            Assert.IsFalse(GameTablePanel.ShouldBlockRevealForActionAnimation(
+                ActionType.UseSkill,
+                SkillType.Unknown,
+                false));
+        }
+
+        [Test]
+        public void VisibleCardActionsBlockSettlementRevealUntilAnimationFinishes()
+        {
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.Draw, SkillType.Unknown, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.DiscardDrawn, SkillType.Unknown, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.ReplaceWithDrawn, SkillType.Unknown, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.TakeFromDiscard, SkillType.Unknown, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.UseSkill, SkillType.PeekSelf, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.UseSkill, SkillType.Spy, false));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.UseSkill, SkillType.Swap, true));
+            Assert.IsTrue(GameTablePanel.ShouldBlockRevealForActionAnimation(ActionType.CallSteady, SkillType.Unknown, false));
+        }
+
+        [Test]
+        public void SwapSkillWithoutSwapDoesNotBlockSettlementReveal()
+        {
+            Assert.IsFalse(GameTablePanel.ShouldBlockRevealForActionAnimation(
+                ActionType.UseSkill,
+                SkillType.Swap,
+                false));
+        }
+
+        [Test]
         public void ExtremeDrawValuesMapToSpecialEffects()
         {
             Assert.AreEqual(CaboSpecialEffect.LowSugarSpring, GameTablePanel.GetDrawnCardSpecialEffect(0));
