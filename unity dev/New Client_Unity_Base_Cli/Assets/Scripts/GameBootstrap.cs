@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using Cabo.Client.Art;
+using Cabo.Client.Platform;
 using Cabo.Client.UI;
 
 namespace Cabo.Client
@@ -57,6 +58,7 @@ namespace Cabo.Client
             _instance = this;
             DontDestroyOnLoad(gameObject);
             ConfigureMobileDisplay();
+            ConfigureStandaloneWindow();
         }
 
         void ConfigureMobileDisplay()
@@ -72,6 +74,14 @@ namespace Cabo.Client
             }
 #if UNITY_ANDROID && !UNITY_EDITOR
             Application.targetFrameRate = 60;
+#endif
+        }
+
+        void ConfigureStandaloneWindow()
+        {
+#if UNITY_STANDALONE_WIN && !UNITY_EDITOR
+            if (GetComponent<WindowsAspectRatioEnforcer>() == null)
+                gameObject.AddComponent<WindowsAspectRatioEnforcer>();
 #endif
         }
 
