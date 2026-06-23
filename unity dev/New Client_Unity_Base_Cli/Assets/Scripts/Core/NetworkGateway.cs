@@ -56,6 +56,8 @@ namespace Cabo.Client
 
             if (drained == null) return 0;
 
+            Debug.Log($"[NetworkGateway] Draining messages count={drained.Count}");
+
             foreach (var msg in drained)
             {
                 if (msg.ServerSeq > LastServerSeq)
@@ -437,8 +439,13 @@ namespace Cabo.Client
             try
             {
                 var msg = MessageCodec.DecodePayload(data);
+                int queuedCount;
                 lock (pendingMessages)
+                {
                     pendingMessages.Enqueue(msg);
+                    queuedCount = pendingMessages.Count;
+                }
+                Debug.Log($"[NetworkGateway] Queued {msg.PayloadCase} seq={msg.ServerSeq} pending={queuedCount}");
             }
             catch (Exception ex)
             {

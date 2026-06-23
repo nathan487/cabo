@@ -49,6 +49,7 @@ namespace Cabo.Client
         public const string DefaultServerAddress = "ws://127.0.0.1:8888";
         const float ReconnectWindowSeconds = 60f;
         const float ReconnectAttemptIntervalSeconds = 2f;
+        const float HeartbeatIntervalSeconds = 5f;
 
         string _nickname = "玩家";
         bool _running = true;
@@ -57,6 +58,7 @@ namespace Cabo.Client
         bool _reconnectRequestSent;
         float _reconnectStartedAt;
         float _nextReconnectAttemptAt;
+        float _nextHeartbeatAt;
         string _reconnectSessionToken = "";
         long _reconnectLastServerSeq;
 
@@ -689,6 +691,7 @@ namespace Cabo.Client
 
             // Drain all pending TCP messages before the state machine decides what UI/actions are valid.
             Gateway.DrainMessages(ProcessServerMessage);
+            TickHeartbeat();
 
             if (IsReconnecting)
             {
@@ -700,6 +703,17 @@ namespace Cabo.Client
 
             // Step 1: Check transitions
             CheckTransitions();
+        }
+
+        void TickHeartbeat()
+        {
+            if (!Gateway.IsConnected || Time.realtimeSinceStartup < _nextHeartbeatAt)
+                return;
+
+            _nextHeartbeatAt = Time.realtimeSinceStartup + HeartbeatIntervalSeconds;
+            long playerId = State.MyPlayerId > 0 ? State.MyPlayerId : State.LobbyPlayerId;
+            Gateway.SendHeartbeat(playerId);
+            Debug.Log($"[GameFlow] Heartbeat sent player={playerId} lastSeq={Gateway.LastServerSeq}");
         }
 
         bool CanBeginReconnect()

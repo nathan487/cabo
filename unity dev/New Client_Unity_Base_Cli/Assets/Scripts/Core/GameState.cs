@@ -388,6 +388,7 @@ namespace Cabo.Client
             RoomCode = rsp.RoomCode; SessionToken = rsp.SessionToken; Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
+            EnsureLocalRoomPlayer(MyPlayerId, true);
             Debug.Log($"[GameState] CreateRoomRsp room={RoomId} code={RoomCode} player={MyPlayerId}");
         }
 
@@ -404,6 +405,7 @@ namespace Cabo.Client
             Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
+            EnsureLocalRoomPlayer(MyPlayerId, false);
             Debug.Log($"[GameState] JoinRoomRsp room={RoomId} player={MyPlayerId} seat={rsp.SeatId}");
         }
 
@@ -599,6 +601,35 @@ namespace Cabo.Client
             MyPlayerId = notify.PlayerId;
             SessionToken = notify.SessionToken;
             Phase = GamePhase.WaitingRoom;
+            EnsureLocalRoomPlayer(MyPlayerId, false);
+        }
+
+        void EnsureLocalRoomPlayer(long playerId, bool isHost)
+        {
+            if (playerId <= 0)
+                return;
+
+            foreach (var player in Players)
+            {
+                if (player.PlayerId != playerId)
+                    continue;
+
+                player.IsHost = player.IsHost || isHost;
+                player.IsConnected = true;
+                if (string.IsNullOrWhiteSpace(player.CharacterId))
+                    player.CharacterId = ResolveIncomingCharacterId(playerId, "");
+                return;
+            }
+
+            Players.Add(new PlayerInfo
+            {
+                PlayerId = playerId,
+                Nickname = "你",
+                CharacterId = ResolveIncomingCharacterId(playerId, ""),
+                SeatId = 0,
+                IsHost = isHost,
+                IsConnected = true
+            });
         }
 
         static RoomSummaryInfo ToRoomSummaryInfo(RoomSummary room)

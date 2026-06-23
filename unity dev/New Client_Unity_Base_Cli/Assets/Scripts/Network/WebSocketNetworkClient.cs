@@ -51,7 +51,7 @@ namespace Cabo.Client.Network
 
                 state = NetworkClientState.Connecting;
                 socket = new ClientWebSocket();
-                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(10);
                 ws = socket;
             }
 
@@ -176,7 +176,7 @@ namespace Cabo.Client.Network
                     WebSocketReceiveResult result;
                     do
                     {
-                        result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                        result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
                         if (result.MessageType == WebSocketMessageType.Close)
                             break;
 
@@ -191,7 +191,10 @@ namespace Cabo.Client.Network
                         break;
 
                     if (messageBuffer.Count > 0)
+                    {
+                        Debug.Log($"[WebSocketNetworkClient] Received binary message bytes={messageBuffer.Count}");
                         DataReceived?.Invoke(messageBuffer.ToArray());
+                    }
                 }
             }
             catch (OperationCanceledException) { }
