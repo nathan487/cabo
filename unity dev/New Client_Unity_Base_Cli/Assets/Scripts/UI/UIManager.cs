@@ -30,6 +30,9 @@ namespace Cabo.Client.UI
         System.Action<Game.Messages.ServerMessage> _messageReceivedHandler;
         bool _waitingForRevealAnimationDrain;
         float _revealAnimationDrainStartedAt;
+        Rect _lastSafeArea;
+        int _lastScreenWidth;
+        int _lastScreenHeight;
 
         void Awake()
         {
@@ -91,11 +94,13 @@ namespace Cabo.Client.UI
             flow.Gateway.MessageReceived += _messageReceivedHandler;
 
             // Initial render
+            ApplySafeAreaPadding();
             OnStateChanged();
         }
 
         void Update()
         {
+            ApplySafeAreaPadding();
             if (!_waitingForRevealAnimationDrain || _flow == null || GameTablePanel == null)
                 return;
 
@@ -132,6 +137,7 @@ namespace Cabo.Client.UI
 
         void OnStateChanged()
         {
+            ApplySafeAreaPadding();
             var state = _flow.State;
             Debug.Log($"[UIManager] OnStateChanged: phase={state.Phase}, flow={_flow.Flow}, players={state.Players.Count}, room={state.RoomCode}");
 
@@ -170,6 +176,35 @@ namespace Cabo.Client.UI
             UpdateReconnectOverlay();
 
             ApplyRuntimeUiFallback();
+        }
+
+        void ApplySafeAreaPadding()
+        {
+            if (Root == null || Screen.width <= 0 || Screen.height <= 0)
+                return;
+
+            var safeArea = Screen.safeArea;
+            if (safeArea == _lastSafeArea
+                && Screen.width == _lastScreenWidth
+                && Screen.height == _lastScreenHeight)
+            {
+                return;
+            }
+
+            float panelWidth = Root.resolvedStyle.width > 1f ? Root.resolvedStyle.width : Screen.width;
+            float panelHeight = Root.resolvedStyle.height > 1f ? Root.resolvedStyle.height : Screen.height;
+            float scaleX = panelWidth / Screen.width;
+            float scaleY = panelHeight / Screen.height;
+
+            Root.style.paddingLeft = Mathf.Max(0f, safeArea.xMin * scaleX);
+            Root.style.paddingRight = Mathf.Max(0f, (Screen.width - safeArea.xMax) * scaleX);
+            Root.style.paddingTop = Mathf.Max(0f, (Screen.height - safeArea.yMax) * scaleY);
+            Root.style.paddingBottom = Mathf.Max(0f, safeArea.yMin * scaleY);
+
+            _lastSafeArea = safeArea;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            Debug.Log($"[UIManager] SafeArea screen={Screen.width}x{Screen.height} safe={safeArea} padding=({Root.style.paddingLeft.value.value},{Root.style.paddingTop.value.value},{Root.style.paddingRight.value.value},{Root.style.paddingBottom.value.value})");
         }
 
         void CreateBackgroundLayer()

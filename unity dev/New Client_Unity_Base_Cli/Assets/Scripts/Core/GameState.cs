@@ -378,25 +378,33 @@ namespace Cabo.Client
 
         void HandleCreateRoom(CreateRoomRsp rsp)
         {
-            if (rsp.Error?.Code != 0) return;
+            if (rsp.Error?.Code != 0)
+            {
+                Debug.LogWarning($"[GameState] CreateRoomRsp error code={rsp.Error?.Code} message={rsp.Error?.Message}");
+                return;
+            }
             ClearRoomBrowserState();
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             RoomCode = rsp.RoomCode; SessionToken = rsp.SessionToken; Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
-            Debug.Log($"[GameState] CreateRoom: {RoomCode} player={MyPlayerId}");
+            Debug.Log($"[GameState] CreateRoomRsp room={RoomId} code={RoomCode} player={MyPlayerId}");
         }
 
         void HandleJoinRoom(JoinRoomRsp rsp)
         {
-            if (rsp.Error?.Code != 0) return;
+            if (rsp.Error?.Code != 0)
+            {
+                Debug.LogWarning($"[GameState] JoinRoomRsp error code={rsp.Error?.Code} message={rsp.Error?.Message}");
+                return;
+            }
             ClearRoomBrowserState();
             RoomId = rsp.RoomId; MyPlayerId = rsp.PlayerId;
             SessionToken = rsp.SessionToken;
             Phase = GamePhase.WaitingRoom;
             if (_hasRequestedCharacterId)
                 RememberCharacterId(MyPlayerId, _requestedCharacterId);
-            Debug.Log($"[GameState] JoinRoom: {RoomId} player={MyPlayerId}");
+            Debug.Log($"[GameState] JoinRoomRsp room={RoomId} player={MyPlayerId} seat={rsp.SeatId}");
         }
 
         void HandleLeaveRoom(LeaveRoomRsp rsp)
@@ -409,6 +417,7 @@ namespace Cabo.Client
         {
             var room = notify.Room;
             if (room == null) return;
+            Debug.Log($"[GameState] RoomStateNotify notifyRoom={notify.RoomId} room={room.RoomId} code={room.RoomCode} players={room.Players.Count} phase={Phase}");
             RoomId = room.RoomId; RoomCode = room.RoomCode;
             MaxPlayers = room.MaxPlayers > 0 ? room.MaxPlayers : 4;
 
@@ -434,6 +443,7 @@ namespace Cabo.Client
                     SeatId = p.SeatId, IsReady = p.IsReady,
                     IsHost = p.IsHost, IsConnected = p.IsConnected, TotalScore = p.TotalScore
                 });
+            Debug.Log($"[GameState] RoomState applied room={RoomId} players={Players.Count}/{MaxPlayers}");
         }
 
         void HandleEnterLobby(EnterLobbyRsp rsp)
@@ -465,12 +475,14 @@ namespace Cabo.Client
             if (rsp.Error?.Code != 0)
             {
                 LastRoomAccessError = rsp.Error?.Message ?? "获取房间列表失败";
+                Debug.LogWarning($"[GameState] ListRoomsRsp error code={rsp.Error?.Code} message={rsp.Error?.Message}");
                 return;
             }
 
             RoomSummaries.Clear();
             foreach (var room in rsp.Rooms)
                 RoomSummaries.Add(ToRoomSummaryInfo(room));
+            Debug.Log($"[GameState] ListRoomsRsp rooms={RoomSummaries.Count}");
         }
 
         void HandleRoomList(RoomListNotify notify)
@@ -480,6 +492,7 @@ namespace Cabo.Client
                 return;
             foreach (var room in notify.Rooms)
                 RoomSummaries.Add(ToRoomSummaryInfo(room));
+            Debug.Log($"[GameState] RoomListNotify rooms={RoomSummaries.Count}");
         }
 
         void HandleOnlineLobbyPlayers(OnlineLobbyPlayersNotify notify)
@@ -555,6 +568,7 @@ namespace Cabo.Client
                     CreatedTimeMs = item.CreatedTimeMs
                 });
             }
+            Debug.Log($"[GameState] RoomAccessInboxNotify items={AccessInboxItems.Count}");
         }
 
         void HandleRoomAccessDecision(RoomAccessDecisionNotify notify)
@@ -780,8 +794,11 @@ namespace Cabo.Client
         {
             var pj = notify.Player;
             if (pj != null)
+            {
                 UpsertPlayer(pj.PlayerId, pj.Nickname, pj.CharacterId, pj.SeatId,
                     pj.IsReady, pj.IsHost, pj.TotalScore);
+                Debug.Log($"[GameState] PlayerJoinNotify room={notify.RoomId} player={pj.PlayerId} players={Players.Count}");
+            }
         }
 
         void HandlePlayerLeave(PlayerLeaveNotify notify)
@@ -804,13 +821,19 @@ namespace Cabo.Client
         {
             var p = Players.Find(x => x.PlayerId == notify.PlayerId);
             if (p != null) p.IsReady = notify.IsReady;
+            Debug.Log($"[GameState] PlayerReadyNotify room={notify.RoomId} player={notify.PlayerId} ready={notify.IsReady} known={p != null}");
         }
 
         void HandleReady(ReadyRsp rsp)
         {
-            if (rsp.Error?.Code != 0) return;
+            if (rsp.Error?.Code != 0)
+            {
+                Debug.LogWarning($"[GameState] ReadyRsp error code={rsp.Error?.Code} message={rsp.Error?.Message}");
+                return;
+            }
             var me = Players.Find(x => x.PlayerId == MyPlayerId);
             if (me != null) me.IsReady = rsp.IsReady;
+            Debug.Log($"[GameState] ReadyRsp player={MyPlayerId} ready={rsp.IsReady} known={me != null}");
         }
 
         void HandleStartGame(StartGameRsp rsp)

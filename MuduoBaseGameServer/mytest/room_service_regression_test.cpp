@@ -23,6 +23,8 @@ void require(bool condition, const std::string& message) {
     }
 }
 
+::game::messages::ServerMessage decodeFrame(const std::string& frame);
+
 std::shared_ptr<game::PlayerSession> player(int64_t playerId,
                                              int32_t seat,
                                              const game::TcpConnectionPtr& conn,
@@ -92,6 +94,19 @@ int countAccessRecordsWithStatus(
     for (const auto& kv : service.accessRecords_) {
         if (kv.second.status == status)
             ++count;
+    }
+    return count;
+}
+
+int countRoomsInSentRoomList(const std::vector<std::string>& sentFrames) {
+    int count = 0;
+    for (const auto& frame : sentFrames) {
+        auto msg = decodeFrame(frame);
+        if (msg.payload_case() == ::game::messages::ServerMessage::kListRoomsRsp) {
+            count += msg.list_rooms_rsp().rooms_size();
+        } else if (msg.payload_case() == ::game::messages::ServerMessage::kRoomListNotify) {
+            count += msg.room_list_notify().rooms_size();
+        }
     }
     return count;
 }
@@ -474,6 +489,124 @@ void pendingAccessRecordsExpireWhenRoomStarts() {
             "starting a room should expire both applications and invitations");
 }
 
+void emptyWaitingRoomsAreHiddenFromRoomLists() {
+    game::RoomService service;
+    std::vector<std::string> sentFrames;
+    service.setSendFunc([&](const game::TcpConnectionPtr&, const std::string& frame) {
+        sentFrames.push_back(frame);
+    });
+
+    auto hostConn = fakeConn(51);
+    auto guestConn = fakeConn(52);
+    auto lobbyConn = fakeConn(53);
+    auto room = makeRoom(hostConn, guestConn);
+    room->players.clear();
+    room->hostPlayerId = 0;
+    installRoom(service, room);
+
+    ::game::messages::ClientMessage listMsg;
+    listMsg.mutable_list_rooms_req()->set_request_id(191);
+    service.handleListRooms(lobbyConn, listMsg);
+
+    require(countRoomsInSentRoomList(sentFrames) == 0,
+            "empty waiting rooms must not be returned by explicit room list requests");
+}
+
+void finalExplicitLeaveDestroysRoomAndExpiresPendingAccess() {
+    game::RoomService service;
+    service.setSendFunc([](const game::TcpConnectionPtr&, const std::string&) {});
+
+    auto hostConn = fakeConn(54);
+    auto guestConn = fakeConn(55);
+    auto applicantConn = fakeConn(56);
+    auto room = makeRoom(hostConn, guestConn);
+    room->maxPlayers = 4;
+    installRoom(service, room);
+
+    enterLobby(service, applicantConn, 201, "Applicant");
+    int64_t lobbyPlayerId = lobbyPlayerIdForConn(service, applicantConn);
+
+    ::game::messages::ClientMessage applyMsg;
+    auto* apply = applyMsg.mutable_apply_join_room_req();
+    apply->set_request_id(202);
+    apply->set_lobby_player_id(lobbyPlayerId);
+    apply->set_room_id(room->roomId);
+    service.handleApplyJoinRoom(applicantConn, applyMsg);
+
+    require(countAccessRecordsWithStatus(
+                service, ::game::room::ROOM_ACCESS_STATUS_PENDING) == 1,
+            "test setup should create a pending application for the room");
+
+    ::game::messages::ClientMessage guestLeave;
+    auto* guestReq = guestLeave.mutable_leave_room_req();
+    guestReq->set_request_id(203);
+    guestReq->set_player_id(10001);
+    guestReq->set_room_id(room->roomId);
+    service.handleLeaveRoom(guestConn, guestLeave);
+
+    require(service.rooms_.find(room->roomId) != service.rooms_.end(),
+            "room should remain while the host is still present");
+
+    ::game::messages::ClientMessage hostLeave;
+    auto* hostReq = hostLeave.mutable_leave_room_req();
+    hostReq->set_request_id(204);
+    hostReq->set_player_id(10000);
+    hostReq->set_room_id(room->roomId);
+    service.handleLeaveRoom(hostConn, hostLeave);
+
+    require(service.rooms_.find(room->roomId) == service.rooms_.end(),
+            "last explicit room leave should destroy the empty room");
+    require(service.playerRooms_.find(10000) == service.playerRooms_.end(),
+            "last explicit room leave should clear host room lookup");
+    require(service.playerRooms_.find(10001) == service.playerRooms_.end(),
+            "last explicit room leave should keep prior leaver lookup cleared");
+    require(countAccessRecordsWithStatus(
+                service, ::game::room::ROOM_ACCESS_STATUS_PENDING) == 0,
+            "destroying an empty room should clear pending access records");
+    require(countAccessRecordsWithStatus(
+                service, ::game::room::ROOM_ACCESS_STATUS_EXPIRED) == 1,
+            "destroying an empty room should expire pending access records");
+}
+
+void staleRoomCodeCannotCreateApplicationAfterRoomDestroyed() {
+    game::RoomService service;
+    service.setSendFunc([](const game::TcpConnectionPtr&, const std::string&) {});
+
+    auto hostConn = fakeConn(57);
+    auto guestConn = fakeConn(58);
+    auto applicantConn = fakeConn(59);
+    auto room = makeRoom(hostConn, guestConn);
+    const std::string oldRoomCode = room->roomCode;
+    installRoom(service, room);
+
+    ::game::messages::ClientMessage guestLeave;
+    auto* guestReq = guestLeave.mutable_leave_room_req();
+    guestReq->set_request_id(211);
+    guestReq->set_player_id(10001);
+    guestReq->set_room_id(room->roomId);
+    service.handleLeaveRoom(guestConn, guestLeave);
+
+    ::game::messages::ClientMessage hostLeave;
+    auto* hostReq = hostLeave.mutable_leave_room_req();
+    hostReq->set_request_id(212);
+    hostReq->set_player_id(10000);
+    hostReq->set_room_id(room->roomId);
+    service.handleLeaveRoom(hostConn, hostLeave);
+
+    enterLobby(service, applicantConn, 213, "LateApplicant");
+    int64_t lobbyPlayerId = lobbyPlayerIdForConn(service, applicantConn);
+
+    ::game::messages::ClientMessage applyMsg;
+    auto* apply = applyMsg.mutable_apply_join_room_req();
+    apply->set_request_id(214);
+    apply->set_lobby_player_id(lobbyPlayerId);
+    apply->set_room_code(oldRoomCode);
+    service.handleApplyJoinRoom(applicantConn, applyMsg);
+
+    require(service.accessRecords_.empty(),
+            "stale room code must not create a pending join application");
+}
+
 void rejectsForgedReady() {
     game::RoomService service;
     std::vector<std::string> sentFrames;
@@ -654,6 +787,9 @@ int main() {
     pendingApplicationExpiresIfRoomFillsBeforeApproval();
     pendingInvitationExpiresIfRoomStartsBeforeAcceptance();
     pendingAccessRecordsExpireWhenRoomStarts();
+    emptyWaitingRoomsAreHiddenFromRoomLists();
+    finalExplicitLeaveDestroysRoomAndExpiresPendingAccess();
+    staleRoomCodeCannotCreateApplicationAfterRoomDestroyed();
     rejectsForgedReady();
     rejectsForgedStartGame();
     rejectsForgedLeaveRoom();

@@ -88,6 +88,7 @@ namespace Cabo.Client
 
         public async void Connect(string url, string nickname = null)
         {
+            Debug.Log($"[GameFlow] Connect requested url={url}");
             if (Gateway.IsConnected)
             {
                 _wasConnected = false;
@@ -436,8 +437,9 @@ namespace Cabo.Client
             var previousFlow = Flow;
             var previousPhase = State.Phase;
 
-            Debug.Log($"[GameFlow] ProcessServerMessage {msg.PayloadCase}");
+            Debug.Log($"[GameFlow] <= {msg.PayloadCase} seq={msg.ServerSeq} before flow={Flow} phase={State.Phase} room={State.RoomId} my={State.MyPlayerId} players={State.Players.Count} address={ConnectedAddress}");
             State.UpdateFromMessage(msg);
+            Debug.Log($"[GameFlow] <= {msg.PayloadCase} after flow={Flow} phase={State.Phase} room={State.RoomId} my={State.MyPlayerId} players={State.Players.Count} rooms={State.RoomSummaries.Count} inbox={State.AccessInboxItems.Count}");
 
             if (IsReconnecting)
             {

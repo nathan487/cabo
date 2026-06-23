@@ -56,6 +56,23 @@ namespace Cabo.Client
 
             _instance = this;
             DontDestroyOnLoad(gameObject);
+            ConfigureMobileDisplay();
+        }
+
+        void ConfigureMobileDisplay()
+        {
+            Screen.autorotateToPortrait = false;
+            Screen.autorotateToPortraitUpsideDown = false;
+            Screen.autorotateToLandscapeLeft = true;
+            Screen.autorotateToLandscapeRight = true;
+            if (Screen.orientation == ScreenOrientation.Portrait
+                || Screen.orientation == ScreenOrientation.PortraitUpsideDown)
+            {
+                Screen.orientation = ScreenOrientation.LandscapeLeft;
+            }
+#if UNITY_ANDROID && !UNITY_EDITOR
+            Application.targetFrameRate = 60;
+#endif
         }
 
         void Start()

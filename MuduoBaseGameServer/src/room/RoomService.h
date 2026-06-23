@@ -191,11 +191,14 @@ private:
     std::shared_ptr<Room> findRoomByCode(const std::string& roomCode) const;
     std::shared_ptr<LobbyPlayer> findLobbyPlayerForConnection(int64_t lobbyPlayerId,
                                                               const TcpConnectionPtr& conn) const;
+    bool hasOnlineHost(const Room& room) const;
+    bool isListableRoom(const Room& room) const;
     bool isRoomJoinable(const Room& room, std::string* errorMessage = nullptr) const;
     std::string hostNickname(const Room& room) const;
     void removeLobbyPlayer(int64_t lobbyPlayerId);
     void expireLobbyAccessRecords(int64_t lobbyPlayerId);
     void expireRoomAccessRecords(int64_t roomId);
+    void destroyRoom(int64_t roomId);
     void sendRoomListTo(const TcpConnectionPtr& conn);
     void broadcastRoomListToLobby();
     void broadcastOnlineLobbyPlayers();

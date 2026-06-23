@@ -192,23 +192,35 @@ std::shared_ptr<LobbyPlayer> RoomService::findLobbyPlayerForConnection(
     return it->second;
 }
 
+bool RoomService::hasOnlineHost(const Room& room) const {
+    for (const auto& p : room.players) {
+        if (p->playerId == room.hostPlayerId && p->isConnected) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool RoomService::isListableRoom(const Room& room) const {
+    return room.state == ::game::common::ROOM_STATE_WAITING
+        && !room.players.empty()
+        && hasOnlineHost(room);
+}
+
 bool RoomService::isRoomJoinable(const Room& room, std::string* errorMessage) const {
     if (room.state != ::game::common::ROOM_STATE_WAITING) {
         if (errorMessage) *errorMessage = "Game already in progress";
+        return false;
+    }
+    if (room.players.empty()) {
+        if (errorMessage) *errorMessage = "Room is closed";
         return false;
     }
     if (static_cast<int>(room.players.size()) >= room.maxPlayers) {
         if (errorMessage) *errorMessage = "Room is full";
         return false;
     }
-    bool hostOnline = false;
-    for (const auto& p : room.players) {
-        if (p->playerId == room.hostPlayerId && p->isConnected) {
-            hostOnline = true;
-            break;
-        }
-    }
-    if (!hostOnline) {
+    if (!hasOnlineHost(room)) {
         if (errorMessage) *errorMessage = "Host is offline";
         return false;
     }
@@ -326,7 +338,7 @@ void RoomService::sendRoomListTo(const TcpConnectionPtr& conn) {
     auto* notify = msg.mutable_room_list_notify();
     for (const auto& kv : rooms_) {
         const auto& room = kv.second;
-        if (!room || room->state != ::game::common::ROOM_STATE_WAITING)
+        if (!room || !isListableRoom(*room))
             continue;
         fillRoomSummary(*room, notify->add_rooms());
     }
@@ -436,6 +448,18 @@ void RoomService::expireRoomAccessRecords(int64_t roomId) {
             record.status = ::game::room::ROOM_ACCESS_STATUS_EXPIRED;
         }
     }
+}
+
+void RoomService::destroyRoom(int64_t roomId) {
+    expireRoomAccessRecords(roomId);
+    for (auto it = playerRooms_.begin(); it != playerRooms_.end();) {
+        const auto& room = it->second;
+        if (room && room->roomId == roomId)
+            it = playerRooms_.erase(it);
+        else
+            ++it;
+    }
+    rooms_.erase(roomId);
 }
 
 void RoomService::removeLobbyPlayer(int64_t lobbyPlayerId) {
@@ -814,7 +838,7 @@ void RoomService::handleListRooms(const TcpConnectionPtr& conn,
     rsp->mutable_error()->set_code(0);
     for (const auto& kv : rooms_) {
         const auto& room = kv.second;
-        if (!room || room->state != ::game::common::ROOM_STATE_WAITING)
+        if (!room || !isListableRoom(*room))
             continue;
         fillRoomSummary(*room, rsp->add_rooms());
     }
@@ -1137,7 +1161,7 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
 
     if (!room) return false;
 
-    int64_t newHostId = 0;
+    bool destroyEmptyRoom = false;
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         auto& players = room->players;
@@ -1161,8 +1185,8 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
         if (playerId == room->hostPlayerId && !players.empty()) {
             players[0]->isHost = true;
             room->hostPlayerId = players[0]->playerId;
-            newHostId = players[0]->playerId;
         }
+        destroyEmptyRoom = players.empty();
     }
 
     // LeaveRoomRsp
@@ -1172,10 +1196,14 @@ bool RoomService::handleLeaveRoom(const TcpConnectionPtr& conn,
     rsp->mutable_error()->set_code(0);
     sendTo(conn, rspMsg);
 
-    // Broadcast updated room state to remaining players
-    for (auto& p : room->players) {
-        if (p->conn && p->isConnected)
-            sendRoomState(room->roomId, p->conn);
+    if (destroyEmptyRoom) {
+        destroyRoom(room->roomId);
+    } else {
+        // Broadcast updated room state to remaining players
+        for (auto& p : room->players) {
+            if (p->conn && p->isConnected)
+                sendRoomState(room->roomId, p->conn);
+        }
     }
     broadcastRoomListToLobby();
     broadcastOnlineLobbyPlayers();
