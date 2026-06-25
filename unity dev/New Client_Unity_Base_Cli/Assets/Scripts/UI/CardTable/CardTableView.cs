@@ -1358,13 +1358,6 @@ namespace Cabo.Client.UI.CardTable
             PlaceCard(sourceCard, sourceSlot);
             PlaceCard(targetCard, targetSlot);
 
-            var sharedSize = GetActionDisplaySize(sourceSlot.Size, targetSlot.Size);
-            if (sharedSize.x > 1f && sharedSize.y > 1f)
-            {
-                sourceCard.SetSize(sharedSize);
-                targetCard.SetSize(sharedSize);
-            }
-
             BringTransientCardsToFront();
             FlipForSwapDestination(sourceCard, action.TargetPlayerId, action.TargetSlot);
             FlipForSwapDestination(targetCard, action.SourcePlayerId, action.SourceSlot);
@@ -1457,7 +1450,6 @@ namespace Cabo.Client.UI.CardTable
             TrackTransient(card);
             var start = slot != null ? slot.RectTransform.anchoredPosition : card.RectTransform.anchoredPosition;
             var size = slot != null ? slot.RectTransform.sizeDelta : card.RectTransform.sizeDelta;
-            size = GetInspectionDisplaySize(size);
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
             card.ShowBack();
@@ -1513,7 +1505,6 @@ namespace Cabo.Client.UI.CardTable
             TrackTransient(card);
             var start = slot != null ? slot.RectTransform.anchoredPosition : card.RectTransform.anchoredPosition;
             var size = slot != null ? slot.RectTransform.sizeDelta : card.RectTransform.sizeDelta;
-            size = GetInspectionDisplaySize(size);
             bool wasOriginallyFaceUp = card.FaceUp;
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
