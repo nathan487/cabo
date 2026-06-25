@@ -35,6 +35,7 @@ namespace Cabo.Client.UI
         const float CardTableFlipDuration = 0.18f;
         const float CaboCallDuration = 1.20f;
         const float SpecialEffectDuration = 1.20f;
+        const int SpecialEffectOverlaySortingOrder = 360;
         const float AnimationSettleDuration = 0.25f;
         const float EmptyOriginHoldDuration = 0.20f;
         const float SurvivorMoveDuration = 0.48f;
@@ -122,6 +123,9 @@ namespace Cabo.Client.UI
         readonly VisualElement _rulesOverlay;
         readonly VisualElement _animationLayer;
         readonly CardTableView _cardTableView;
+        Canvas _specialEffectOverlayCanvas;
+        RectTransform _specialEffectOverlayRoot;
+        readonly List<GameObject> _specialEffectOverlayItems = new();
         SettlementStageRuntime _settlementStage;
         TableCharacterRuntime _tableCharacterStage;
         readonly List<SettlementScoreRowView> _settlementScoreRows = new();
@@ -271,6 +275,7 @@ namespace Cabo.Client.UI
 
             _cardTableView = CardTableView.Create(ownerTransform);
             _cardTableView.SetVisible(false);
+            CreateSpecialEffectOverlay(ownerTransform);
 
             _geometryChangedHandler = _ => ScheduleLayoutRefresh();
             _root.RegisterCallback(_geometryChangedHandler);
@@ -557,6 +562,43 @@ namespace Cabo.Client.UI
             _endGameModalOverlay.BringToFront();
         }
 
+        void CreateSpecialEffectOverlay(Transform ownerTransform)
+        {
+            var go = new GameObject("SpecialEffectOverlay", typeof(RectTransform), typeof(Canvas), typeof(CanvasGroup));
+            if (ownerTransform != null)
+                go.transform.SetParent(ownerTransform, false);
+
+            _specialEffectOverlayRoot = go.GetComponent<RectTransform>();
+            _specialEffectOverlayRoot.anchorMin = Vector2.zero;
+            _specialEffectOverlayRoot.anchorMax = Vector2.one;
+            _specialEffectOverlayRoot.offsetMin = Vector2.zero;
+            _specialEffectOverlayRoot.offsetMax = Vector2.zero;
+
+            _specialEffectOverlayCanvas = go.GetComponent<Canvas>();
+            _specialEffectOverlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _specialEffectOverlayCanvas.sortingOrder = SpecialEffectOverlaySortingOrder;
+
+            var group = go.GetComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+        }
+
+        void ClearSpecialEffectOverlay()
+        {
+            for (int i = _specialEffectOverlayItems.Count - 1; i >= 0; i--)
+                DestroySpecialEffectItem(_specialEffectOverlayItems[i]);
+            _specialEffectOverlayItems.Clear();
+        }
+
+        void DestroySpecialEffectItem(GameObject item)
+        {
+            if (item == null)
+                return;
+
+            _specialEffectOverlayItems.Remove(item);
+            DestroyRuntimeGameObject(item);
+        }
+
         VisualElement CreateRulesOverlay()
         {
             var overlay = new VisualElement { name = "RulesOverlay" };
@@ -649,6 +691,9 @@ namespace Cabo.Client.UI
                 _root.UnregisterCallback(_geometryChangedHandler);
             _container?.RemoveFromHierarchy();
             _animationLayer?.RemoveFromHierarchy();
+            ClearSpecialEffectOverlay();
+            if (_specialEffectOverlayCanvas != null)
+                DestroyRuntimeGameObject(_specialEffectOverlayCanvas.gameObject);
             _endGameButton?.RemoveFromHierarchy();
             _endGameModalOverlay?.RemoveFromHierarchy();
             if (_cardTableView != null)
@@ -2616,6 +2661,7 @@ namespace Cabo.Client.UI
             _heldDiscardSequence = 0;
             _uiActionQueued = false;
             _animationLayer.Clear();
+            ClearSpecialEffectOverlay();
             _cardTableView.ClearTransient();
             _inspectionActive = false;
             _inspectionEndsAt = 0f;
@@ -2742,6 +2788,9 @@ namespace Cabo.Client.UI
             if (sprite == null)
                 return;
 
+            if (PlaySpecialEffectOverlayCanvas(cue, sprite, worldCenter, maxPixelSize))
+                return;
+
             var rootBounds = _root.worldBound;
             if (rootBounds.width <= 20f || rootBounds.height <= 20f)
                 return;
@@ -2836,6 +2885,104 @@ namespace Cabo.Client.UI
             }).Every(16);
         }
 
+        bool PlaySpecialEffectOverlayCanvas(CaboSpecialEffect cue, Sprite sprite, Vector2 worldCenter, float maxPixelSize)
+        {
+            if (_specialEffectOverlayRoot == null || _specialEffectOverlayCanvas == null)
+                return false;
+
+            var overlayPosition = WorldPointToOverlayPosition(worldCenter);
+            if (!IsFinite(overlayPosition))
+                return false;
+
+            var generation = _animationGeneration;
+            var host = new GameObject($"SpecialEffect_{cue}", typeof(RectTransform), typeof(CanvasGroup));
+            host.transform.SetParent(_specialEffectOverlayRoot, false);
+            _specialEffectOverlayItems.Add(host);
+
+            var hostRect = host.GetComponent<RectTransform>();
+            hostRect.anchorMin = new Vector2(0.5f, 0.5f);
+            hostRect.anchorMax = new Vector2(0.5f, 0.5f);
+            hostRect.pivot = new Vector2(0.5f, 0.5f);
+
+            var group = host.GetComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+            group.alpha = 0f;
+
+            var art = new GameObject("Art", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            art.transform.SetParent(host.transform, false);
+            var artRect = art.GetComponent<RectTransform>();
+            artRect.anchorMin = new Vector2(0.5f, 0.5f);
+            artRect.anchorMax = new Vector2(0.5f, 0.5f);
+            artRect.pivot = new Vector2(0.5f, 0.5f);
+            var artImage = art.GetComponent<UnityEngine.UI.Image>();
+            artImage.sprite = sprite;
+            artImage.preserveAspect = true;
+            artImage.raycastTarget = false;
+
+            var label = new GameObject("Label", typeof(RectTransform), typeof(UnityEngine.UI.Text));
+            label.transform.SetParent(host.transform, false);
+            var labelRect = label.GetComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.5f, 0.5f);
+            labelRect.anchorMax = new Vector2(0.5f, 0.5f);
+            labelRect.pivot = new Vector2(0.5f, 0.5f);
+            var labelText = label.GetComponent<UnityEngine.UI.Text>();
+            labelText.text = GetSpecialEffectLabel(cue);
+            labelText.alignment = TextAnchor.MiddleCenter;
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.fontSize = 24;
+            labelText.color = GetSpecialEffectLabelColor(cue);
+            labelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            labelText.raycastTarget = false;
+
+            float startedAt = Time.realtimeSinceStartup;
+            IVisualElementScheduledItem item = null;
+            item = _root.schedule.Execute(() =>
+            {
+                if (generation != _animationGeneration || host == null || !host)
+                {
+                    item?.Pause();
+                    DestroySpecialEffectItem(host);
+                    return;
+                }
+
+                var rootBounds = _root?.worldBound ?? Rect.zero;
+                if (!HasUsableBounds(rootBounds))
+                    return;
+
+                float maxSize = Mathf.Min(rootBounds.width * 0.54f, rootBounds.height * 0.50f);
+                if (maxSize <= 20f)
+                    return;
+
+                float targetSize = Mathf.Min(Mathf.Clamp(maxSize, 118f, maxPixelSize), maxSize);
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startedAt) / SpecialEffectDuration);
+                float fadeIn = Mathf.Clamp01(t / 0.16f);
+                float fadeOut = 1f - Mathf.Clamp01((t - 0.76f) / 0.24f);
+                float opacity = Mathf.Min(fadeIn, fadeOut);
+                float pulse = 0.90f + Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI) * 0.14f;
+                float size = targetSize * pulse;
+                float labelWidth = Mathf.Min(Mathf.Max(148f, targetSize * 0.68f), rootBounds.width * 0.82f);
+
+                hostRect.anchoredPosition = overlayPosition;
+                hostRect.sizeDelta = new Vector2(Mathf.Max(size, labelWidth), size + 42f);
+                group.alpha = opacity;
+
+                artRect.anchoredPosition = new Vector2(0f, 10f);
+                artRect.sizeDelta = new Vector2(size, size);
+
+                labelRect.anchoredPosition = new Vector2(0f, -size * 0.5f + 8f);
+                labelRect.sizeDelta = new Vector2(labelWidth, 34f);
+
+                if (t >= 1f)
+                {
+                    item?.Pause();
+                    DestroySpecialEffectItem(host);
+                }
+            }).Every(16);
+
+            return true;
+        }
+
         Vector2 OverlayPositionToWorld(Vector2 overlayPosition)
         {
             var rootBounds = _root?.worldBound ?? Rect.zero;
@@ -2850,6 +2997,24 @@ namespace Cabo.Client.UI
             float localX = overlayPosition.x * rootBounds.width / overlayWidth + rootBounds.width * 0.5f;
             float localY = rootBounds.height * 0.5f - overlayPosition.y * rootBounds.height / overlayHeight;
             return new Vector2(rootBounds.x + localX, rootBounds.y + localY);
+        }
+
+        Vector2 WorldPointToOverlayPosition(Vector2 worldPoint)
+        {
+            var rootBounds = _root?.worldBound ?? Rect.zero;
+            if (!HasUsableBounds(rootBounds))
+                return Vector2.zero;
+
+            float overlayWidth = Screen.width > 1 ? Screen.width : rootBounds.width;
+            float overlayHeight = Screen.height > 1 ? Screen.height : rootBounds.height;
+            if (overlayWidth <= 1f || overlayHeight <= 1f)
+                return Vector2.zero;
+
+            float scaleX = overlayWidth / rootBounds.width;
+            float scaleY = overlayHeight / rootBounds.height;
+            float localX = (worldPoint.x - rootBounds.x - rootBounds.width * 0.5f) * scaleX;
+            float localY = (rootBounds.height * 0.5f - (worldPoint.y - rootBounds.y)) * scaleY;
+            return new Vector2(localX, localY);
         }
 
         public static CaboSpecialEffect GetActionSpecialEffect(ActionType actionType, SkillType skill)

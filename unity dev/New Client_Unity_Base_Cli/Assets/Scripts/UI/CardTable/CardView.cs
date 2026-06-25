@@ -329,6 +329,14 @@ namespace Cabo.Client.UI.CardTable
             return _moveRoutine;
         }
 
+        public Coroutine MoveTo(Vector2 anchoredPosition, Vector2 targetSize, float duration)
+        {
+            if (_moveRoutine != null)
+                StopCoroutine(_moveRoutine);
+            _moveRoutine = StartCoroutine(MoveRoutine(anchoredPosition, targetSize, Mathf.Max(0.01f, duration)));
+            return _moveRoutine;
+        }
+
         public Coroutine FlipToFront(int value, float duration)
         {
             if (_flipRoutine != null)
@@ -364,6 +372,31 @@ namespace Cabo.Client.UI.CardTable
             }
 
             RectTransform.anchoredPosition = target;
+            _moveRoutine = null;
+        }
+
+        IEnumerator MoveRoutine(Vector2 target, Vector2 targetSize, float duration)
+        {
+            var start = RectTransform.anchoredPosition;
+            var startSize = RectTransform.sizeDelta;
+            targetSize = new Vector2(Mathf.Max(24f, targetSize.x), Mathf.Max(32f, targetSize.y));
+            float elapsed = 0f;
+
+            // Let the layout settle for a frame so we interpolate from the visible source state.
+            yield return null;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                t = t * t * (3f - 2f * t);
+                RectTransform.anchoredPosition = Vector2.LerpUnclamped(start, target, t);
+                SetSize(Vector2.LerpUnclamped(startSize, targetSize, t));
+                yield return null;
+            }
+
+            RectTransform.anchoredPosition = target;
+            SetSize(targetSize);
             _moveRoutine = null;
         }
 

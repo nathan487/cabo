@@ -319,6 +319,33 @@ namespace Cabo.Client.Tests
             Assert.NotNull(CaboArt.GetSpecialEffect(CaboSpecialEffect.SugarBomb));
         }
 
+        [Test]
+        public void SpecialEffectOverlayCanvasSortsAboveCardTableCanvas()
+        {
+            var root = new VisualElement();
+            var owner = new GameObject("SpecialEffectOverlayOwner");
+            var flow = new GameFlow(new NetworkGateway());
+            var panel = new GameTablePanel(root, flow, owner.transform);
+            try
+            {
+                var field = typeof(GameTablePanel).GetField("_specialEffectOverlayCanvas", BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.NotNull(field);
+                var canvas = (Canvas)field.GetValue(panel);
+
+                Assert.NotNull(canvas);
+                Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode);
+                var tableCanvas = GetCardTableView(panel).GetComponent<Canvas>();
+                Assert.NotNull(tableCanvas);
+                Assert.Greater(canvas.sortingOrder, tableCanvas.sortingOrder);
+                Assert.Greater(canvas.sortingOrder, 300);
+            }
+            finally
+            {
+                panel.Dispose();
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         static CardTableView GetCardTableView(GameTablePanel panel)
         {
             var field = typeof(GameTablePanel).GetField("_cardTableView", BindingFlags.NonPublic | BindingFlags.Instance);
