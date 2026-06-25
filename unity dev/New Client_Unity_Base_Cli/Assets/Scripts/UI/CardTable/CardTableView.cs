@@ -122,11 +122,13 @@ namespace Cabo.Client.UI.CardTable
         RectTransform _root;
         RectTransform _slotRoot;
         RectTransform _cardRoot;
+        RectTransform _effectsCanvasRoot;
         CardSlotView _drawPileSlot;
         CardSlotView _discardPileSlot;
         CardView _drawPileCard;
         Text _drawPileCaption;
         Text _discardPileCaption;
+        Canvas _effectsCanvas;
         GameState _lastState;
         CardTableLayout _lastLayout;
         long _myPlayerId;
@@ -214,7 +216,7 @@ namespace Cabo.Client.UI.CardTable
 
             var canvas = GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 80;
+            canvas.sortingOrder = 200;
 
             var group = GetComponent<CanvasGroup>();
             group.blocksRaycasts = true;
@@ -223,6 +225,12 @@ namespace Cabo.Client.UI.CardTable
 
             _slotRoot = CreateRoot("Slots");
             _cardRoot = CreateRoot("Cards");
+
+            _effectsCanvasRoot = CreateRoot("EffectsCanvas");
+            var effectsCanvasGo = _effectsCanvasRoot.gameObject;
+            _effectsCanvas = effectsCanvasGo.AddComponent<Canvas>();
+            _effectsCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            _effectsCanvas.sortingOrder = 300;
 
             _drawPileSlot = CardSlotView.Create(_slotRoot, "DrawPileSlot");
             _discardPileSlot = CardSlotView.Create(_slotRoot, "DiscardPileSlot");
@@ -498,6 +506,7 @@ namespace Cabo.Client.UI.CardTable
             marker.SetSize(targetSize.x > 1f && targetSize.y > 1f ? targetSize : new Vector2(70f, 96f));
             marker.ShowBack();
             marker.SetVisible(true);
+            BringTransientCardsToFront();
 
             yield return marker.MoveTo(targetPosition, MoveDuration);
             yield return marker.FlipToFront(value, 0.18f);
@@ -727,18 +736,21 @@ namespace Cabo.Client.UI.CardTable
         {
             var marker = GetOrCreateDrawnMarker(action.SourcePlayerId, action.DrawPileSize);
             _movingDrawnMarkers.Add(action.SourcePlayerId);
+            _animatingPlayers.Add(action.SourcePlayerId);
             marker.RectTransform.anchoredPosition = action.DrawPilePosition;
             marker.SetSize(action.TargetInspectionSize.x > 1f && action.TargetInspectionSize.y > 1f
                 ? action.TargetInspectionSize
                 : action.DrawPileSize);
             marker.ShowBack();
             marker.SetVisible(true);
+            BringTransientCardsToFront();
 
             Vector2 end = action.TargetInspectionPosition != Vector2.zero
                 ? action.TargetInspectionPosition
                 : (action.SourceInspectionPosition != Vector2.zero ? action.SourceInspectionPosition : action.SourcePlayerPosition);
             yield return marker.MoveTo(end, MoveDuration);
             _movingDrawnMarkers.Remove(action.SourcePlayerId);
+            _animatingPlayers.Remove(action.SourcePlayerId);
             SnapDrawnMarkerToCurrentLayout(action.SourcePlayerId, marker, end, action.TargetInspectionSize);
         }
 
@@ -757,6 +769,7 @@ namespace Cabo.Client.UI.CardTable
             else
                 marker.ShowBack();
 
+            BringTransientCardsToFront();
             marker.transform.SetAsLastSibling();
             yield return MoveCardOntoDiscardStack(action, marker, 0, 1,
                 action.DiscardPilePosition, GetDiscardPileSize(action), false);
@@ -856,7 +869,6 @@ namespace Cabo.Client.UI.CardTable
                 yield return PlayFailedExchange(action, fromDiscard);
                 _animatingPlayers.Remove(action.SourcePlayerId);
                 Reconcile();
-                // Wait one frame to ensure Reconcile has rendered before destroying transients
                 yield return null;
                 DestroyTransientCards();
                 yield break;
@@ -878,6 +890,7 @@ namespace Cabo.Client.UI.CardTable
                 yield break;
             }
 
+            BringTransientCardsToFront();
             var selected = new HashSet<int>(action.SelectedSlots);
             var outgoing = new List<CardView>();
             var survivors = new List<CardView>();
@@ -907,7 +920,6 @@ namespace Cabo.Client.UI.CardTable
             yield return new WaitForSecondsRealtime(IncomingLandingPause);
             _animatingPlayers.Remove(action.SourcePlayerId);
             Reconcile();
-            // Wait one frame to ensure Reconcile has rendered before destroying transients
             yield return null;
             DestroyTransientCards();
         }
@@ -1163,12 +1175,14 @@ namespace Cabo.Client.UI.CardTable
 
             bool known = TryGetOutgoingDiscardValue(action, card, index, count, out int value);
             card.transform.SetAsLastSibling();
+            BringTransientCardsToFront();
             bool revealAtLanding = known && (!card.FaceUp || card.Value != value);
             if (!known)
                 card.ShowBack();
 
             yield return MoveCardToPositionOnTop(card, discardPosition, MoveDuration, revealAtLanding, value);
             card.transform.SetAsLastSibling();
+            BringTransientCardsToFront();
             PushDiscardCard(card, value, known, discardPosition, discardSize);
 
             if (holdAfterLanding)
@@ -1218,7 +1232,6 @@ namespace Cabo.Client.UI.CardTable
                         }
                     }
                 }
-                card.transform.SetAsLastSibling();
                 yield return null;
             }
 
@@ -1226,7 +1239,6 @@ namespace Cabo.Client.UI.CardTable
             if (revealDuringMove && !revealed)
                 card.ShowFront(revealValue, false);
             rect.localScale = baseScale;
-            card.transform.SetAsLastSibling();
         }
 
         bool TryGetOutgoingDiscardValue(CardTableActionSnapshot action, CardView card, int index, int count, out int value)
@@ -1353,6 +1365,7 @@ namespace Cabo.Client.UI.CardTable
                 targetCard.SetSize(sharedSize);
             }
 
+            BringTransientCardsToFront();
             FlipForSwapDestination(sourceCard, action.TargetPlayerId, action.TargetSlot);
             FlipForSwapDestination(targetCard, action.SourcePlayerId, action.SourceSlot);
             sourceCard.MoveTo(targetSlot.AnchoredPosition, SwapDuration);
@@ -1415,6 +1428,7 @@ namespace Cabo.Client.UI.CardTable
                 preview.ShowBack();
                 preview.SetVisible(true);
                 PrepareMovingCard(preview);
+                BringTransientCardsToFront();
 
                 if (action.PeekedValue >= 0)
                     yield return preview.FlipToFront(action.PeekedValue, 0.18f);
@@ -1448,6 +1462,7 @@ namespace Cabo.Client.UI.CardTable
             card.RectTransform.anchoredPosition = start;
             card.ShowBack();
             card.SetVisible(true);
+            BringTransientCardsToFront();
 
             Vector2 inspect = GetInspectionTarget(action, start, size);
 
@@ -1503,12 +1518,12 @@ namespace Cabo.Client.UI.CardTable
             card.SetSize(size);
             card.RectTransform.anchoredPosition = start;
             card.SetVisible(true);
+            BringTransientCardsToFront();
 
             Vector2 inspect = GetInspectionTarget(action, start, size);
 
             yield return card.MoveTo(inspect, MoveDuration);
 
-            // 发动者视角：翻到牌面显示偷看内容
             if (sourcePlayerId == _myPlayerId && action.PeekedValue >= 0)
             {
                 if (!card.FaceUp)
@@ -1516,7 +1531,6 @@ namespace Cabo.Client.UI.CardTable
                 else
                     card.ShowFront(action.PeekedValue);
             }
-            // 被看者视角和其他对手视角：如果原本是牌面，翻到牌背
             else if (wasOriginallyFaceUp && card.FaceUp)
             {
                 yield return card.FlipToBack(0.18f);
@@ -1528,7 +1542,6 @@ namespace Cabo.Client.UI.CardTable
 
             yield return new WaitForSecondsRealtime(InspectHoldDuration);
 
-            // 发动者视角：翻回牌背再移动回去
             if (sourcePlayerId == _myPlayerId && card.FaceUp)
             {
                 yield return card.FlipToBack(0.18f);
