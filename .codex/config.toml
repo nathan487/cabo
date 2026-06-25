@@ -1,0 +1,16 @@
+default_permissions = ":danger-full-access"
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+approvals_reviewer = "auto_review"
+
+[mcp_servers.unityMCP]
+url = "http://127.0.0.1:8080/mcp"
+enabled = true
+default_tools_approval_mode = "approve"
+
+[apps._default]
+enabled = true
+default_tools_approval_mode = "approve"
+approvals_reviewer = "auto_review"
+destructive_enabled = true
+open_world_enabled = true
