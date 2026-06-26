@@ -8,9 +8,10 @@
 
 - [ ] Per-player initial peek card selection (currently hardcoded to first 2 cards)
 - [ ] Discard pile reshuffle when deck empties mid-round
-- [ ] 2-3 player game support (currently fixed 4)
-- [ ] Reconnect / state recovery (StateSyncNotify exists but not fully tested)
-- [ ] Per-action timers (replace server sleep with muduo timer for non-blocking delays)
+- [x] Variable-size room support for 2-6 players
+- [x] Reconnect / state recovery with session token and StateSync snapshot
+- [ ] More weak-network soak tests for reconnect edge cases
+- [ ] Per-action timers / animation pacing hooks driven by server events rather than blocking sleeps
 
 ## Unity Client
 

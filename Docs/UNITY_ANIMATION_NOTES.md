@@ -1,5 +1,7 @@
 # Unity Animation Notes
 
+> Historical Unity implementation note. This file focuses on animation/UI decisions and may mention synthetic 4-player test states. For current networking, reconnect, and backend resume material, start with `Docs/README.md`.
+
 ## 2026-06-11 Decision: Migrate Card Visuals To Persistent Card Views
 
 The next animation task should not continue deepening the UI Toolkit clone/hide workaround for replacement animations. Start the card-table migration described in:

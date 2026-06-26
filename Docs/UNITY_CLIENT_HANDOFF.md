@@ -1,5 +1,7 @@
 # Unity Client Handoff / MCP Quick Start
 
+> Historical Unity handoff note. It is retained for UI/client work, but current project architecture and backend resume materials are indexed from `Docs/README.md`.
+
 ## 2026-06-11 Fast Resume: Card Table View Migration Next
 
 Next requested task:

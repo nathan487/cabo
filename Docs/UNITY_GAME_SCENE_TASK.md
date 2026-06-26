@@ -1,5 +1,7 @@
 # Unity Game Scene Task
 
+> Historical Unity implementation note. This file records UI/game-scene work from June 2026 and may contain old assumptions from that phase. For current backend architecture and resume material, start with `Docs/README.md`, `Docs/ARCHITECTURE.md`, and `Docs/TENCENT_BACKEND_RESUME_DRAFT.md`.
+
 ## 2026-06-08 Status After Chat / Avatar Pass
 
 The log/chat/avatar task has a committed first implementation in `39bb458 Add room chat avatars and build UI resources`.

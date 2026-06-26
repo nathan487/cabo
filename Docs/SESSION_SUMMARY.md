@@ -1,72 +1,53 @@
 # Session Summary
 
-## 2026-06-10 Latest Handoff
+## 2026-06-25 Latest Handoff
 
-Current next task: in-game animation polish for the Unity client.
+当前工作重点：更新过期 Docs，并从 git 历史中整理适合腾讯后台开发实习简历的项目问题复盘。
 
-Read first:
+已确认的分支情况：
 
-- `Docs/CURRENT_TASK.md`
-- `Docs/UNITY_ANIMATION_NOTES.md`
-- `Docs/UNITY_CLIENT_HANDOFF.md`
-- `Docs/NEXT_SESSION_PROMPT.md`
-- `Docs/superpowers/plans/2026-06-10-game-animation-polish-plan.md`
+- 当前分支：`codex/special-effects`；
+- `main` 分叉后主要只有 `.gitignore` 维护提交；
+- 当前分支包含更多 Unity 表现层、断线重连、房间浏览/申请/邀请流程；
+- 后台/系统相关亮点主要来自共有历史中的服务端 hardening、WebSocket、并发、性能优化提交，以及当前分支的 reconnect / room browser 提交。
 
-Goal:
+本轮文档更新：
 
-- Optimize local-player and opponent action animations.
-- Audit animation logic, order, timing, smoothness, and readability.
-- Ensure final action animations finish before `RoundReveal` / settlement renders.
-- Preserve game rules, protobuf schema, WebSocket transport, room logic, scoring, and table/chat layout.
+- `PROJECT_OVERVIEW.md`：更新当前项目状态和技术栈；
+- `README.md`：新增 Docs 入口索引；
+- `ARCHITECTURE.md`：更新为 Unity WebSocket + C++ authoritative server 架构；
+- `NETWORK_LAYER.md`：重写当前网络层说明，去掉旧日期和乱码；
+- `BUG_LOG.md`：加入 git-derived 后台/系统问题；
+- `BACKEND_RESUME_PROBLEM_LOG.md`：新增简历专用问题日志；
+- `TENCENT_BACKEND_RESUME_DRAFT.md`：新增腾讯后台开发实习简历成稿版；
+- `TODO.md`：修正过期 TODO；
+- `CURRENT_TASK.md` / `NEXT_SESSION_PROMPT.md`：更新当前交接语境；
+- `GAME_SESSION.md`：标记为历史 CLI 参考。
 
-Testing expectation:
+未触碰：
 
-- Use the `unity-mcp-orchestrator` skill and Unity MCP.
-- Verify with synthetic 4-player Play Mode states before live-server testing.
-- Capture before/mid/hold/after screenshots for motion phases.
-- Final Console target is `0 errors / 0 warnings`, or clearly document unrelated pre-existing messages.
-- Do not commit Unity MCP screenshot artifacts under `unity dev/New Client_Unity_Base_Cli/Assets/Screenshots/`.
+- `unity dev/New Client_Unity_Base_Cli/Assets/Resources/Art/CaboArtCatalog.asset` 有既有未提交改动，本轮没有修改它。
 
-Primary Unity files:
+## Resume Direction
 
-- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/GameTablePanel.cs`
-- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameState.cs`
-- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/Core/GameFlow.cs`
-- `unity dev/New Client_Unity_Base_Cli/Assets/Scripts/UI/UIManager.cs`
+适合放进简历的核心能力：
 
-## 2026-06-05 to 2026-06-06
+- C++ 网络服务端；
+- WebSocket + Protobuf；
+- Reactor / 非阻塞 socket；
+- 多线程同步与连接生命周期；
+- 服务端权威状态与会话安全；
+- 断线重连和状态快照；
+- 广播路径性能优化；
+- 回归测试覆盖。
 
-## What Was Done
+优先阅读：
 
-### Audit & Bug Fixes (17+ bugs)
+1. `Docs/BACKEND_RESUME_PROBLEM_LOG.md`
+2. `Docs/BUG_LOG.md`
+3. `Docs/ARCHITECTURE.md`
+4. `Docs/NETWORK_LAYER.md`
 
-Comprehensive audit of C++ CLI client and GameServer. Fixed critical sync/async issues where the client couldn't properly respond to server messages in real time.
+## Historical Notes
 
-**Key architectural fix**: Refactored `gameLoop` from blocking `std::cin >>` to non-blocking `select()`-based state machine, following the pattern already used in `waitingRoomLoop`. This eliminated all network freeze during user input.
-
-### Server Game Logic Fixes
-
-- Fixed skill handling: step management, validation guards, scoring
-- Fixed multi-card exchange: card conservation (N out, 1 in), slot validation, duplicate detection
-- Fixed round transitions: empty deck handling, inter-round waiting state
-- Added 1.5s turn transition delay for animation window
-
-### CLI Client Features
-
-- Non-blocking GameSubState state machine
-- Skill result display overlay (2 seconds) with turn preservation
-- Inter-round reveal panel with dynamic ready status
-- Skill action broadcast display for all players
-- Configurable first-turn menu (no discard option when empty)
-
-### Documentation
-
-- Cleaned 37 outdated Unity fix logs and GDD
-- Created structured project documentation
-
-## Current Project State
-
-- **Server**: Production-ready for 4-player games
-- **CLI Client**: Fully functional debug/test client
-- **Protocol**: Stable, complete message coverage
-- **Ready for**: Unity client migration
+早期 Unity 动画、CardView 迁移、CLI 客户端和 4-player synthetic state 文档仍保留作为历史开发记录。它们不再代表当前架构总览。

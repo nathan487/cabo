@@ -1,5 +1,7 @@
 # Unity Card View Migration Plan
 
+> Historical Unity implementation note. This file is still useful for card-table UI work, but it is not the current backend architecture reference. For current project overview and resume material, start with `Docs/README.md`.
+
 ## Decision
 
 Move the in-game card table rendering away from rebuild-heavy UI Toolkit card `VisualElement`s and toward persistent uGUI/GameObject card views.
